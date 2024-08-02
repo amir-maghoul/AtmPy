@@ -1,0 +1,5 @@
+setup.py
+atmpy.egg-info/PKG-INFO
+atmpy.egg-info/SOURCES.txt
+atmpy.egg-info/dependency_links.txt
+atmpy.egg-info/top_level.txt
