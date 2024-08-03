@@ -1,5 +1,4 @@
 import numpy as np
-import atmpy
 from atmpy.grid.grid import Grid
 import numpy.testing as npt
 import pytest
