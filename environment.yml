@@ -1,8 +1,14 @@
 # environment.yml
 name: atmpy_env
 dependencies:
-  - python=3.8
+  - cuda
+  - numpy
+  - numba
+  - scipy
+  - matplotlib
   - pytest
+  - black
+  - flake8
   - pip
   - pip:
       - -e .
