@@ -30,5 +30,7 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test Suite with pytest
       run: |
-        conda install pytest
         pytest
+#    - name: Docs Suite with sphinx
+#      run:
+#        make html
