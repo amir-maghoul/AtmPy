@@ -1,5 +1,8 @@
 # environment.yml
-name: atmpy_env
+name: atmpy
+channels:
+  - conda-forge
+  - defaults
 dependencies:
   - cuda
   - numpy
@@ -9,6 +12,7 @@ dependencies:
   - pytest
   - black
   - flake8
+  - sphinx
   - pip
   - pip:
       - -e .
