@@ -21,15 +21,16 @@ jobs:
     - name: Install dependencies
       run: |
         conda env update --file environment.yml --name base
-    - name: Lint Suite with flake8
+    - name: Formatting Suite [flake8 and black]
       run: |
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F8 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test Suite with pytest
+        black --check --exclude /docs .
+    - name: Test Suite [pytest]
       run: |
         pytest
-#    - name: Docs Suite with sphinx
+#    - name: Docs Suite [sphinx]
 #      run:
 #        make html

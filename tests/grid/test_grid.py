@@ -44,7 +44,7 @@ class TestGrid:
     @pytest.mark.parametrize("inputs", fail_1d)
     def test_1d_fail(self, inputs):
         with pytest.raises(AssertionError):
-            grid1D = Grid(ranges=inputs[0], nnodes=inputs[1], nghosts=inputs[2])
+            Grid(ranges=inputs[0], nnodes=inputs[1], nghosts=inputs[2])
 
     # def test_pipeline_fail_test(self):
     #     with pytest.raises(AssertionError):
