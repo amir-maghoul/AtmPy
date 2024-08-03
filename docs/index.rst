@@ -14,6 +14,8 @@ Contents
    :maxdepth: 4
 
    atmpy/grid.rst
+   atmpy/flux.rst
+
 
 Indices and tables
 ------------------

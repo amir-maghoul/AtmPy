@@ -12,8 +12,10 @@ dependencies:
   - pytest
   - black
   - flake8
-  - sphinx
+  - sphinx=6.2.1
   - jupyter
+  - sphinx-autoapi
   - pip
   - pip:
+      -  sphinx-rtd-theme
       - -e .

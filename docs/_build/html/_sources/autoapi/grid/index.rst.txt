@@ -1,0 +1,57 @@
+:py:mod:`grid`
+==============
+
+.. py:module:: grid
+
+
+Module Contents
+---------------
+
+Classes
+~~~~~~~
+
+.. autoapisummary::
+
+   grid.Grid
+
+
+
+Functions
+~~~~~~~~~
+
+.. autoapisummary::
+
+   grid.main
+
+
+
+.. py:class:: Grid(ranges=np.zeros((3, 2)), nnodes=np.zeros(3), nghosts=np.zeros(3))
+
+
+   Initialize a general grid with x, y, and z
+
+   Attributes
+   ----------
+   ranges : 2D ndarray or list of shape (3, 2)
+       ranges of coordinates in each direction
+   nnodes : ndarray or list of shape (3,)
+       array or list of number of nodes in each direction
+   nghosts : ndarray or list of shape (3,)
+       array or list of number of ghosts cells in each direction
+   dim : int
+       dimension of the grid
+   lims : np.ndarray or list of shape (3, 1)
+       length of intervals in each coordinate direction
+   nx, ny, nz : int
+       number of nodes in each direction
+   ngx, ngy, ngz : int
+       number of ghost cells in each direction
+   x, y, z : ndarray or list of shape (2,)
+       coordinate intervals in each direction
+
+
+
+
+.. py:function:: main()
+
+
