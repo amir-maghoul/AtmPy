@@ -1,12 +1,11 @@
 import numpy as np
-import atmpy
 from atmpy.grid.grid import Grid
 import numpy.testing as npt
 import pytest
 
 
-class TestGrid:
-    def test_init(self):
+class TestCreateGrid:
+    def test_create_empty_grid(self):
         grid = Grid()
         npt.assert_array_equal(grid.x, [0, 0])
         npt.assert_array_equal(grid.y, [0, 0])
@@ -36,13 +35,13 @@ class TestGrid:
     ]
 
     @pytest.mark.parametrize("inputs", success_1d)
-    def test_1d_success(self, inputs):
+    def test_create_1d_success(self, inputs):
         grid1D = Grid(ranges=inputs[0], nnodes=inputs[1], nghosts=inputs[2])
         assert grid1D.dim == 1
         assert grid1D.ny == 0 and grid1D.nz == 0 and grid1D.ngy == 0 and grid1D.ngz == 0
         npt.assert_array_equal(grid1D.ranges[1:, :], 0)
 
     @pytest.mark.parametrize("inputs", fail_1d)
-    def test_1d_fail(self, inputs):
+    def test_create_1d_fail(self, inputs):
         with pytest.raises(AssertionError):
-            grid1D = Grid(ranges=inputs[0], nnodes=inputs[1], nghosts=inputs[2])
+            Grid(ranges=inputs[0], nnodes=inputs[1], nghosts=inputs[2])

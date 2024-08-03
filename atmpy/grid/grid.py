@@ -1,5 +1,8 @@
+""" Grid Module """
+
 import numpy as np
 import numpy.testing as npt
+from typing import Union
 
 
 class Grid:
@@ -28,7 +31,10 @@ class Grid:
     """
 
     def __init__(
-        self, ranges=np.zeros((3, 2)), nnodes=np.zeros(3), nghosts=np.zeros(3)
+        self,
+        ranges: Union[np.ndarray, list] = np.zeros((3, 2)),
+        nnodes: Union[np.ndarray, list] = np.zeros(3),
+        nghosts: Union[np.ndarray, list] = np.zeros(3),
     ):
         """Initialize a general grid with x, y, and z
 
