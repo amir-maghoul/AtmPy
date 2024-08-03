@@ -4,6 +4,7 @@ from atmpy.grid.grid import Grid
 import numpy.testing as npt
 import pytest
 
+
 class TestGrid:
     def test_init(self):
         grid = Grid()
@@ -17,16 +18,14 @@ class TestGrid:
         assert grid.ngy == 0
         assert grid.ngz == 0
 
-    success_1d = [
-        (np.array([[0, 1], [0, 0], [0, 0]]), [3, 0, 0], [1, 0, 0])
-    ]
+    success_1d = [(np.array([[0, 1], [0, 0], [0, 0]]), [3, 0, 0], [1, 0, 0])]
     fail_1d = [
         (np.zeros((3, 2)), [1, 0, 0], np.zeros(3)),
         (np.zeros((3, 2)), np.zeros(3), [1, 0, 0]),
         (np.array([[0, 1], [0, 0], [0, 0]]), np.zeros(3), np.zeros(3)),
         (np.array([[0, 1], [0, 0], [0, 0]]), [0, 1, 0], np.zeros(3)),
         (np.array([[0, 1], [0, 0], [0, 0]]), np.zeros(3), [0, 1, 0]),
-        (np.array([[0, 1], [0, 0], [0, 0]]),  [1, 0, 0], [0, 1, 0]),
+        (np.array([[0, 1], [0, 0], [0, 0]]), [1, 0, 0], [0, 1, 0]),
         (np.array([[0, 1], [0, 0], [0, 0]]), [1, 0, 0], [0, 0, 1]),
         (np.array([[0, 1], [0, 0], [0, 0]]), [0, 1, 0], [0, 0, 1]),
         (np.array([[0, 1], [0, 0], [0, 0]]), [0, 1, 0], [0, 0, 1]),
@@ -47,4 +46,3 @@ class TestGrid:
     def test_1d_fail(self, inputs):
         with pytest.raises(AssertionError):
             grid1D = Grid(ranges=inputs[0], nnodes=inputs[1], nghosts=inputs[2])
-

@@ -3,12 +3,53 @@ import numpy.testing as npt
 
 
 class Grid:
-    def __init__(self, ranges=np.zeros((3, 2)), nnodes=np.zeros(3), nghosts=np.zeros(3)):
-        """ Initialize a general grid with x, y, and z """
+    """Initialize a general grid with x, y, and z
+
+    Attributes
+    ----------
+    ranges : 2D ndarray or list of shape (3, 2)
+        ranges of coordinates in each direction
+    nnodes : ndarray or list of shape (3,)
+        array or list of number of nodes in each direction
+    nghosts : ndarray or list of shape (3,)
+        array or list of number of ghosts cells in each direction
+    dim : int
+        dimension of the grid
+    lims : np.ndarray or list of shape (3, 1)
+        length of intervals in each coordinate direction
+    nx, ny, nz : int
+        number of nodes in each direction
+    ngx, ngy, ngz : int
+        number of ghost cells in each direction
+    x, y, z : ndarray or list of shape (2,)
+        coordinate intervals in each direction
+
+
+    """
+
+    def __init__(
+        self, ranges=np.zeros((3, 2)), nnodes=np.zeros(3), nghosts=np.zeros(3)
+    ):
+        """Initialize a general grid with x, y, and z
+
+        Parameters
+        ----------
+        ranges : 2D ndarray or list of shape (3, 2)
+            ranges of coordinates in each direction
+        nnodes : ndarray or list of shape (3,)
+            number of nodes in each direction
+        nghosts : ndarray or list of shape (3,)
+            number of ghosts cells in each direction
+
+        """
         self.dim = np.count_nonzero(nnodes)
         self.lims = ranges[:, 1] - ranges[:, 0]
-        if self.dim != np.count_nonzero(self.lims) or self.dim != np.count_nonzero(nghosts):
-            raise AssertionError("The number of dimensions in coordinates and nodes does not match")
+        if self.dim != np.count_nonzero(self.lims) or self.dim != np.count_nonzero(
+            nghosts
+        ):
+            raise AssertionError(
+                "The number of dimensions in coordinates and nodes does not match"
+            )
         self.ranges = ranges
         self.nnodes = nnodes
         self.nghosts = nghosts
@@ -29,11 +70,11 @@ class Grid:
             assert self.nz == 0
             assert self.ngz == 0
 
+
 def main():
-    grid = Grid(np.array([[0, 0], [0, 0], [0, 1]]),  [1, 0, 0], [1, 0, 0])
+    grid = Grid(np.array([[0, 0], [0, 0], [0, 1]]), [1, 0, 0], [1, 0, 0])
     npt.assert_array_equal(grid.z, np.array([0, 0]))
 
 
 if __name__ == "__main__":
     main()
-
