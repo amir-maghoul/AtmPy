@@ -1,7 +1,8 @@
 import numpy as np
 
+
 def flux_api_test(a):
-    """ This is a test fucntion for api docs
+    """This is a test fucntion for api docs
 
     Parameters
     ----------
