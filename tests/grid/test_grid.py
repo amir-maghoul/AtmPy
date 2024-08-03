@@ -46,3 +46,7 @@ class TestGrid:
     def test_1d_fail(self, inputs):
         with pytest.raises(AssertionError):
             grid1D = Grid(ranges=inputs[0], nnodes=inputs[1], nghosts=inputs[2])
+
+    def test_pipeline_fail_test(self):
+        with pytest.raises(AssertionError):
+            grid1D = Grid(np.array([[0, 1], [0, 0], [0, 0]]), [3, 0, 0], [1, 0, 0])
