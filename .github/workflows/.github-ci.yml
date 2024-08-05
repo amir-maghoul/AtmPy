@@ -68,7 +68,7 @@ jobs:
     - name: Download documentation artifacts
       uses: actions/download-artifact@v3
       with:
-        name: docs-html
+        name: sphinx-docs
         path: docs/_build/html
 
     - name: Deploy to GitHub Pages
