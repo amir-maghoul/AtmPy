@@ -29,10 +29,15 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
         # Pipeline failure with black errors
         black --check --exclude /docs .
+  test:
     - name: Test Suite [pytest]
+      needs: build
       run: |
+        pip install pytest-cov
         pytest
+  docs:
     - name: Docs Suite [sphinx]
+      needs: build
       run: |
         cd docs
         make html
@@ -41,21 +46,6 @@ jobs:
       with:
         name: sphinx-docs
         path: docs/_build/html/
-
-#    - name: Build HTML
-#      uses: ammaraskar/sphinx-action@master
-#    - name: Upload artifacts
-#      uses: actions/upload-artifact@v4
-#      with:
-#        name: html-docs
-#        path: docs/_build/html/
-#    - name: Deploy
-#      uses: peaceiris/actions-gh-pages@v3
-#      if: github.ref == 'refs/heads/main'
-#      with:
-#        github_token: ${{ secrets.GITHUB_TOKEN }}
-#        publish_dir: docs/_build/html
-
   deploy:
     runs-on: ubuntu-latest
     needs: build
