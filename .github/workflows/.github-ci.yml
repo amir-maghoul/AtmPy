@@ -20,7 +20,7 @@ jobs:
         echo $CONDA/bin >> $GITHUB_PATH
     - name: Install dependencies
       run: |
-        conda env update --file environment.yml --name base
+        conda env update --file environment.yml --name base --prune
     - name: Formatting Suite [flake8 and black]
       run: |
         # Pipeline failure with Python syntax errors or undefined names
