@@ -151,10 +151,9 @@ class CellGrid(Grid):
         self.nix, self.niy, self.niz = self.ninodes
         self.nnx, self.nny, self.nnz = self.nnodes
 
-        self.x = (self.x + self.ds[0]/2)[:-1]
-        self.y = (self.y + self.ds[1]/2)[:-1]
+        self.x = (self.x + self.ds[0] / 2)[:-1]
+        self.y = (self.y + self.ds[1] / 2)[:-1]
         self.z = (self.z + self.ds[2] / 2)[:-1]
-
 
 
 class NodeGrid(Grid):
