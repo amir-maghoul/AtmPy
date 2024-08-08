@@ -37,10 +37,6 @@ class Grid:
         array of coordinates in each direction by considering the ghost cells
     ix, iy, iz : ndarray of shape (inodes, )
         array of coordinates of inner nodes in each direction
-    gx, gy, gz : ndarray of shape (2, ng)
-        array of coordinates of ghost nodes in each direction.
-        First row is the ghost coordinates in the back of the interval.
-        Second row is the ghost coordinates in the front of the interval.
 
     """
 
@@ -89,9 +85,9 @@ class Grid:
             )
 
         self.nix, self.niy, self.niz = self.ninodes
-        zeros = np.array([0, 0])
         self.nnx, self.nny, self.nnz = self.nnodes
         self.ngx, self.ngy, self.ngz = self.nghosts
+
         self.xlims, self.ylims, self.zlims = self.ranges
 
         # -1 since the number of intervals
@@ -107,12 +103,13 @@ class Grid:
 
         self.x = self._coordinates(self.outer_xlims, self.nnx)
         self.y = self._coordinates(self.outer_ylims, self.nny) if self.nny > 1 else 0
-        self.z = self._coordinates(self.outer_zlims, self.nnz) if self.nny > 1 else 0
+        self.z = self._coordinates(self.outer_zlims, self.nnz) if self.nnz > 1 else 0
 
         self.ix = self._coordinates(self.xlims, self.nix)
         self.iy = self._coordinates(self.ylims, self.niy) if self.niy > 1 else 0
-        self.iz = self._coordinates(self.ylims, self.niy)
+        self.iz = self._coordinates(self.ylims, self.niy) if self.niz > 1 else 0
 
+        zeros = np.array([0, 0])
         if self.dim == 1:
             npt.assert_array_equal(self.ylims, zeros)
             npt.assert_array_equal(self.zlims, zeros)
@@ -139,17 +136,7 @@ class Grid:
 
 
 class CellGrid(Grid):
-    """Class of cell grid. The unmentioned attributes of the class are overriden attributes of the parent class.
-
-    Attributes
-    ----------
-    xcoords : ndarray of shape (nnx+ngx-1,)
-        The array of coordinates of the cell points in x direction
-    ycoords : ndarray of shape (nny+ngy-1,)
-        The array of coordinates of the cell points in x direction
-    zcoords : ndarray of shape (nnz+ngz-1,)
-        The array of coordinates of the cell points in x direction
-    """
+    """Class of cell grid. The unmentioned attributes of the class are overriden attributes of the parent class."""
 
     def __init__(
         self, ranges=np.zeros((3, 2)), ninodes=np.zeros(3), nghosts=np.zeros(3)
@@ -159,6 +146,16 @@ class CellGrid(Grid):
         new_end = self.ranges[:, 1] + self.nghosts * self.ds
         self.xlims, self.ylims, self.zlims = np.column_stack((new_begin, new_end))
 
+        self.ninodes = self.ninodes - 1
+        self.nnodes = self.nnodes - 1
+        self.nix, self.niy, self.niz = self.ninodes
+        self.nnx, self.nny, self.nnz = self.nnodes
+
+        self.x = (self.x + self.ds[0]/2)[:-1]
+        self.y = (self.y + self.ds[1]/2)[:-1]
+        self.z = (self.z + self.ds[2] / 2)[:-1]
+
+
 
 class NodeGrid(Grid):
     def __init__(self):
@@ -166,8 +163,12 @@ class NodeGrid(Grid):
 
 
 def main():
-    grid = CellGrid(np.array([[0, 1], [0, 1], [0, 1]]), [3, 3, 2], [1, 2, 0])
-    print(grid.y)
+    grid = Grid(np.array([[0, 1], [0, 1], [0, 1]]), [3, 3, 2], [1, 2, 0])
+    cell = CellGrid(np.array([[0, 1], [0, 1], [0, 1]]), [3, 3, 2], [1, 2, 0])
+    print(grid.nnodes)
+    print(grid.z)
+    print(cell.nnodes)
+    print(cell.z)
 
 
 if __name__ == "__main__":
