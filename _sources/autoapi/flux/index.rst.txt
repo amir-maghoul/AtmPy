@@ -1,21 +1,19 @@
-:py:mod:`flux`
-==============
+flux
+====
 
 .. py:module:: flux
 
 
-Module Contents
----------------
-
-
 Functions
-~~~~~~~~~
+---------
 
 .. autoapisummary::
 
    flux.flux_api_test
 
 
+Module Contents
+---------------
 
 .. py:function:: flux_api_test(a)
 
