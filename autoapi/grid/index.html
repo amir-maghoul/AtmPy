@@ -147,10 +147,6 @@
 </dd>
 <dt>ix, iy, iz<span class="classifier">ndarray of shape (inodes, )</span></dt><dd><p>array of coordinates of inner nodes in each direction</p>
 </dd>
-<dt>gx, gy, gz<span class="classifier">ndarray of shape (2, ng)</span></dt><dd><p>array of coordinates of ghost nodes in each direction.
-First row is the ghost coordinates in the back of the interval.
-Second row is the ghost coordinates in the front of the interval.</p>
-</dd>
 </dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="grid.Grid.L">
@@ -180,11 +176,6 @@ Second row is the ghost coordinates in the front of the interval.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="grid.Grid.nnodes">
 <span class="sig-name descname"><span class="pre">nnodes</span></span><a class="reference internal" href="../../_modules/grid.html#Grid.nnodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.Grid.nnodes" title="Permalink to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="grid.Grid.zeros">
-<span class="sig-name descname"><span class="pre">zeros</span></span><a class="reference internal" href="../../_modules/grid.html#Grid.zeros"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.Grid.zeros" title="Permalink to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -252,6 +243,11 @@ Second row is the ghost coordinates in the front of the interval.</p>
 <span class="sig-name descname"><span class="pre">iz</span></span><a class="reference internal" href="../../_modules/grid.html#Grid.iz"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.Grid.iz" title="Permalink to this definition"></a></dt>
 <dd></dd></dl>
 
+<dl class="py attribute">
+<dt class="sig sig-object py" id="grid.Grid.zeros">
+<span class="sig-name descname"><span class="pre">zeros</span></span><a class="reference internal" href="../../_modules/grid.html#Grid.zeros"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.Grid.zeros" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="grid.Grid._compute_outer_lims">
 <em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_compute_outer_lims</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ng</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ds</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/grid.html#Grid._compute_outer_lims"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.Grid._compute_outer_lims" title="Permalink to this definition"></a></dt>
@@ -272,16 +268,6 @@ Second row is the ghost coordinates in the front of the interval.</p>
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">grid.</span></span><span class="sig-name descname"><span class="pre">CellGrid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ranges</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros((3,</span> <span class="pre">2))</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ninodes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros(3)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nghosts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros(3)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/grid.html#CellGrid"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#grid.Grid" title="grid.Grid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Grid</span></code></a></p>
 <p>Class of cell grid. The unmentioned attributes of the class are overriden attributes of the parent class.</p>
-<section id="id1">
-<h3>Attributes<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h3>
-<dl class="simple">
-<dt>xcoords<span class="classifier">ndarray of shape (nnx+ngx-1,)</span></dt><dd><p>The array of coordinates of the cell points in x direction</p>
-</dd>
-<dt>ycoords<span class="classifier">ndarray of shape (nny+ngy-1,)</span></dt><dd><p>The array of coordinates of the cell points in x direction</p>
-</dd>
-<dt>zcoords<span class="classifier">ndarray of shape (nnz+ngz-1,)</span></dt><dd><p>The array of coordinates of the cell points in x direction</p>
-</dd>
-</dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="grid.CellGrid.new_begin">
 <span class="sig-name descname"><span class="pre">new_begin</span></span><a class="reference internal" href="../../_modules/grid.html#CellGrid.new_begin"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid.new_begin" title="Permalink to this definition"></a></dt>
@@ -292,7 +278,31 @@ Second row is the ghost coordinates in the front of the interval.</p>
 <span class="sig-name descname"><span class="pre">new_end</span></span><a class="reference internal" href="../../_modules/grid.html#CellGrid.new_end"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid.new_end" title="Permalink to this definition"></a></dt>
 <dd></dd></dl>
 
-</section>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="grid.CellGrid.ninodes">
+<span class="sig-name descname"><span class="pre">ninodes</span></span><a class="reference internal" href="../../_modules/grid.html#CellGrid.ninodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid.ninodes" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="grid.CellGrid.nnodes">
+<span class="sig-name descname"><span class="pre">nnodes</span></span><a class="reference internal" href="../../_modules/grid.html#CellGrid.nnodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid.nnodes" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="grid.CellGrid.x">
+<span class="sig-name descname"><span class="pre">x</span></span><a class="reference internal" href="../../_modules/grid.html#CellGrid.x"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid.x" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="grid.CellGrid.y">
+<span class="sig-name descname"><span class="pre">y</span></span><a class="reference internal" href="../../_modules/grid.html#CellGrid.y"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid.y" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="grid.CellGrid.z">
+<span class="sig-name descname"><span class="pre">z</span></span><a class="reference internal" href="../../_modules/grid.html#CellGrid.z"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid.z" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
 </dd></dl>
 
 <dl class="py class">
@@ -300,8 +310,8 @@ Second row is the ghost coordinates in the front of the interval.</p>
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">grid.</span></span><span class="sig-name descname"><span class="pre">NodeGrid</span></span><a class="reference internal" href="../../_modules/grid.html#NodeGrid"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.NodeGrid" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#grid.Grid" title="grid.Grid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Grid</span></code></a></p>
 <p>Initialize a general grid with x, y, and z</p>
-<section id="id2">
-<h3>Attributes<a class="headerlink" href="#id2" title="Permalink to this heading"></a></h3>
+<section id="id1">
+<h3>Attributes<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h3>
 <dl class="simple">
 <dt>ranges<span class="classifier">2D np.ndarray of shape (3, 2)</span></dt><dd><p>ranges of coordinates in each direction</p>
 </dd>
@@ -332,10 +342,6 @@ Second row is the ghost coordinates in the front of the interval.</p>
 <dt>x, y, z<span class="classifier">ndarray of shape (nnodes, )</span></dt><dd><p>array of coordinates in each direction by considering the ghost cells</p>
 </dd>
 <dt>ix, iy, iz<span class="classifier">ndarray of shape (inodes, )</span></dt><dd><p>array of coordinates of inner nodes in each direction</p>
-</dd>
-<dt>gx, gy, gz<span class="classifier">ndarray of shape (2, ng)</span></dt><dd><p>array of coordinates of ghost nodes in each direction.
-First row is the ghost coordinates in the back of the interval.
-Second row is the ghost coordinates in the front of the interval.</p>
 </dd>
 </dl>
 </section>

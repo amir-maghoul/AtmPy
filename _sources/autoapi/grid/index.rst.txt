@@ -61,10 +61,6 @@ Module Contents
        array of coordinates in each direction by considering the ghost cells
    ix, iy, iz : ndarray of shape (inodes, )
        array of coordinates of inner nodes in each direction
-   gx, gy, gz : ndarray of shape (2, ng)
-       array of coordinates of ghost nodes in each direction.
-       First row is the ghost coordinates in the back of the interval.
-       Second row is the ghost coordinates in the front of the interval.
 
 
 
@@ -84,9 +80,6 @@ Module Contents
 
 
    .. py:attribute:: nnodes
-
-
-   .. py:attribute:: zeros
 
 
    .. py:attribute:: dx
@@ -128,6 +121,9 @@ Module Contents
    .. py:attribute:: iz
 
 
+   .. py:attribute:: zeros
+
+
    .. py:method:: _compute_outer_lims(lim, ng, ds)
       :staticmethod:
 
@@ -151,20 +147,26 @@ Module Contents
 
    Class of cell grid. The unmentioned attributes of the class are overriden attributes of the parent class.
 
-   Attributes
-   ----------
-   xcoords : ndarray of shape (nnx+ngx-1,)
-       The array of coordinates of the cell points in x direction
-   ycoords : ndarray of shape (nny+ngy-1,)
-       The array of coordinates of the cell points in x direction
-   zcoords : ndarray of shape (nnz+ngz-1,)
-       The array of coordinates of the cell points in x direction
-
 
    .. py:attribute:: new_begin
 
 
    .. py:attribute:: new_end
+
+
+   .. py:attribute:: ninodes
+
+
+   .. py:attribute:: nnodes
+
+
+   .. py:attribute:: x
+
+
+   .. py:attribute:: y
+
+
+   .. py:attribute:: z
 
 
 .. py:class:: NodeGrid
@@ -206,10 +208,6 @@ Module Contents
        array of coordinates in each direction by considering the ghost cells
    ix, iy, iz : ndarray of shape (inodes, )
        array of coordinates of inner nodes in each direction
-   gx, gy, gz : ndarray of shape (2, ng)
-       array of coordinates of ghost nodes in each direction.
-       First row is the ghost coordinates in the back of the interval.
-       Second row is the ghost coordinates in the front of the interval.
 
 
 
