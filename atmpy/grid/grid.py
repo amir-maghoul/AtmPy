@@ -176,7 +176,7 @@ def main():
     grid = NodeGrid(np.array([[0, 1], [0, 2], [0, 3]]), [3, 3, 2], [1, 2, 0])
     cell = CellGrid(np.array([[0, 1], [0, 2], [0, 3]]), [3, 3, 2], [1, 2, 0])
     print(cell.x)
-    print(node.x)
+    print(grid.x)
 
 
 if __name__ == "__main__":
