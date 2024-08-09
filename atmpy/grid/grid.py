@@ -2,7 +2,7 @@ import numpy as np
 import numpy.testing as npt
 
 
-class Grid:
+class NodeGrid:
     """Initialize a general grid with x, y, and z
 
     Attributes
@@ -135,7 +135,7 @@ class Grid:
         return np.linspace(lims[0], lims[1], n)
 
 
-class CellGrid(Grid):
+class CellGrid(NodeGrid):
     """Class of cell grid. The unmentioned attributes of the class are overriden attributes of the parent class."""
 
     def __init__(
@@ -151,23 +151,30 @@ class CellGrid(Grid):
         self.nix, self.niy, self.niz = self.ninodes
         self.nnx, self.nny, self.nnz = self.nnodes
 
-        self.x = (self.x + self.ds[0] / 2)[:-1]
-        self.y = (self.y + self.ds[1] / 2)[:-1]
-        self.z = (self.z + self.ds[2] / 2)[:-1]
+        # self.x = (self.x + self.ds[0] / 2)[:-1]
+        # self.y = (self.y + self.ds[1] / 2)[:-1]
+        # self.z = (self.z + self.ds[2] / 2)[:-1]
 
+        self.xlims, self.ylims, self.zlims = np.column_stack((self.ranges[:, 0] + self.ds/2,
+                                                              self.ranges[:, 1] - self.ds/2))
 
-class NodeGrid(Grid):
-    def __init__(self):
-        pass
+        self.outer_xlims = self._compute_outer_lims(self.xlims, self.ngx, self.ds[0])
+        self.outer_ylims = self._compute_outer_lims(self.ylims, self.ngy, self.ds[1])
+        self.outer_zlims = self._compute_outer_lims(self.zlims, self.ngz, self.ds[2])
+
+        self.x = self._coordinates(self.outer_xlims, self.nnx)
+        self.y = self._coordinates(self.outer_ylims, self.nny) if self.nny > 0 else 0
+        self.z = self._coordinates(self.outer_zlims, self.nnz) if self.nnz > 0 else 0
+
+        self.ix = self._coordinates(self.xlims, self.nix)
+        self.iy = self._coordinates(self.ylims, self.niy) if self.niy > 0 else 0
+        self.iz = self._coordinates(self.ylims, self.niy) if self.niz > 0 else 0
 
 
 def main():
-    grid = Grid(np.array([[0, 1], [0, 1], [0, 1]]), [3, 3, 2], [1, 2, 0])
-    cell = CellGrid(np.array([[0, 1], [0, 1], [0, 1]]), [3, 3, 2], [1, 2, 0])
-    print(grid.nnodes)
-    print(grid.z)
-    print(cell.nnodes)
-    print(cell.z)
+    grid = NodeGrid(np.array([[0, 1], [0, 2], [0, 3]]), [3, 3, 2], [1, 2, 0])
+    cell = CellGrid(np.array([[0, 1], [0, 2], [0, 3]]), [3, 3, 2], [1, 2, 0])
+
 
 
 if __name__ == "__main__":

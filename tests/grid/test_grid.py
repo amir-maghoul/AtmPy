@@ -1,11 +1,15 @@
 import numpy as np
-from atmpy.grid.grid import Grid
+from atmpy.grid.grid import NodeGrid, CellGrid
 import numpy.testing as npt
 import pytest
-from pytest_cases import PyTestCases1D
+from pytest_cases import PyTestCases1D, PyTestCases2D, PyTestCases3D
 
 
 class TestGrid:
+
+    ############################################################################
+    #                                   1D
+    ############################################################################
 
     TestCases = PyTestCases1D()
     success_1d = TestCases.success
@@ -13,49 +17,68 @@ class TestGrid:
 
     @pytest.mark.parametrize("inputs", success_1d)
     def test_1d_success(self, inputs):
-        grid1D = Grid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
-        assert grid1D.dim == 1
+        nodegrid = NodeGrid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
+        cellgrid = CellGrid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
+        assert nodegrid.dim == 1
         assert (
-            grid1D.nny == 0 and grid1D.nnz == 0 and grid1D.ngy == 0 and grid1D.ngz == 0
+            nodegrid.nny == 0 and nodegrid.nnz == 0 and nodegrid.ngy == 0 and nodegrid.ngz == 0
         )
-        npt.assert_array_equal(grid1D.nnodes, grid1D.ninodes + 2 * grid1D.nghosts)
-        npt.assert_array_equal(grid1D.ranges[1:, :], 0)
-        assert grid1D.dx
-        assert grid1D.dy == 0 and grid1D.dz == 0
+        npt.assert_array_equal(nodegrid.nnodes, nodegrid.ninodes + 2 * nodegrid.nghosts)
+        npt.assert_array_equal(nodegrid.ranges[1:, :], 0)
+        assert nodegrid.dx
+        assert nodegrid.dy == 0 and nodegrid.dz == 0
+        npt.assert_array_equal(cellgrid.nnodes, nodegrid.nnodes - 1)
+        npt.assert_array_equal(cellgrid.ninodes, nodegrid.ninodes - 1)
+        assert len(cellgrid.x) == len(nodegrid.x) - 1
+        assert cellgrid.y == nodegrid.y == 0
+        assert cellgrid.z == nodegrid.z == 0
 
     @pytest.mark.parametrize("inputs", fail_1d)
     def test_1d_fail(self, inputs):
         with pytest.raises(AssertionError):
-            Grid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
+            NodeGrid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
 
-    success_2d = [(np.array([[0, 1], [0, 1], [0, 0]]), [3, 2, 0], [1, 2, 0])]
-    fail_2d = [
-        (np.array([[0, 1], [0, 1], [0, 0]]), [3, 0, 0], [3, 1, 0]),
-        (np.array([[0, 1], [0, 0], [0, 1]]), [3, 2, 0], [3, 1, 0]),
-        (np.array([[0, 1], [0, 1], [0, 0]]), [3, 1, 0], [3, 0, 1]),
-        (np.array([[0, 1], [0, 1], [0, 0]]), [3, 0, 1], [3, 1, 0]),
-        (np.array([[0, 1], [0, -1], [0, 0]]), [3, 1, 0], [3, 1, 0]),
-    ]
+    ############################################################################
+    #                                   2D
+    ############################################################################
+
+    TestCases = PyTestCases2D()
+    success_2d = TestCases.success
+    fail_2d = TestCases.fail
+    
+    @pytest.mark.parametrize("inputs", success_2d)
+    def test_2d_success(self, inputs):
+        node = NodeGrid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
+        cell = CellGrid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
+
+        assert len(node.y) == len(cell.y) + 1
+        assert cell.dim == node.dim == 2
+        assert len(node.y) == len(cell.y) + 1
 
     @pytest.mark.parametrize("inputs", fail_2d)
     def test_2d_fail(self, inputs):
         with pytest.raises(AssertionError):
-            Grid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
+            NodeGrid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
 
-    fail_3d = [
-        (np.array([[0, 1], [0, 1], [0, 0]]), [3, 0, 0], [3, 1, 0]),
-        (np.array([[0, 1], [0, 0], [0, 1]]), [3, 2, 1], [3, 1, 1]),
-        (np.array([[0, 1], [0, 1], [0, 0]]), [3, 1, 0], [3, 0, 1]),
-        (np.array([[0, 1], [0, 1], [0, 1]]), [3, 0, 1], [0, 0, 0]),
-        (np.array([[0, 1], [0, -1], [0, 1]]), [3, 1, 0], [3, 1, 0]),
-    ]
+    ############################################################################
+    #                                   3D
+    ############################################################################
+
+    TestCases = PyTestCases3D()
+    success_3d = TestCases.success
+    fail_3d = TestCases.fail
+
+    @pytest.mark.parametrize("inputs", success_3d)
+    def test_3d_success(self, inputs):
+        node = NodeGrid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
+        cell = CellGrid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
+
+        assert len(node.z) == len(cell.z) + 1
+        assert cell.dim == node.dim == 3
+        assert len(node.z) == len(cell.z) + 1
 
     @pytest.mark.parametrize("inputs", fail_3d)
     def test_3d_fail(self, inputs):
         with pytest.raises(AssertionError):
-            Grid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
+            NodeGrid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
 
-
-class TestCellGrid:
-    def test_pass(self):
-        assert True
