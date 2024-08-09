@@ -17,6 +17,7 @@ dependencies:
   - sphinx-autoapi
   - pytest-cov
   - doctest
+  - mypy
   - pip
   - pip:
       -  sphinx-rtd-theme

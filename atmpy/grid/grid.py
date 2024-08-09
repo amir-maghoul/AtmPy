@@ -17,7 +17,7 @@ class NodeGrid:
         array of inner nodes in each direction
     dim : int
         dimension of the grid
-    L : np.ndarray or list of shape (3, 1)
+    L : np.ndarray of shape (3, 1)
         length of intervals in each coordinate direction
     nnx, nny, nnz : int
         number of nodes in each direction
@@ -47,16 +47,16 @@ class NodeGrid:
 
         Parameters
         ----------
-        ranges : 2D ndarray or list of shape (3, 2)
+        ranges : 2D ndarray or list of shape (3, 2), default = np.zeros((3, 2))
             ranges of coordinates in each direction
-        ninodes : ndarray or list of shape (3,)
+        ninodes : ndarray or list of shape (3,), default = np.zeros(3)
             number of the inner nodes in each direction = limits + number of nodes in between
-        nghosts : ndarray or list of shape (3,)
+        nghosts : ndarray or list of shape (3,), default = np.zeros(3)
             number of ghosts cells in each direction
 
         """
-        self.L = ranges[:, 1] - ranges[:, 0]
-        self.dim = np.count_nonzero(ninodes)
+        self.L: np.ndarray = np.array(ranges[:, 1] - ranges[:, 0])
+        self.dim: int = np.count_nonzero(ninodes)
 
         self.ranges = np.array(ranges)
         self.nghosts = np.array(nghosts)
@@ -170,6 +170,19 @@ class CellGrid(NodeGrid):
         self.ix = self._coordinates(self.xlims, self.nix)
         self.iy = self._coordinates(self.ylims, self.niy) if self.niy > 0 else 0
         self.iz = self._coordinates(self.ylims, self.niy) if self.niz > 0 else 0
+
+
+class Grid:
+    """Grid factory class. Creates both node grid and cell grid with a given cell size."""
+
+    def __init__(
+        self,
+        ranges,
+        nnodes,
+        nghosts,
+    ):
+        self.cell = CellGrid(ranges, nnodes, nghosts)
+        self.node = NodeGrid(ranges, nnodes, nghosts)
 
 
 def main():

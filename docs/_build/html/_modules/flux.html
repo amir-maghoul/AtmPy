@@ -74,22 +74,62 @@
              
   <h1>Source code for flux</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">atmpy.grid.grid</span> <span class="kn">import</span> <span class="n">NodeGrid</span><span class="p">,</span> <span class="n">CellGrid</span>
 
+<div class="viewcode-block" id="Flux"><a class="viewcode-back" href="../autoapi/flux/index.html#flux.Flux">[docs]</a><span class="k">class</span> <span class="nc">Flux</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create and manage the flux of the problem.</span>
 
-<div class="viewcode-block" id="flux_api_test"><a class="viewcode-back" href="../autoapi/flux/index.html#flux.flux_api_test">[docs]</a><span class="k">def</span> <span class="nf">flux_api_test</span><span class="p">(</span><span class="n">a</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;This is a test fucntion for api docs</span>
-
-<span class="sd">    Parameters</span>
+<span class="sd">    Attributes</span>
 <span class="sd">    ----------</span>
-<span class="sd">    a : int</span>
-<span class="sd">        basic integer value</span>
-
-<span class="sd">    Returns</span>
-<span class="sd">    -------</span>
-<span class="sd">    float</span>
-<span class="sd">        square root of a</span>
+<span class="sd">    cont_flux : Callable</span>
+<span class="sd">        The continuous flux function as a function of u.</span>
+<span class="sd">    flux : np.ndarray</span>
+<span class="sd">        The discretized flux.</span>
+<span class="sd">    cell : :py:class:`~atmpy.grid.grid.CellGrid`</span>
+<span class="sd">        The grid of cell-centered points.</span>
+<span class="sd">    node : NodeGrid</span>
+<span class="sd">        The grid of node-centered points.</span>
+<span class="sd">    grid_type : str</span>
+<span class="sd">        The type of grid on which the problem is based on. FVM or FDM are the choices</span>
+<span class="sd">    inner_u : np.ndarray</span>
+<span class="sd">        The solution on inner nodes.</span>
+<span class="sd">    u : np.ndarray</span>
+<span class="sd">        The discretized function on ghost nodes as well as inner nodes. The solution container.</span>
+<span class="sd">    uint : np.ndarray</span>
+<span class="sd">        The array of u values on interfaces (cell centers)</span>
+<span class="sd">    u0 : Union[Callable, np.ndarray]</span>
+<span class="sd">        The initial function.</span>
+<span class="sd">    method : str</span>
+<span class="sd">        The method to calculate the flux.</span>
+<span class="sd">    boundary : str</span>
+<span class="sd">        The boundary condition of the problem.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">a</span><span class="p">)</span></div>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">flux</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+        <span class="n">u0</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+        <span class="n">grid</span><span class="p">:</span> <span class="n">Grid</span><span class="p">,</span>
+        <span class="n">grid_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;FDM&quot;</span><span class="p">,</span>
+        <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;upwind&quot;</span><span class="p">,</span>
+        <span class="n">boundary</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;zero&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cont_flux</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="n">flux</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">u0</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="n">u0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">grid</span> <span class="o">=</span> <span class="n">grid</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cell_grid</span><span class="p">:</span> <span class="n">CellGrid</span> <span class="o">=</span> <span class="n">grid</span><span class="o">.</span><span class="n">cell_grid</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">node_grid</span><span class="p">:</span> <span class="n">NodeGrid</span> <span class="o">=</span> <span class="n">grid</span><span class="o">.</span><span class="n">node_grid</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">grid_type</span> <span class="o">=</span> <span class="n">grid_type</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">u</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">node_grid</span><span class="o">.</span><span class="n">oshape</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cellu</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell_grid</span><span class="o">.</span><span class="n">oshape</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">uint</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell_grid</span><span class="o">.</span><span class="n">oshape</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">method</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">boundary</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell_grid</span><span class="o">.</span><span class="n">oshape</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inner_u</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">node_grid</span><span class="o">.</span><span class="n">ishape</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_node_eval_u</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update_solution</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inner_u</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update_flux</span><span class="p">()</span></div>
 </pre></div>
 
            </div>

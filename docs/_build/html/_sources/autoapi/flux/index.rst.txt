@@ -7,28 +7,44 @@
 Module Contents
 ---------------
 
-
-Functions
-~~~~~~~~~
+Classes
+~~~~~~~
 
 .. autoapisummary::
 
-   flux.flux_api_test
+   flux.Flux
 
 
 
-.. py:function:: flux_api_test(a)
 
-   This is a test fucntion for api docs
+.. py:class:: Flux(flux: Callable[[numpy.ndarray], numpy.ndarray], u0: Union[Callable[[numpy.ndarray], numpy.ndarray], numpy.ndarray], grid: Grid, grid_type: str = 'FDM', method: str = 'upwind', boundary: str = 'zero')
 
-   Parameters
+
+   Create and manage the flux of the problem.
+
+   Attributes
    ----------
-   a : int
-       basic integer value
-
-   Returns
-   -------
-   float
-       square root of a
+   cont_flux : Callable
+       The continuous flux function as a function of u.
+   flux : np.ndarray
+       The discretized flux.
+   cell : :py:class:`~atmpy.grid.grid.CellGrid`
+       The grid of cell-centered points.
+   node : NodeGrid
+       The grid of node-centered points.
+   grid_type : str
+       The type of grid on which the problem is based on. FVM or FDM are the choices
+   inner_u : np.ndarray
+       The solution on inner nodes.
+   u : np.ndarray
+       The discretized function on ghost nodes as well as inner nodes. The solution container.
+   uint : np.ndarray
+       The array of u values on interfaces (cell centers)
+   u0 : Union[Callable, np.ndarray]
+       The initial function.
+   method : str
+       The method to calculate the flux.
+   boundary : str
+       The boundary condition of the problem.
 
 
