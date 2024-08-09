@@ -87,8 +87,11 @@
 <h3>Classes<a class="headerlink" href="#classes" title="Permalink to this heading"></a></h3>
 <table class="autosummary longtable docutils align-default">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#grid.Grid" title="grid.Grid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Grid</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#grid.NodeGrid" title="grid.NodeGrid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NodeGrid</span></code></a></p></td>
 <td><p>Initialize a general grid with x, y, and z</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#grid.CellGrid" title="grid.CellGrid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CellGrid</span></code></a></p></td>
+<td><p>Class of cell grid. The unmentioned attributes of the class are overriden attributes of the parent class.</p></td>
 </tr>
 </tbody>
 </table>
@@ -103,30 +106,63 @@
 </tbody>
 </table>
 <dl class="py class">
-<dt class="sig sig-object py" id="grid.Grid">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">grid.</span></span><span class="sig-name descname"><span class="pre">Grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ranges</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros((3,</span> <span class="pre">2))</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nnodes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros(3)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nghosts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros(3)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/grid.html#Grid"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.Grid" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="grid.NodeGrid">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">grid.</span></span><span class="sig-name descname"><span class="pre">NodeGrid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ranges</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros((3,</span> <span class="pre">2))</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ninodes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros(3)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nghosts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros(3)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/grid.html#NodeGrid"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.NodeGrid" title="Permalink to this definition"></a></dt>
 <dd><p>Initialize a general grid with x, y, and z</p>
 <section id="attributes">
 <h4>Attributes<a class="headerlink" href="#attributes" title="Permalink to this heading"></a></h4>
 <dl class="simple">
-<dt>ranges<span class="classifier">2D ndarray or list of shape (3, 2)</span></dt><dd><p>ranges of coordinates in each direction</p>
+<dt>ranges<span class="classifier">2D np.ndarray of shape (3, 2)</span></dt><dd><p>ranges of coordinates in each direction</p>
 </dd>
-<dt>nnodes<span class="classifier">ndarray or list of shape (3,)</span></dt><dd><p>array or list of number of nodes in each direction</p>
+<dt>ninodes<span class="classifier">np.ndarray of shape (3,)</span></dt><dd><p>array of number of inner nodes in each direction (inner nodes are nodes that are not ghost nodes)</p>
 </dd>
-<dt>nghosts<span class="classifier">ndarray or list of shape (3,)</span></dt><dd><p>array or list of number of ghosts cells in each direction</p>
+<dt>nghosts<span class="classifier">np.ndarray of shape (3,)</span></dt><dd><p>array of number of ghosts cells in each direction</p>
+</dd>
+<dt>nnodes<span class="classifier">np.ndarray of shape (3,)</span></dt><dd><p>array of inner nodes in each direction</p>
 </dd>
 <dt>dim<span class="classifier">int</span></dt><dd><p>dimension of the grid</p>
 </dd>
-<dt>lims<span class="classifier">np.ndarray or list of shape (3, 1)</span></dt><dd><p>length of intervals in each coordinate direction</p>
+<dt>L<span class="classifier">np.ndarray or list of shape (3, 1)</span></dt><dd><p>length of intervals in each coordinate direction</p>
 </dd>
-<dt>nx, ny, nz<span class="classifier">int</span></dt><dd><p>number of nodes in each direction</p>
+<dt>nnx, nny, nnz<span class="classifier">int</span></dt><dd><p>number of nodes in each direction</p>
 </dd>
 <dt>ngx, ngy, ngz<span class="classifier">int</span></dt><dd><p>number of ghost cells in each direction</p>
 </dd>
-<dt>x, y, z<span class="classifier">ndarray or list of shape (2,)</span></dt><dd><p>coordinate intervals in each direction</p>
+<dt>nix, niy, niz<span class="classifier">int</span></dt><dd><p>number of inner nodes in each direction</p>
+</dd>
+<dt>xlims, ylims, zlims<span class="classifier">ndarray of shape (2,)</span></dt><dd><p>upper and lower bounds of the intervals in each direction</p>
+</dd>
+<dt>dx, dy, dz<span class="classifier">float</span></dt><dd><p>the fineness of discretization in each direction</p>
+</dd>
+<dt>ds<span class="classifier">np.ndarray</span></dt><dd><p>array of discretization fineness in each direction</p>
+</dd>
+<dt>outer_xlims, outer_xlims, outer_xlims<span class="classifier">ndarray of shape (2, )</span></dt><dd><p>array of limits in each direction by considering the ghost nodes</p>
+</dd>
+<dt>x, y, z<span class="classifier">ndarray of shape (nnodes, )</span></dt><dd><p>array of coordinates in each direction by considering the ghost cells</p>
+</dd>
+<dt>ix, iy, iz<span class="classifier">ndarray of shape (inodes, )</span></dt><dd><p>array of coordinates of inner nodes in each direction</p>
 </dd>
 </dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="grid.NodeGrid._compute_outer_lims">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_compute_outer_lims</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ng</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ds</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/grid.html#NodeGrid._compute_outer_lims"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.NodeGrid._compute_outer_lims" title="Permalink to this definition"></a></dt>
+<dd><p>Computes the outer lims of the grid in each direction</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="grid.NodeGrid._coordinates">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_coordinates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lims</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/grid.html#NodeGrid._coordinates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.NodeGrid._coordinates" title="Permalink to this definition"></a></dt>
+<dd><p>Compute coodinates of the outer NODES</p>
+</dd></dl>
+
 </section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="grid.CellGrid">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">grid.</span></span><span class="sig-name descname"><span class="pre">CellGrid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ranges</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros((3,</span> <span class="pre">2))</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ninodes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros(3)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nghosts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros(3)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/grid.html#CellGrid"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#grid.NodeGrid" title="grid.NodeGrid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NodeGrid</span></code></a></p>
+<p>Class of cell grid. The unmentioned attributes of the class are overriden attributes of the parent class.</p>
 </dd></dl>
 
 <dl class="py function">
