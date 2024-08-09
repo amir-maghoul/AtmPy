@@ -9,9 +9,8 @@ Classes
 
 .. autoapisummary::
 
-   grid.Grid
-   grid.CellGrid
    grid.NodeGrid
+   grid.CellGrid
 
 
 Functions
@@ -25,7 +24,7 @@ Functions
 Module Contents
 ---------------
 
-.. py:class:: Grid(ranges=np.zeros((3, 2)), ninodes=np.zeros(3), nghosts=np.zeros(3))
+.. py:class:: NodeGrid(ranges=np.zeros((3, 2)), ninodes=np.zeros(3), nghosts=np.zeros(3))
 
    Initialize a general grid with x, y, and z
 
@@ -142,7 +141,7 @@ Module Contents
 
 .. py:class:: CellGrid(ranges=np.zeros((3, 2)), ninodes=np.zeros(3), nghosts=np.zeros(3))
 
-   Bases: :py:obj:`Grid`
+   Bases: :py:obj:`NodeGrid`
 
 
    Class of cell grid. The unmentioned attributes of the class are overriden attributes of the parent class.
@@ -160,6 +159,15 @@ Module Contents
    .. py:attribute:: nnodes
 
 
+   .. py:attribute:: outer_xlims
+
+
+   .. py:attribute:: outer_ylims
+
+
+   .. py:attribute:: outer_zlims
+
+
    .. py:attribute:: x
 
 
@@ -169,46 +177,13 @@ Module Contents
    .. py:attribute:: z
 
 
-.. py:class:: NodeGrid
-
-   Bases: :py:obj:`Grid`
+   .. py:attribute:: ix
 
 
-   Initialize a general grid with x, y, and z
+   .. py:attribute:: iy
 
-   Attributes
-   ----------
-   ranges : 2D np.ndarray of shape (3, 2)
-       ranges of coordinates in each direction
-   ninodes : np.ndarray of shape (3,)
-       array of number of inner nodes in each direction (inner nodes are nodes that are not ghost nodes)
-   nghosts : np.ndarray of shape (3,)
-       array of number of ghosts cells in each direction
-   nnodes : np.ndarray of shape (3,)
-       array of inner nodes in each direction
-   dim : int
-       dimension of the grid
-   L : np.ndarray or list of shape (3, 1)
-       length of intervals in each coordinate direction
-   nnx, nny, nnz : int
-       number of nodes in each direction
-   ngx, ngy, ngz : int
-       number of ghost cells in each direction
-   nix, niy, niz : int
-       number of inner nodes in each direction
-   xlims, ylims, zlims : ndarray of shape (2,)
-       upper and lower bounds of the intervals in each direction
-   dx, dy, dz : float
-       the fineness of discretization in each direction
-   ds : np.ndarray
-       array of discretization fineness in each direction
-   outer_xlims, outer_xlims, outer_xlims : ndarray of shape (2, )
-       array of limits in each direction by considering the ghost nodes
-   x, y, z : ndarray of shape (nnodes, )
-       array of coordinates in each direction by considering the ghost cells
-   ix, iy, iz : ndarray of shape (inodes, )
-       array of coordinates of inner nodes in each direction
 
+   .. py:attribute:: iz
 
 
 .. py:function:: main()
