@@ -155,8 +155,9 @@ class CellGrid(NodeGrid):
         # self.y = (self.y + self.ds[1] / 2)[:-1]
         # self.z = (self.z + self.ds[2] / 2)[:-1]
 
-        self.xlims, self.ylims, self.zlims = np.column_stack((self.ranges[:, 0] + self.ds/2,
-                                                              self.ranges[:, 1] - self.ds/2))
+        self.xlims, self.ylims, self.zlims = np.column_stack(
+            (self.ranges[:, 0] + self.ds / 2, self.ranges[:, 1] - self.ds / 2)
+        )
 
         self.outer_xlims = self._compute_outer_lims(self.xlims, self.ngx, self.ds[0])
         self.outer_ylims = self._compute_outer_lims(self.ylims, self.ngy, self.ds[1])
@@ -174,7 +175,6 @@ class CellGrid(NodeGrid):
 def main():
     grid = NodeGrid(np.array([[0, 1], [0, 2], [0, 3]]), [3, 3, 2], [1, 2, 0])
     cell = CellGrid(np.array([[0, 1], [0, 2], [0, 3]]), [3, 3, 2], [1, 2, 0])
-
 
 
 if __name__ == "__main__":

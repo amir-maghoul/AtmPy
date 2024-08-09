@@ -21,7 +21,10 @@ class TestGrid:
         cellgrid = CellGrid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
         assert nodegrid.dim == 1
         assert (
-            nodegrid.nny == 0 and nodegrid.nnz == 0 and nodegrid.ngy == 0 and nodegrid.ngz == 0
+            nodegrid.nny == 0
+            and nodegrid.nnz == 0
+            and nodegrid.ngy == 0
+            and nodegrid.ngz == 0
         )
         npt.assert_array_equal(nodegrid.nnodes, nodegrid.ninodes + 2 * nodegrid.nghosts)
         npt.assert_array_equal(nodegrid.ranges[1:, :], 0)
@@ -45,7 +48,7 @@ class TestGrid:
     TestCases = PyTestCases2D()
     success_2d = TestCases.success
     fail_2d = TestCases.fail
-    
+
     @pytest.mark.parametrize("inputs", success_2d)
     def test_2d_success(self, inputs):
         node = NodeGrid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
@@ -81,4 +84,3 @@ class TestGrid:
     def test_3d_fail(self, inputs):
         with pytest.raises(AssertionError):
             NodeGrid(ranges=inputs[0], ninodes=inputs[1], nghosts=inputs[2])
-
