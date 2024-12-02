@@ -1,11 +1,13 @@
 """ This module contains configuration values for the project. It contains the global and regime dependent constants
 and  pysical quantities"""
+
 from dataclasses import dataclass
 from atmpy.data.TestCaseData import TestCaseData
 
+
 @dataclass
 class Config:
-    """ Data class for the global values and quantities
+    """Data class for the global values and quantities
 
     Attributes
     ----------
@@ -16,13 +18,14 @@ class Config:
         alpha_p: compressible / soundproof
 
     """
+
     alpha_g: int = 1
     alpha_w: int = 1
     alpha_p: int = 1
 
 
 class Thermodynamics:
-    """ Data class for thermodynamic values and constants
+    """Data class for thermodynamic values and constants
 
     Parameters
     ----------
@@ -37,5 +40,6 @@ class Thermodynamics:
     Gamma : float
     Gamma_inv : float
     """
-    def __init__(self, data : TestCaseData):
+
+    def __init__(self, data: TestCaseData):
         self.gamma: float = data.gamma

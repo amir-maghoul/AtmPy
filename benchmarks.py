@@ -4,9 +4,11 @@ import numba
 
 # Continuous function
 
+
 @numba.njit
 def continuous_function(x, y):
     return np.sin(x) * np.cos(y)
+
 
 # Numba-accelerated evaluation on 2D grid
 @numba.njit
@@ -18,9 +20,11 @@ def evaluate_on_grid_2d(grid_x, grid_y):
             result[i, j] = continuous_function(grid_x[i, j], grid_y[i, j])
     return result
 
+
 # Numpy vectorized evaluation on 2D grid
 def evaluate_on_grid_2d_numpy(grid_x, grid_y):
     return continuous_function(grid_x, grid_y)
+
 
 # Create grid using numpy.meshgrid
 x = np.linspace(0, 2 * np.pi, 5000)
