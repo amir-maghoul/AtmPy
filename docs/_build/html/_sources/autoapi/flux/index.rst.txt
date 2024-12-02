@@ -1,40 +1,37 @@
-:py:mod:`flux`
-==============
+flux
+====
 
 .. py:module:: flux
 
 
-Module Contents
----------------
-
 Classes
-~~~~~~~
+-------
 
 .. autoapisummary::
 
    flux.Flux
 
 
+Module Contents
+---------------
 
-
-.. py:class:: Flux(flux: Callable[[numpy.ndarray], numpy.ndarray], u0: Union[Callable[[numpy.ndarray], numpy.ndarray], numpy.ndarray], grid: Grid, grid_type: str = 'FDM', method: str = 'upwind', boundary: str = 'zero')
-
+.. py:class:: Flux(cflux: Callable[[numpy.ndarray], numpy.ndarray], u0: Union[Callable[[numpy.ndarray], numpy.ndarray], numpy.ndarray], grid: atmpy.grid.grid.Grid, discretization: str = 'FDM', method: str = 'upwind', boundary: str = 'zero')
 
    Create and manage the flux of the problem.
 
    Attributes
    ----------
-   cont_flux : Callable
+   cflux : Callable
        The continuous flux function as a function of u.
    flux : np.ndarray
        The discretized flux.
    cell : :py:class:`~atmpy.grid.grid.CellGrid`
        The grid of cell-centered points.
-   node : NodeGrid
+   node : :py:class:`~atmpy.grid.grid.CellGrid`
        The grid of node-centered points.
    grid_type : str
        The type of grid on which the problem is based on. FVM or FDM are the choices
-   inner_u : np.ndarray
+   iu : np.ndarray
        The solution on inner nodes.
    u : np.ndarray
        The discretized function on ghost nodes as well as inner nodes. The solution container.
@@ -45,6 +42,61 @@ Classes
    method : str
        The method to calculate the flux.
    boundary : str
-       The boundary condition of the problem.
+       The boundary condition of the problem. Choices are:
+       "zero" : zero padding of the ghost cells
+       "periodic" : periodic boundary condition
+       "linear" : linear extrapolation on the ghost cells
+
+
+   .. py:attribute:: cflux
+      :type:  Callable[[numpy.ndarray], numpy.ndarray]
+
+
+   .. py:attribute:: u0
+      :type:  Union[Callable[[numpy.ndarray], numpy.ndarray], numpy.ndarray]
+
+
+   .. py:attribute:: grid
+      :type:  atmpy.grid.grid.Grid
+
+
+   .. py:attribute:: cell
+      :type:  atmpy.grid.grid.CellGrid
+
+
+   .. py:attribute:: node
+      :type:  atmpy.grid.grid.NodeGrid
+
+
+   .. py:attribute:: discretization
+      :type:  str
+
+
+   .. py:attribute:: u
+      :type:  numpy.ndarray
+
+
+   .. py:attribute:: cellu
+      :type:  numpy.ndarray
+
+
+   .. py:attribute:: uint
+      :type:  numpy.ndarray
+
+
+   .. py:attribute:: method
+      :type:  str
+
+
+   .. py:attribute:: boundary
+      :type:  str
+
+
+   .. py:attribute:: flux
+      :type:  numpy.ndarray
+
+
+   .. py:attribute:: inner_u
+      :type:  numpy.ndarray
 
 

@@ -49,8 +49,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../atmpy/grid.html">Grid</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../atmpy/flux.html">Flux</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">API Reference</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="#"><code class="xref py py-mod docutils literal notranslate"><span class="pre">flux</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="../grid/index.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">grid</span></code></a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">flux</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../grid/index.html">grid</a></li>
 </ul>
 </li>
 </ul>
@@ -70,7 +70,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">API Reference</a></li>
-      <li class="breadcrumb-item active"><code class="xref py py-mod docutils literal notranslate"><span class="pre">flux</span></code></li>
+      <li class="breadcrumb-item active">flux</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../_sources/autoapi/flux/index.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -81,11 +81,9 @@
            <div itemprop="articleBody">
              
   <section id="module-flux">
-<span id="flux"></span><h1><a class="reference internal" href="#module-flux" title="flux"><code class="xref py py-mod docutils literal notranslate"><span class="pre">flux</span></code></a><a class="headerlink" href="#module-flux" title="Permalink to this heading"></a></h1>
-<section id="module-contents">
-<h2>Module Contents<a class="headerlink" href="#module-contents" title="Permalink to this heading"></a></h2>
+<span id="flux"></span><h1>flux<a class="headerlink" href="#module-flux" title="Permalink to this heading"></a></h1>
 <section id="classes">
-<h3>Classes<a class="headerlink" href="#classes" title="Permalink to this heading"></a></h3>
+<h2>Classes<a class="headerlink" href="#classes" title="Permalink to this heading"></a></h2>
 <table class="autosummary longtable docutils align-default">
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="#flux.Flux" title="flux.Flux"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Flux</span></code></a></p></td>
@@ -93,24 +91,27 @@
 </tr>
 </tbody>
 </table>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Permalink to this heading"></a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="flux.Flux">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">flux.</span></span><span class="sig-name descname"><span class="pre">Flux</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">flux</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">u0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'FDM'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'upwind'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'zero'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/flux.html#Flux"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">flux.</span></span><span class="sig-name descname"><span class="pre">Flux</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cflux</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">u0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">atmpy.grid.grid.Grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">discretization</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'FDM'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'upwind'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'zero'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/flux.html#Flux"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux" title="Permalink to this definition"></a></dt>
 <dd><p>Create and manage the flux of the problem.</p>
 <section id="attributes">
-<h4>Attributes<a class="headerlink" href="#attributes" title="Permalink to this heading"></a></h4>
+<h3>Attributes<a class="headerlink" href="#attributes" title="Permalink to this heading"></a></h3>
 <dl>
-<dt>cont_flux<span class="classifier">Callable</span></dt><dd><p>The continuous flux function as a function of u.</p>
+<dt>cflux<span class="classifier">Callable</span></dt><dd><p>The continuous flux function as a function of u.</p>
 </dd>
 <dt>flux<span class="classifier">np.ndarray</span></dt><dd><p>The discretized flux.</p>
 </dd>
 <dt>cell<span class="classifier"><code class="xref py py-class docutils literal notranslate"><span class="pre">CellGrid</span></code></span></dt><dd><p>The grid of cell-centered points.</p>
 </dd>
-<dt>node<span class="classifier">NodeGrid</span></dt><dd><p>The grid of node-centered points.</p>
+<dt>node<span class="classifier"><code class="xref py py-class docutils literal notranslate"><span class="pre">CellGrid</span></code></span></dt><dd><p>The grid of node-centered points.</p>
 </dd>
 <dt>grid_type<span class="classifier">str</span></dt><dd><p>The type of grid on which the problem is based on. FVM or FDM are the choices</p>
 </dd>
-<dt>inner_u<span class="classifier">np.ndarray</span></dt><dd><p>The solution on inner nodes.</p>
+<dt>iu<span class="classifier">np.ndarray</span></dt><dd><p>The solution on inner nodes.</p>
 </dd>
 <dt>u<span class="classifier">np.ndarray</span></dt><dd><p>The discretized function on ghost nodes as well as inner nodes. The solution container.</p>
 </dd>
@@ -120,13 +121,80 @@
 </dd>
 <dt>method<span class="classifier">str</span></dt><dd><p>The method to calculate the flux.</p>
 </dd>
-<dt>boundary<span class="classifier">str</span></dt><dd><p>The boundary condition of the problem.</p>
+<dt>boundary<span class="classifier">str</span></dt><dd><p>The boundary condition of the problem. Choices are:
+“zero” : zero padding of the ghost cells
+“periodic” : periodic boundary condition
+“linear” : linear extrapolation on the ghost cells</p>
 </dd>
 </dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.cflux">
+<span class="sig-name descname"><span class="pre">cflux</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span></em><a class="reference internal" href="../../_modules/flux.html#Flux.cflux"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.cflux" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.u0">
+<span class="sig-name descname"><span class="pre">u0</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span></em><a class="reference internal" href="../../_modules/flux.html#Flux.u0"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.u0" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.grid">
+<span class="sig-name descname"><span class="pre">grid</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">atmpy.grid.grid.Grid</span></em><a class="reference internal" href="../../_modules/flux.html#Flux.grid"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.grid" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.cell">
+<span class="sig-name descname"><span class="pre">cell</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">atmpy.grid.grid.CellGrid</span></em><a class="reference internal" href="../../_modules/flux.html#Flux.cell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.cell" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.node">
+<span class="sig-name descname"><span class="pre">node</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">atmpy.grid.grid.NodeGrid</span></em><a class="reference internal" href="../../_modules/flux.html#Flux.node"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.node" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.discretization">
+<span class="sig-name descname"><span class="pre">discretization</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="reference internal" href="../../_modules/flux.html#Flux.discretization"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.discretization" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.u">
+<span class="sig-name descname"><span class="pre">u</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span></em><a class="reference internal" href="../../_modules/flux.html#Flux.u"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.u" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.cellu">
+<span class="sig-name descname"><span class="pre">cellu</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span></em><a class="reference internal" href="../../_modules/flux.html#Flux.cellu"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.cellu" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.uint">
+<span class="sig-name descname"><span class="pre">uint</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span></em><a class="reference internal" href="../../_modules/flux.html#Flux.uint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.uint" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.method">
+<span class="sig-name descname"><span class="pre">method</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="reference internal" href="../../_modules/flux.html#Flux.method"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.method" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.boundary">
+<span class="sig-name descname"><span class="pre">boundary</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="reference internal" href="../../_modules/flux.html#Flux.boundary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.boundary" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.flux">
+<span class="sig-name descname"><span class="pre">flux</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span></em><a class="reference internal" href="../../_modules/flux.html#Flux.flux"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.flux" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flux.Flux.inner_u">
+<span class="sig-name descname"><span class="pre">inner_u</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span></em><a class="reference internal" href="../../_modules/flux.html#Flux.inner_u"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#flux.Flux.inner_u" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
 </section>
 </dd></dl>
 
-</section>
 </section>
 </section>
 

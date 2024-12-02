@@ -1,33 +1,31 @@
-:py:mod:`grid`
-==============
+grid
+====
 
 .. py:module:: grid
 
 
-Module Contents
----------------
-
 Classes
-~~~~~~~
+-------
 
 .. autoapisummary::
 
    grid.NodeGrid
    grid.CellGrid
-
+   grid.Grid
 
 
 Functions
-~~~~~~~~~
+---------
 
 .. autoapisummary::
 
    grid.main
 
 
+Module Contents
+---------------
 
 .. py:class:: NodeGrid(ranges=np.zeros((3, 2)), ninodes=np.zeros(3), nghosts=np.zeros(3))
-
 
    Initialize a general grid with x, y, and z
 
@@ -43,7 +41,7 @@ Functions
        array of inner nodes in each direction
    dim : int
        dimension of the grid
-   L : np.ndarray or list of shape (3, 1)
+   L : np.ndarray of shape (3, 1)
        length of intervals in each coordinate direction
    nnx, nny, nnz : int
        number of nodes in each direction
@@ -65,14 +63,80 @@ Functions
        array of coordinates of inner nodes in each direction
 
 
+
+   .. py:attribute:: L
+      :type:  numpy.ndarray
+
+
+   .. py:attribute:: dim
+      :type:  int
+
+
+   .. py:attribute:: ranges
+
+
+   .. py:attribute:: nghosts
+
+
+   .. py:attribute:: ninodes
+
+
+   .. py:attribute:: nnodes
+
+
+   .. py:attribute:: dx
+
+
+   .. py:attribute:: dy
+
+
+   .. py:attribute:: dz
+
+
+   .. py:attribute:: ds
+
+
+   .. py:attribute:: outer_xlims
+
+
+   .. py:attribute:: outer_ylims
+
+
+   .. py:attribute:: outer_zlims
+
+
+   .. py:attribute:: x
+
+
+   .. py:attribute:: y
+
+
+   .. py:attribute:: z
+
+
+   .. py:attribute:: ix
+
+
+   .. py:attribute:: iy
+
+
+   .. py:attribute:: iz
+
+
+   .. py:attribute:: zeros
+
+
    .. py:method:: _compute_outer_lims(lim, ng, ds)
       :staticmethod:
+
 
       Computes the outer lims of the grid in each direction
 
 
+
    .. py:method:: _coordinates(lims, n)
       :staticmethod:
+
 
       Compute coodinates of the outer NODES
 
@@ -80,12 +144,61 @@ Functions
 
 .. py:class:: CellGrid(ranges=np.zeros((3, 2)), ninodes=np.zeros(3), nghosts=np.zeros(3))
 
-
    Bases: :py:obj:`NodeGrid`
+
 
    Class of cell grid. The unmentioned attributes of the class are overriden attributes of the parent class.
 
 
-.. py:function:: main()
+   .. py:attribute:: new_begin
 
+
+   .. py:attribute:: new_end
+
+
+   .. py:attribute:: ninodes
+
+
+   .. py:attribute:: nnodes
+
+
+   .. py:attribute:: outer_xlims
+
+
+   .. py:attribute:: outer_ylims
+
+
+   .. py:attribute:: outer_zlims
+
+
+   .. py:attribute:: x
+
+
+   .. py:attribute:: y
+
+
+   .. py:attribute:: z
+
+
+   .. py:attribute:: ix
+
+
+   .. py:attribute:: iy
+
+
+   .. py:attribute:: iz
+
+
+.. py:class:: Grid(ranges, nnodes, nghosts)
+
+   Grid factory class. Creates both node grid and cell grid with a given cell size.
+
+
+   .. py:attribute:: cell
+
+
+   .. py:attribute:: node
+
+
+.. py:function:: main()
 
