@@ -27,12 +27,6 @@ class Config:
 class Thermodynamics:
     """Data class for thermodynamic values and constants
 
-    Parameters
-    ----------
-    data : atmpy.data.TestCaseData
-        the data container of the test cases, it should contain needed values for calculation of the thermodynamic
-        quantities
-
     Attributes
     ----------
     gamma : float
@@ -42,4 +36,13 @@ class Thermodynamics:
     """
 
     def __init__(self, data: TestCaseData):
+        """ Calculates the thermodynamic values using the given data from the user test case
+
+        Parameters
+        ----------
+        data : atmpy.data.TestCaseData
+            the data container of the test cases, it should contain needed values for calculation of the thermodynamic
+            quantities
+
+    """
         self.gamma: float = data.gamma
