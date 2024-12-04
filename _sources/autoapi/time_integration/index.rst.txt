@@ -1,0 +1,25 @@
+time_integration
+================
+
+.. py:module:: time_integration
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   time_integration.TimeIntegrator
+
+
+Module Contents
+---------------
+
+.. py:class:: TimeIntegrator(grid, state, flux_calculator)
+
+   .. py:method:: advance_time_step()
+
+
+   .. py:method:: compute_timestep()
+
+

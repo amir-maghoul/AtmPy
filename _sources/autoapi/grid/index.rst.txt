@@ -11,6 +11,7 @@ Classes
 
    grid.NodeGrid
    grid.CellGrid
+   grid.Grid
 
 
 Functions
@@ -40,7 +41,7 @@ Module Contents
        array of inner nodes in each direction
    dim : int
        dimension of the grid
-   L : np.ndarray or list of shape (3, 1)
+   L : np.ndarray of shape (3, 1)
        length of intervals in each coordinate direction
    nnx, nny, nnz : int
        number of nodes in each direction
@@ -64,9 +65,11 @@ Module Contents
 
 
    .. py:attribute:: L
+      :type:  numpy.ndarray
 
 
    .. py:attribute:: dim
+      :type:  int
 
 
    .. py:attribute:: ranges
@@ -120,9 +123,6 @@ Module Contents
    .. py:attribute:: iz
 
 
-   .. py:attribute:: zeros
-
-
    .. py:method:: _compute_outer_lims(lim, ng, ds)
       :staticmethod:
 
@@ -145,12 +145,6 @@ Module Contents
 
 
    Class of cell grid. The unmentioned attributes of the class are overriden attributes of the parent class.
-
-
-   .. py:attribute:: new_begin
-
-
-   .. py:attribute:: new_end
 
 
    .. py:attribute:: ninodes
@@ -184,6 +178,17 @@ Module Contents
 
 
    .. py:attribute:: iz
+
+
+.. py:class:: Grid(ranges, nnodes, nghosts)
+
+   Grid factory class. Creates both node grid and cell grid with a given cell size.
+
+
+   .. py:attribute:: cell
+
+
+   .. py:attribute:: node
 
 
 .. py:function:: main()

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Overview: module code &mdash; Atmpy 0.1 documentation</title>
+  <title>TestCaseData &mdash; Atmpy 0.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css" />
       <link rel="stylesheet" type="text/css" href="../_static/graphviz.css" />
@@ -60,7 +60,8 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Overview: module code</li>
+          <li class="breadcrumb-item"><a href="index.html">Module code</a></li>
+      <li class="breadcrumb-item active">TestCaseData</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -69,14 +70,31 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>All modules for which code is available</h1>
-<ul><li><a href="TestCaseData.html">TestCaseData</a></li>
-<li><a href="config.html">config</a></li>
-<li><a href="flux.html">flux</a></li>
-<li><a href="grid.html">grid</a></li>
-<li><a href="states.html">states</a></li>
-<li><a href="time_integration.html">time_integration</a></li>
-</ul>
+  <h1>Source code for TestCaseData</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; This is an abstract class for the test cases. It brings the given test case into a</span>
+<span class="sd">uniform class for the whole project.</span>
+
+<span class="sd">The code is taken from PyBella+ Library by Ray Chew https://github.com/ray-chew/pyBELLA &quot;&quot;&quot;</span>
+
+
+<div class="viewcode-block" id="TestCaseData"><a class="viewcode-back" href="../autoapi/TestCaseData/index.html#TestCaseData.TestCaseData">[docs]</a><span class="k">class</span> <span class="nc">TestCaseData</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Test Case class. It brings the given test case into a uniform class for the whole project.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TestCaseData.update_test_case"><a class="viewcode-back" href="../autoapi/TestCaseData/index.html#TestCaseData.TestCaseData.update_test_case">[docs]</a>    <span class="k">def</span> <span class="nf">update_test_case</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">update</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the test case with the given update.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        update : dict</span>
+<span class="sd">            the update value for the test case</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">update</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div></div>
+</pre></div>
 
            </div>
           </div>

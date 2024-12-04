@@ -6,7 +6,11 @@ This page contains auto-generated API reference documentation [#f1]_.
 .. toctree::
    :titlesonly:
 
-   /autoapi/grid/index
    /autoapi/flux/index
+   /autoapi/grid/index
+   /autoapi/config/index
+   /autoapi/states/index
+   /autoapi/TestCaseData/index
+   /autoapi/time_integration/index
 
 .. [#f1] Created with `sphinx-autoapi <https://github.com/readthedocs/sphinx-autoapi>`_
