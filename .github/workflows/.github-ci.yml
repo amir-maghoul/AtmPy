@@ -31,12 +31,12 @@ jobs:
         black --check --exclude /docs .
     - name: Test Suite [pytest]
       run: |
-          pytest --cov-report html:tests/coverage/cov_html --cov-report xml:tests/coverage/cov_xml --cov=atmpy/
-    - name: Upload coverage report to Codecov.io
+          pytest --cov=atmpy/ --cov-config=.coveragerc --cov-report xml
+    - name: Upload coverage [Codecov.io]
       uses: codecov/codecov-action@v5
       with:
-        token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
-        fail_ci_if_error: false # optional (default = false)
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
     - name: Docs Suite [sphinx]
       run: |
         cd docs
