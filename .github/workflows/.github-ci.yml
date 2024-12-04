@@ -31,7 +31,7 @@ jobs:
         black --check --exclude /docs .
     - name: Test Suite [pytest]
       run: |
-          pytest tests/ --doctest-modules --junitxml=junit/test-results.xml --cov --cov-report=html:junit/html
+          pytest --cov-report html:tests/coverage/cov_html --cov-report xml:tests/coverage/cov_xml term-missing --cov=myproj tests/
     - name: Docs Suite [sphinx]
       run: |
         cd docs
