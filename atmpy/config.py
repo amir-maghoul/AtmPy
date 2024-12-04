@@ -36,7 +36,7 @@ class Thermodynamics:
     """
 
     def __init__(self, data: TestCaseData):
-        """ Calculates the thermodynamic values using the given data from the user test case
+        """Calculates the thermodynamic values using the given data from the user test case
 
         Parameters
         ----------
@@ -44,5 +44,5 @@ class Thermodynamics:
             the data container of the test cases, it should contain needed values for calculation of the thermodynamic
             quantities
 
-    """
+        """
         self.gamma: float = data.gamma
