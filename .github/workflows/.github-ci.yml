@@ -31,7 +31,7 @@ jobs:
         black --check --exclude /docs .
     - name: Test Suite [pytest]
       run: |
-          pytest --cov-report xml --cov=atmpy/
+          pytest --cov-report html:tests/coverage/cov_html --cov-report json:tests/coverage/cov_json --cov=atmpy/
     - name: Upload coverage report to Codecov.io
       uses: codecov/codecov-action@v5
       with:
