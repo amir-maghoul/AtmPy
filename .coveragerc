@@ -1,0 +1,16 @@
+[run]
+source = atmpy/
+omit = atmpy/config.py
+
+[report]
+show_missing = true
+
+[html]
+directory = tests/coverage/cov-html
+
+[xml]
+output = tests/coverage/cov-xml
+
+[json]
+output = tests/coverage/cov-json
+
