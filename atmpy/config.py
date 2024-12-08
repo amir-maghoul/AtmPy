@@ -3,8 +3,6 @@ and  pysical quantities"""
 
 from dataclasses import dataclass
 from atmpy.data.TestCaseData import TestCaseData
-
-from dataclasses import dataclass
 from typing import List
 
 
