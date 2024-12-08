@@ -17,6 +17,7 @@ dependencies:
   - jupyter
   - sphinx-autoapi
   - pytest-cov
+  - pytest-doctestplus
   - doctest
   - mypy
   - pip
