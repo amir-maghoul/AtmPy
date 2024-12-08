@@ -35,10 +35,8 @@ class Grid:
         Number of ghost cells in the z-direction.
     dimensions : int
         dimension of the grid
-    inner_cells_x, inner_cells_y, inner_cells_z : slice
-        the index slices of inner cells in each direction
-    inner_nodes_x, inner_nodes_y, inner_nodes_z : slice
-        the index slices of inner nodes in each direction
+    inner_slice_x, inner_slice_y, inner_slice_z : slice
+        the index slices of inner cells/nodes in each direction
     nx_total : int
         Total number of cells in the x-direction (inner cells + ghost cells)
     ny_total : int
@@ -122,9 +120,7 @@ class Grid:
         )
 
         # Inner cell indices in x-direction
-        self.inner_cells_x = slice(ngx, -ngx)
-        # Inner node indices in x-direction
-        self.inner_nodes_x = slice(ngx, -ngx + 1)
+        self.inner_slice_x = slice(ngx, -ngx)
 
         # Check for 2D grid
         if ny is not None and y_start is not None and y_end is not None:
@@ -153,9 +149,7 @@ class Grid:
             )
 
             # Inner cell indices in y-direction
-            self.inner_cells_y = slice(self.ngy, -self.ngy)
-            # Inner node indices in y-direction
-            self.inner_nodes_y = slice(self.ngy, -self.ngy + 1)
+            self.inner_slice_y = slice(self.ngy, -self.ngy)
 
         # Check for 3D grid
         if nz is not None and z_start is not None and z_end is not None:
@@ -184,9 +178,7 @@ class Grid:
             )
 
             # Inner cell indices in z-direction
-            self.inner_cells_z = slice(self.ngz, -self.ngz)
-            # Inner node indices in z-direction
-            self.inner_nodes_z = slice(self.ngz, -self.ngz + 1)
+            self.inner_slice_z = slice(self.ngz, -self.ngz)
 
     @property
     def cell_mesh(self):
@@ -222,11 +214,11 @@ class Grid:
             Tuple[slice, ...]: Slices for indexing inner cells.
         """
         if self.dimensions == 1:
-            return (self.inner_cells_x,)
+            return (self.inner_slice_x,)
         elif self.dimensions == 2:
-            return self.inner_cells_x, self.inner_cells_y
+            return self.inner_slice_x, self.inner_slice_y
         elif self.dimensions == 3:
-            return self.inner_cells_x, self.inner_cells_y, self.inner_cells_z
+            return self.inner_slice_x, self.inner_slice_y, self.inner_slice_z
         else:
             raise ValueError("Invalid grid dimension")
 
@@ -266,11 +258,11 @@ class Grid:
             Tuple[slice, ...]: Slices for indexing inner nodes.
         """
         if self.dimensions == 1:
-            return (self.inner_nodes_x,)
+            return (self.inner_slice_x,)
         elif self.dimensions == 2:
-            return self.inner_nodes_x, self.inner_nodes_y
+            return self.inner_slice_x, self.inner_slice_y
         elif self.dimensions == 3:
-            return self.inner_nodes_x, self.inner_nodes_y, self.inner_nodes_z
+            return self.inner_slice_x, self.inner_slice_y, self.inner_slice_z
         else:
             raise ValueError("Invalid grid dimension")
 
@@ -338,10 +330,10 @@ class Grid:
         if self.dimensions == 1:
             return func(self.x_nodes)
         elif self.dimensions == 2:
-            Xn, Yn = self.nodes  # self.nodes is a meshgrid (Xn, Yn)
+            Xn, Yn = self.node_mesh  # self.nodes is a meshgrid (Xn, Yn)
             return func(Xn, Yn)
         elif self.dimensions == 3:
-            Xn, Yn, Zn = self.nodes  # self.nodes is a meshgrid (Xn, Yn, Zn)
+            Xn, Yn, Zn = self.node_mesh  # self.nodes is a meshgrid (Xn, Yn, Zn)
             return func(Xn, Yn, Zn)
         else:
             raise ValueError("Invalid grid dimension.")
@@ -436,12 +428,15 @@ if __name__ == "__main__":
 
     from atmpy.grid.utility import *
 
-    dimensions = [DimensionSpec(n=15, start=0, end=15, ng=1)]
+    dimensions = [DimensionSpec(n=3, start=0, end=3, ng=1)]
     grid = create_grid(dimensions)
     print(grid.x_cell_centers)
     print(grid.x_nodes)
-    print(grid.inner_nodes_x)
+    print(grid.inner_slice_x)
 
     @stencil
     def kernel(variable):
         return (variable[0] + variable[1] + variable[-1]) / 3
+
+    x = slice(1, -1)
+    print(grid.x_cell_centers[(x,)])
