@@ -1,7 +1,5 @@
 import numpy as np
 from typing import Optional, Tuple
-from numba import njit, stencil
-
 
 class Grid:
     """
@@ -97,6 +95,13 @@ class Grid:
         """
         self.dimensions: int = 1  # Default to 1D
 
+        if nx is None or x_start is None or x_end is None or ngx is None:
+            raise ValueError("Cannot have None as given parameters for the first dimension.")
+        if nx < 0:
+            raise ValueError("Cannot have negative values for number of cells.")
+        if ngx < 1:
+            raise ValueError("Number of ghost cells should at least be 1.")
+
         # Grid parameters in x-direction
         self.nx: int = nx
         self.x_start: float = x_start
@@ -123,7 +128,11 @@ class Grid:
         self.inner_slice_x = slice(ngx, -ngx)
 
         # Check for 2D grid
-        if ny is not None and y_start is not None and y_end is not None:
+        if ny is not None and y_start is not None and y_end is not None and ngy is not None:
+            if ny < 0:
+                raise ValueError("Cannot have negative values for number of cells.")
+            if ngy < 1:
+                raise ValueError("Number of ghost cells should at least be 1.")
             self.dimensions = 2
             self.ny: int = ny
             self.y_start: float = y_start
@@ -150,9 +159,15 @@ class Grid:
 
             # Inner cell indices in y-direction
             self.inner_slice_y = slice(self.ngy, -self.ngy)
+        elif not ( ny is None and y_start is None and y_end is None and ngy is None):
+            raise ValueError("Cannot have mixed of None and not None values for parameters of the dimensions.")
 
         # Check for 3D grid
-        if nz is not None and z_start is not None and z_end is not None:
+        if nz is not None and z_start is not None and z_end is not None and ngz is not None:
+            if nz < 0:
+                raise ValueError("Cannot have negative values for number of cells.")
+            if ngz < 1:
+                raise ValueError("Number of ghost cells should at least be 1.")
             self.dimensions = 3
             self.nz: int = nz
             self.z_start: float = z_start
@@ -179,6 +194,9 @@ class Grid:
 
             # Inner cell indices in z-direction
             self.inner_slice_z = slice(self.ngz, -self.ngz)
+
+        elif not ( nz is None and z_start is None and z_end is None and ngz is None):
+            raise ValueError("Cannot have mixed of None and not None values for parameters of the dimensions.")
 
     @property
     def cell_mesh(self):
@@ -330,98 +348,13 @@ class Grid:
         if self.dimensions == 1:
             return func(self.x_nodes)
         elif self.dimensions == 2:
-            Xn, Yn = self.node_mesh  # self.nodes is a meshgrid (Xn, Yn)
+            Xn, Yn = self.node_mesh  # self.mesh is a meshgrid (Xn, Yn)
             return func(Xn, Yn)
         elif self.dimensions == 3:
-            Xn, Yn, Zn = self.node_mesh  # self.nodes is a meshgrid (Xn, Yn, Zn)
+            Xn, Yn, Zn = self.node_mesh  # self.mesh is a meshgrid (Xn, Yn, Zn)
             return func(Xn, Yn, Zn)
         else:
             raise ValueError("Invalid grid dimension.")
-
-    @staticmethod
-    @njit
-    def cell_to_node_average_1d(var_cells: np.ndarray, ngx: int) -> np.ndarray:
-        pass
-
-    @staticmethod
-    @njit
-    def node_to_cell_average_1d(var_nodes: np.ndarray, ngx: int) -> np.ndarray:
-        pass
-
-    @staticmethod
-    @njit
-    def cell_to_node_average_2d(
-        var_cells: np.ndarray, ngx: int, ngy: int
-    ) -> np.ndarray:
-        pass
-
-    @staticmethod
-    @njit
-    def node_to_cell_average_2d(
-        var_nodes: np.ndarray, ngx: int, ngy: int
-    ) -> np.ndarray:
-        pass
-
-    @staticmethod
-    @stencil
-    def node_to_cell_2d_kernel(var_nodes: np.ndarray) -> np.ndarray:
-        pass
-
-    @staticmethod
-    @njit
-    def cell_to_node_average_3d(
-        var_cells: np.ndarray, ngx: int, ngy: int, ngz: int
-    ) -> np.ndarray:
-        pass
-
-    @staticmethod
-    @stencil
-    def node_to_cell_3d_kernel(var_nodes: np.ndarray) -> np.ndarray:
-        pass
-
-    @staticmethod
-    def node_to_cell_average_3d(
-        var_nodes: np.ndarray, ngx: int, ngy: int, ngz: int
-    ) -> np.ndarray:
-        return Grid.node_to_cell_3d_kernel(var_nodes)
-
-    def cell_to_node_average(self, var_cells: np.ndarray) -> np.ndarray:
-        if self.dimensions == 1:
-            return self.cell_to_node_average_1d(var_cells, self.ngx)
-        elif self.dimensions == 2:
-            return self.cell_to_node_average_2d(var_cells, self.ngx, self.ngy)
-        elif self.dimensions == 3:
-            return self.cell_to_node_average_3d(var_cells, self.ngx, self.ngy, self.ngz)
-        else:
-            raise ValueError("Invalid grid dimension")
-
-    def node_to_cell_average(self, var_nodes: np.ndarray) -> np.ndarray:
-        if self.dimensions == 1:
-            return self.node_to_cell_average_1d(var_nodes, self.ngx)
-        elif self.dimensions == 2:
-            return self.node_to_cell_average_2d(var_nodes, self.ngx, self.ngy)
-        elif self.dimensions == 3:
-            return self.node_to_cell_average_3d(var_nodes, self.ngx, self.ngy, self.ngz)
-        else:
-            raise ValueError("Invalid grid dimension")
-
-    def apply_boundary_conditions_cells(self, var_cells: np.ndarray) -> None:
-        """
-        Apply boundary conditions to cell-centered variables.
-
-        Parameters:
-            var_cells (np.ndarray): Array of cell-centered variable values.
-        """
-        pass
-
-    def apply_boundary_conditions_nodes(self, var_nodes: np.ndarray) -> None:
-        """
-        Apply boundary conditions to node-centered variables.
-
-        Parameters:
-            var_nodes (np.ndarray): Array of node-centered variable values.
-        """
-        pass
 
 
 if __name__ == "__main__":
@@ -434,9 +367,17 @@ if __name__ == "__main__":
     print(grid.x_nodes)
     print(grid.inner_slice_x)
 
-    @stencil
-    def kernel(variable):
-        return (variable[0] + variable[1] + variable[-1]) / 3
+    def f(x):
+        return x
 
-    x = slice(1, -1)
-    print(grid.x_cell_centers[(x,)])
+    var_cells = f(grid.x_cell_centers)
+    print(var_cells)
+    var_nodes = f(grid.x_nodes)
+    print(var_nodes)
+
+    print("_________________")
+    # print(node_to_cell_average_1d(grid, var_nodes))
+    # x = np.array([1, 2, 3, 4, 5, 6])
+    # ngx = 1
+    # print(x[ngx:-ngx])
+

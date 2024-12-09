@@ -7,6 +7,22 @@ from atmpy.grid.kgrid import Grid  # Assuming the Grid class is in a file named 
 
 class TestKgrid:
 
+    def test_empty_grid(self):
+        with pytest.raises(ValueError):
+            Grid(nx=10, x_start=0, x_end=0, ngx=None)
+        with pytest.raises(ValueError):
+            Grid(nx=10, x_start=0, x_end=0, ny=10, y_start=0, y_end=0, ngy=0)
+        with pytest.raises(ValueError):
+            Grid(nx=10, x_start=0, x_end=0, ny=1, y_start=0, y_end=0, ngy=2, nz=10, z_start=0, z_end=0)
+
+    def test_negative_number_of_cells(self):
+        with pytest.raises(ValueError):
+            Grid(nx=-1, x_start=0, x_end=0)
+        with pytest.raises(ValueError):
+            Grid(nx=10, x_start=0, x_end=0, ny=-1, y_start=0, y_end=1, ngy=1)
+        with pytest.raises(ValueError):
+            Grid(nx=10, x_start=0, x_end=0, ny=1, y_start=0, y_end=0, ngy=1, nz=-1, z_start=0, z_end=0, ngz=1)
+
     def test_grid_initialization_1d(self):
         grid = Grid(nx=10, x_start=0.0, x_end=1.0, ngx=2)
         assert grid.dimensions == 1
@@ -88,6 +104,9 @@ class TestKgrid:
         assert Xc.shape == (grid.nx_total, grid.ny_total), "Xc shape mismatch"
         assert Yc.shape == (grid.nx_total, grid.ny_total), "Yc shape mismatch"
 
+    def test_cell_mesh_3d(self):
+        pass
+
     def test_node_mesh_1d(self):
         # 1D grid
         grid = Grid(nx=10, x_start=0.0, x_end=1.0, ngx=2)
@@ -110,6 +129,9 @@ class TestKgrid:
         Xn, Yn = grid.node_mesh
         assert Xn.shape == (grid.nx_total + 1, grid.ny_total + 1)
         assert Yn.shape == (grid.nx_total + 1, grid.ny_total + 1)
+
+    def test_node_mesh_3d(self):
+        pass
 
     def test_get_inner_cells_1d(self):
         grid = Grid(nx=10, x_start=0.0, x_end=1.0, ngx=2)
@@ -147,6 +169,12 @@ class TestKgrid:
         inner_cells = var_cells[inner_cells_slice]
         assert inner_cells.shape == (grid.nx, grid.ny, grid.nz)
 
+    def test_get_inner_cells_invalid_dimension(self):
+        grid = Grid(nx=10, x_start=0.0, x_end=1.0)
+        grid.dimensions = 4  # Invalid dimension
+        with pytest.raises(ValueError):
+            grid.get_inner_cells()
+
     def test_cell_to_node_average_1d(self):
         pass
 
@@ -165,11 +193,9 @@ class TestKgrid:
     def test_apply_boundary_conditions_nodes_1d(self):
         pass
 
-    def test_invalid_grid_dimension(self):
-        grid = Grid(nx=10, x_start=0.0, x_end=1.0)
-        grid.dimensions = 4  # Invalid dimension
+    def test_invalid_number_of_ghost_cells(self):
         with pytest.raises(ValueError):
-            grid.get_inner_cells()
+            grid = Grid(nx=10, x_start=0.0, x_end=1.0, ngx=0)
 
     def test_invalid_parameters(self):
         with pytest.raises(ValueError):
