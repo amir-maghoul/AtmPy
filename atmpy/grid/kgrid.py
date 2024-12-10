@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Optional, Tuple
 
+
 class Grid:
     """
     Basic grid data structure for the FVM solver.
@@ -35,12 +36,30 @@ class Grid:
         dimension of the grid
     inner_slice_x, inner_slice_y, inner_slice_z : slice
         the index slices of inner cells/nodes in each direction
-    nx_total : int
+    ncx_total : int
         Total number of cells in the x-direction (inner cells + ghost cells)
-    ny_total : int
+    ncy_total : int
         Total number of cells in the y-direction (inner cells + ghost cells)
-    nz_total : int
+    ncz_total : int
         Total number of cells in the z-direction (inner cells + ghost cells)
+    nnx_total : int
+        Total number of nodes in the x-direction (inner nodes + ghost nodes)
+    nny_total : int
+        Total number of nodes in the y-direction (inner nodes + ghost nodes)
+    nnz_total : int
+        Total number of nodes in the z-direction (inner nodes + ghost nodes)
+    x_cells : ndarray
+        Coordinate array of cell centers in x-direction
+    y_cells : ndarray, optional
+        Coordinate array of cell centers in y-direction
+    z_cells : ndarray, optional
+        Coordinate array of cell centers in z-direction
+    x_nodes : np.ndarray
+        Coordinate array of nodes in x-direction
+    y_nodes : np.ndarray, optional
+        Coordinate array of nodes in y-direction
+    z_nodes : np.ndarray, optional
+        Coordinate array of nodes in z-direction
     cell_mesh : Tuple[np.ndarray, ...]
         the meshgrid created from the cell centers according to the dimension
     node_mesh : Tuple[np.ndarray, ...]
@@ -96,7 +115,9 @@ class Grid:
         self.dimensions: int = 1  # Default to 1D
 
         if nx is None or x_start is None or x_end is None or ngx is None:
-            raise ValueError("Cannot have None as given parameters for the first dimension.")
+            raise ValueError(
+                "Cannot have None as given parameters for the first dimension."
+            )
         if nx < 0:
             raise ValueError("Cannot have negative values for number of cells.")
         if ngx < 1:
@@ -109,26 +130,32 @@ class Grid:
         self.dx: float = (x_end - x_start) / nx
         self.ngx: int = ngx  # Number of ghost cells in x-direction
 
-        # Total number of cells including ghost cells in x-direction
-        self.nx_total: int = nx + 2 * ngx
+        # Total number of cells and nodes including ghost cells in x-direction
+        self.ncx_total: int = nx + 2 * ngx
+        self.nnx_total: int = self.ncx_total + 1
 
         # Generate x-coordinate arrays
-        self.x_cell_centers: np.ndarray = np.linspace(
+        self.x_cells: np.ndarray = np.linspace(
             x_start - ngx * self.dx + 0.5 * self.dx,
             x_end + ngx * self.dx - 0.5 * self.dx,
-            self.nx_total,
+            self.ncx_total,
         )
         self.x_nodes: np.ndarray = np.linspace(
             x_start - ngx * self.dx,
             x_end + ngx * self.dx,
-            self.nx_total + 1,
+            self.ncx_total + 1,
         )
 
         # Inner cell indices in x-direction
         self.inner_slice_x = slice(ngx, -ngx)
 
         # Check for 2D grid
-        if ny is not None and y_start is not None and y_end is not None and ngy is not None:
+        if (
+            ny is not None
+            and y_start is not None
+            and y_end is not None
+            and ngy is not None
+        ):
             if ny < 0:
                 raise ValueError("Cannot have negative values for number of cells.")
             if ngy < 1:
@@ -142,28 +169,36 @@ class Grid:
                 ngy if ngy is not None else ngx
             )  # Use ngx if ngy not specified
 
-            # Total number of cells including ghost cells in y-direction
-            self.ny_total: int = ny + 2 * self.ngy
+            # Total number of cells and nodes including ghost cells in y-direction
+            self.ncy_total: int = ny + 2 * self.ngy
+            self.nny_total: int = self.ncy_total + 1
 
             # Generate y-coordinate arrays
-            self.y_cell_centers: np.ndarray = np.linspace(
+            self.y_cells: np.ndarray = np.linspace(
                 y_start - self.ngy * self.dy + 0.5 * self.dy,
                 y_end + self.ngy * self.dy - 0.5 * self.dy,
-                self.ny_total,
+                self.ncy_total,
             )
             self.y_nodes: np.ndarray = np.linspace(
                 y_start - self.ngy * self.dy,
                 y_end + self.ngy * self.dy,
-                self.ny_total + 1,
+                self.ncy_total + 1,
             )
 
             # Inner cell indices in y-direction
             self.inner_slice_y = slice(self.ngy, -self.ngy)
-        elif not ( ny is None and y_start is None and y_end is None and ngy is None):
-            raise ValueError("Cannot have mixed of None and not None values for parameters of the dimensions.")
+        elif not (ny is None and y_start is None and y_end is None and ngy is None):
+            raise ValueError(
+                "Cannot have mixed of None and not None values for parameters of the dimensions."
+            )
 
         # Check for 3D grid
-        if nz is not None and z_start is not None and z_end is not None and ngz is not None:
+        if (
+            nz is not None
+            and z_start is not None
+            and z_end is not None
+            and ngz is not None
+        ):
             if nz < 0:
                 raise ValueError("Cannot have negative values for number of cells.")
             if ngz < 1:
@@ -177,40 +212,43 @@ class Grid:
                 ngz if ngz is not None else ngx
             )  # Use ngx if ngz not specified
 
-            # Total number of cells including ghost cells in z-direction
-            self.nz_total: int = nz + 2 * self.ngz
+            # Total number of cells and nodes including ghost cells in z-direction
+            self.ncz_total: int = nz + 2 * self.ngz
+            self.nnz_total: int = self.ncz_total + 1
 
             # Generate z-coordinate arrays
-            self.z_cell_centers: np.ndarray = np.linspace(
+            self.z_cells: np.ndarray = np.linspace(
                 z_start - self.ngz * self.dz + 0.5 * self.dz,
                 z_end + self.ngz * self.dz - 0.5 * self.dz,
-                self.nz_total,
+                self.ncz_total,
             )
             self.z_nodes: np.ndarray = np.linspace(
                 z_start - self.ngz * self.dz,
                 z_end + self.ngz * self.dz,
-                self.nz_total + 1,
+                self.ncz_total + 1,
             )
 
             # Inner cell indices in z-direction
             self.inner_slice_z = slice(self.ngz, -self.ngz)
 
-        elif not ( nz is None and z_start is None and z_end is None and ngz is None):
-            raise ValueError("Cannot have mixed of None and not None values for parameters of the dimensions.")
+        elif not (nz is None and z_start is None and z_end is None and ngz is None):
+            raise ValueError(
+                "Cannot have mixed of None and not None values for parameters of the dimensions."
+            )
 
     @property
     def cell_mesh(self):
         """Create a mesh using the dimension and cell coordinates"""
 
         if self.dimensions == 1:
-            return (self.x_cell_centers,)
+            return (self.x_cells,)
         elif self.dimensions == 2:
-            return np.meshgrid(self.x_cell_centers, self.y_cell_centers, indexing="ij")
+            return np.meshgrid(self.x_cells, self.y_cells, indexing="ij")
         elif self.dimensions == 3:
             return np.meshgrid(
-                self.x_cell_centers,
-                self.y_cell_centers,
-                self.z_cell_centers,
+                self.x_cells,
+                self.y_cells,
+                self.z_cells,
                 indexing="ij",
             )
 
@@ -324,7 +362,7 @@ class Grid:
             np.ndarray: Array of function values at each cell center.
         """
         if self.dimensions == 1:
-            return func(self.x_cell_centers)
+            return func(self.x_cells)
         elif self.dimensions == 2:
             xc, yc = self.cell_mesh  # self.cell_mesh is a meshgrid (Xc, Yc)
             return func(xc, yc)
@@ -363,14 +401,14 @@ if __name__ == "__main__":
 
     dimensions = [DimensionSpec(n=3, start=0, end=3, ng=1)]
     grid = create_grid(dimensions)
-    print(grid.x_cell_centers)
+    print(grid.x_cells)
     print(grid.x_nodes)
     print(grid.inner_slice_x)
 
     def f(x):
         return x
 
-    var_cells = f(grid.x_cell_centers)
+    var_cells = f(grid.x_cells)
     print(var_cells)
     var_nodes = f(grid.x_nodes)
     print(var_nodes)
@@ -380,4 +418,3 @@ if __name__ == "__main__":
     # x = np.array([1, 2, 3, 4, 5, 6])
     # ngx = 1
     # print(x[ngx:-ngx])
-
