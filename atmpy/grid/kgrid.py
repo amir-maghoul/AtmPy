@@ -48,6 +48,10 @@ class Grid:
         Total number of nodes in the y-direction (inner nodes + ghost nodes)
     nnz_total : int
         Total number of nodes in the z-direction (inner nodes + ghost nodes)
+    cshape : Tuple[int, ...]
+        The total shape of the cell grid
+    nshape : Tuple[int, ...]
+        The total shape of the node grid
     x_cells : ndarray
         Coordinate array of cell centers in x-direction
     y_cells : ndarray, optional
@@ -133,6 +137,8 @@ class Grid:
         # Total number of cells and nodes including ghost cells in x-direction
         self.ncx_total: int = nx + 2 * ngx
         self.nnx_total: int = self.ncx_total + 1
+        self.cshape: Tuple[int, ...] = (self.ncx_total,)
+        self.nshape: Tuple[int, ...] = (self.nnx_total,)
 
         # Generate x-coordinate arrays
         self.x_cells: np.ndarray = np.linspace(
@@ -140,6 +146,7 @@ class Grid:
             x_end + ngx * self.dx - 0.5 * self.dx,
             self.ncx_total,
         )
+
         self.x_nodes: np.ndarray = np.linspace(
             x_start - ngx * self.dx,
             x_end + ngx * self.dx,
@@ -172,6 +179,8 @@ class Grid:
             # Total number of cells and nodes including ghost cells in y-direction
             self.ncy_total: int = ny + 2 * self.ngy
             self.nny_total: int = self.ncy_total + 1
+            self.cshape = (self.ncy_total, self.ncy_total)
+            self.nshape = (self.nny_total, self.nny_total)
 
             # Generate y-coordinate arrays
             self.y_cells: np.ndarray = np.linspace(
@@ -215,6 +224,9 @@ class Grid:
             # Total number of cells and nodes including ghost cells in z-direction
             self.ncz_total: int = nz + 2 * self.ngz
             self.nnz_total: int = self.ncz_total + 1
+
+            self.cshape = (self.ncy_total, self.ncy_total, self.ncz_total)
+            self.nshape = (self.nny_total, self.nny_total, self.nnz_total)
 
             # Generate z-coordinate arrays
             self.z_cells: np.ndarray = np.linspace(

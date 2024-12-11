@@ -5,6 +5,7 @@ from atmpy.grid.kgrid import Grid
 from dataclasses import dataclass
 from typing import List
 
+
 class TestUtility:
 
     def test_dimension_spec(self):
@@ -17,15 +18,21 @@ class TestUtility:
     def test_to_grid_args_1d(self):
         dimensions = [DimensionSpec(5, 0, 3, 2)]
         args = to_grid_args(dimensions)
-        expected = {'nx': 5, 'x_start': 0, 'x_end': 3, 'ngx': 2}
+        expected = {"nx": 5, "x_start": 0, "x_end": 3, "ngx": 2}
         assert args == expected
 
     def test_to_grid_args_2d(self):
         dimensions = [DimensionSpec(5, 0, 3, 2), DimensionSpec(6, 1, 4, 3)]
         args = to_grid_args(dimensions)
         expected = {
-            'nx': 5, 'x_start': 0, 'x_end': 3, 'ngx': 2,
-            'ny': 6, 'y_start': 1, 'y_end': 4, 'ngy': 3
+            "nx": 5,
+            "x_start": 0,
+            "x_end": 3,
+            "ngx": 2,
+            "ny": 6,
+            "y_start": 1,
+            "y_end": 4,
+            "ngy": 3,
         }
         assert args == expected
 
@@ -42,7 +49,7 @@ class TestUtility:
         dimensions = [
             DimensionSpec(5, 0, 1, 2),
             DimensionSpec(6, 1, 2, 2),
-            DimensionSpec(7, 2, 3, 2)
+            DimensionSpec(7, 2, 3, 2),
         ]
         grid = create_grid(dimensions)
         assert grid.dimensions == 3
@@ -61,7 +68,7 @@ class TestUtility:
 
         ngx = grid.ngx
         inner_slice = slice(ngx, -ngx)
-        expected = 0.5 * (var_cells[ngx - 1:-ngx] + var_cells[ngx:-ngx + 1])
+        expected = 0.5 * (var_cells[ngx - 1 : -ngx] + var_cells[ngx : -ngx + 1])
         np.testing.assert_allclose(var_nodes[inner_slice], expected)
 
     def test_node_to_cell_average_1d(self):
@@ -75,14 +82,14 @@ class TestUtility:
 
         ngx = grid.ngx
         inner_slice = slice(ngx, -ngx)
-        expected = 0.5 * (var_nodes[ngx:-ngx] + var_nodes[ngx + 1:-ngx + 1])
+        expected = 0.5 * (var_nodes[ngx:-ngx] + var_nodes[ngx + 1 : -ngx + 1])
         np.testing.assert_allclose(var_cells[inner_slice], expected)
 
     def test_cell_to_node_average_3d(self):
         dimensions = [
             DimensionSpec(4, 0.0, 1.0, 1),
             DimensionSpec(4, 0.0, 1.0, 1),
-            DimensionSpec(4, 0.0, 1.0, 1)
+            DimensionSpec(4, 0.0, 1.0, 1),
         ]
         grid = create_grid(dimensions)
         nx_total, ny_total, nz_total = grid.nx_total, grid.ny_total, grid.nz_total
@@ -102,8 +109,14 @@ class TestUtility:
         i, j, k = ngx, ngy, ngz
         # Compute expected manually
         cells = [
-            (i - 1, j - 1, k - 1), (i, j - 1, k - 1), (i - 1, j, k - 1), (i, j, k - 1),
-            (i - 1, j - 1, k), (i, j - 1, k), (i - 1, j, k), (i, j, k)
+            (i - 1, j - 1, k - 1),
+            (i, j - 1, k - 1),
+            (i - 1, j, k - 1),
+            (i, j, k - 1),
+            (i - 1, j - 1, k),
+            (i, j - 1, k),
+            (i - 1, j, k),
+            (i, j, k),
         ]
         expected_value = np.mean([var_cells[a, b, c] for (a, b, c) in cells])
         np.testing.assert_allclose(var_nodes[i, j, k], expected_value)
@@ -112,7 +125,7 @@ class TestUtility:
         dimensions = [
             DimensionSpec(4, 0.0, 1.0, 1),
             DimensionSpec(4, 0.0, 1.0, 1),
-            DimensionSpec(4, 0.0, 1.0, 1)
+            DimensionSpec(4, 0.0, 1.0, 1),
         ]
         grid = create_grid(dimensions)
         nx_total, ny_total, nz_total = grid.nx_total, grid.ny_total, grid.nz_total
