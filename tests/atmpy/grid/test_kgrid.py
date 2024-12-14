@@ -206,7 +206,7 @@ class TestKgrid:
 
     def test_invalid_number_of_ghost_cells(self):
         with pytest.raises(ValueError):
-            grid = Grid(nx=10, x_start=0.0, x_end=1.0, ngx=0)
+            Grid(nx=10, x_start=0.0, x_end=1.0, ngx=0)
 
     def test_invalid_parameters(self):
         with pytest.raises(ValueError):
@@ -286,5 +286,3 @@ class TestKgrid:
 
     def test_exceptions_in_methods(self):
         pass
-
-

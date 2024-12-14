@@ -58,7 +58,6 @@ class TestUtility:
         assert grid.ny == 6 and grid.ngy == 2
         assert grid.nz == 7 and grid.ngz == 2
 
-
     @pytest.fixture
     def grid_1d(self):
         dimensions = [DimensionSpec(n=5, start=0.0, end=5.0, ng=1)]
@@ -82,14 +81,14 @@ class TestUtility:
         return create_grid(dimensions)
 
     def test_cell_to_node_average_1d(self, grid_1d):
-        var_cells = np.array([0., 1., 2., 3., 4., 5., 6.])
+        var_cells = np.array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
         var_nodes = np.zeros(grid_1d.nshape)
         expected_nodes = np.array([0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 0])
         computed_nodes = cell_to_node_average(grid_1d, var_cells, var_nodes=var_nodes)
         assert_allclose(computed_nodes, expected_nodes, atol=1e-12)
 
     def test_node_to_cell_average_1d(self, grid_1d):
-        var_nodes = np.array([0., 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.])
+        var_nodes = np.array([0.0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.0])
         var_cells = np.zeros(grid_1d.cshape)
         expected_cells = [0, 1, 2, 3, 4, 5, 0]
         computed_cells = node_to_cell_average(grid_1d, var_nodes, var_cells=var_cells)

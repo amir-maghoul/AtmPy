@@ -195,6 +195,7 @@ def _node_to_cell_average_1d(
     var_cells[i_slice_node] = temp[i_slice_node]
     return var_cells
 
+
 def _cell_to_node_average_2d(
     grid: Grid, var_cells: np.ndarray, var_nodes: np.ndarray = None
 ) -> np.ndarray:
@@ -269,6 +270,7 @@ def _node_to_cell_average_2d(
     )
     var_cells[i_slice_node, j_slice_node] = temp[i_slice_node, j_slice_node]
     return var_cells
+
 
 def _cell_to_node_average_3d(grid, var_cells, var_nodes):
     """
@@ -356,7 +358,7 @@ def _node_to_cell_average_3d(
 
 
 if __name__ == "__main__":
-    nx, ny, nz = 2, 3, 4     # number of cells
+    nx, ny, nz = 2, 3, 4  # number of cells
     ngx, ngy, ngz = 1, 2, 3  # number of ghost cells
 
     dimensions = [
@@ -365,4 +367,3 @@ if __name__ == "__main__":
         DimensionSpec(n=nz, start=0, end=3, ng=ngz),
     ]
     grid = create_grid(dimensions)
-
