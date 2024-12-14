@@ -225,8 +225,8 @@ class Grid:
             self.ncz_total: int = nz + 2 * self.ngz
             self.nnz_total: int = self.ncz_total + 1
 
-            self.cshape = (self.ncy_total, self.ncy_total, self.ncz_total)
-            self.nshape = (self.nny_total, self.nny_total, self.nnz_total)
+            self.cshape = (self.ncx_total, self.ncy_total, self.ncz_total)
+            self.nshape = (self.nnx_total, self.nny_total, self.nnz_total)
 
             # Generate z-coordinate arrays
             self.z_cells: np.ndarray = np.linspace(
