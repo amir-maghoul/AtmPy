@@ -1,5 +1,3 @@
-from numba import stencil, njit
-
 from atmpy.grid.kgrid import Grid
 import numpy as np
 from dataclasses import dataclass
@@ -94,11 +92,11 @@ def cell_to_node_average(
             )
 
     if grid.dimensions == 1:
-        return cell_to_node_average_1d(grid, var_cells, var_nodes)
+        return _cell_to_node_average_1d(grid, var_cells, var_nodes)
     elif grid.dimensions == 2:
-        return cell_to_node_average_2d(grid, var_cells, var_nodes)
+        return _cell_to_node_average_2d(grid, var_cells, var_nodes)
     elif grid.dimensions == 3:
-        return cell_to_node_average_3d(grid, var_cells, var_nodes)
+        return _cell_to_node_average_3d(grid, var_cells, var_nodes)
     else:
         raise ValueError("Invalid grid dimension")
 
@@ -131,16 +129,16 @@ def node_to_cell_average(
             )
 
     if grid.dimensions == 1:
-        return node_to_cell_average_1d(grid, var_nodes, var_cells)
+        return _node_to_cell_average_1d(grid, var_nodes, var_cells)
     elif grid.dimensions == 2:
-        return node_to_cell_average_2d(grid, var_nodes, var_cells)
+        return _node_to_cell_average_2d(grid, var_nodes, var_cells)
     elif grid.dimensions == 3:
-        return node_to_cell_average_3d(grid, var_nodes, var_cells)
+        return _node_to_cell_average_3d(grid, var_nodes, var_cells)
     else:
         raise ValueError("Invalid grid dimension")
 
 
-def cell_to_node_average_1d(
+def _cell_to_node_average_1d(
     grid: Grid, var_cells: np.ndarray, var_nodes: np.ndarray = None
 ) -> np.ndarray:
     """
@@ -172,7 +170,7 @@ def cell_to_node_average_1d(
     return var_nodes
 
 
-def node_to_cell_average_1d(
+def _node_to_cell_average_1d(
     grid: Grid, var_nodes: np.ndarray, var_cells: np.ndarray = None
 ) -> np.ndarray:
     """
@@ -192,38 +190,12 @@ def node_to_cell_average_1d(
     i_slice_node = slice(grid.ngx, grid.ngx + grid.nx)
 
     # var_cells[i] = 0.5 * (var_nodes[i] + var_nodes[i+1]) for inner region
+    # Temp will have the same shape as nodes
     temp = 0.5 * (var_nodes[:-1] + var_nodes[1:])
     var_cells[i_slice_node] = temp[i_slice_node]
     return var_cells
 
-
-def interface_averaging_1d(
-    grid, var_nodes: np.ndarray, var_cells: np.ndarray = None, direction="x"
-) -> np.ndarray:
-    """Calculate u[i-1/2] = 0.5 (u[i] + u[i+1]) which is the same as node_to_cell_average_1d()
-
-    Parameters:
-    ----------
-    grid: :py:class:`~atmpy.grid.kgrid.Grid`
-    var_nodes: np.ndarray
-        A 1D array of node-centered values of shape (nnx_total,).
-    var_cells: np.ndarray
-        A 1D array of cell-centered values of shape (ncx_total,).
-    direction: str, default="x"
-        The direction of the interface averaging. In 1d, only "x" direction is accepted.
-
-    Return
-    ------
-    np.ndarray of shape (ncx_total,)
-        Array of interface values averaged in "x" direction.
-    """
-    if direction != "x":
-        raise ValueError("In 1d case, direction must be x.")
-
-    return node_to_cell_average_1d(grid, var_nodes, var_cells)
-
-
-def cell_to_node_average_2d(
+def _cell_to_node_average_2d(
     grid: Grid, var_cells: np.ndarray, var_nodes: np.ndarray = None
 ) -> np.ndarray:
     """
@@ -249,25 +221,28 @@ def cell_to_node_average_2d(
     # This makes indexing easier: now padded[i,j] corresponds to var_cells[i-1,j-1],
     # and we can form averages with consistent slicing.
     padded = np.pad(var_cells, pad_width=1, mode="constant", constant_values=0.0)
-    # padded shape: (nx_total+2, ny_total+2)
+    # padded shape: (nnx_total+1, nny_total+1)
 
     # Note: The indexing here corresponds to shifted indices after padding.
+    # Temp will have the same shape as nodes
     temp = 0.25 * (
         padded[:-1, :-1]  # top-left corner
         + padded[:-1, 1:]  # top-right corner
         + padded[1:, :-1]  # bottom-left corner
         + padded[1:, 1:]  # bottom-right corner
     )
+    # temp shape: (nnx_total, nny_total)
     # fill out the inner nodes of the var_nodes
     var_nodes[i_slice_node, j_slice_node] = temp[i_slice_node, j_slice_node]
     return var_nodes
 
 
-def node_to_cell_average_2d(
+def _node_to_cell_average_2d(
     grid: Grid, var_nodes: np.ndarray, var_cells: np.ndarray = None
 ) -> np.ndarray:
     """
     Evaluate a variable on cells of the grid using averaging the already evaluated values on nodes.
+
     Parameters
     ----------
     grid : :py:class:`~atmpy.grid.kgrid.Grid`
@@ -295,88 +270,99 @@ def node_to_cell_average_2d(
     var_cells[i_slice_node, j_slice_node] = temp[i_slice_node, j_slice_node]
     return var_cells
 
-
-def interface_averaging_2d(grid: Grid, var_nodes: np.ndarray) -> np.ndarray:
-    pass
-
-
-def cell_to_node_average_3d(grid, var_cells, var_nodes):
+def _cell_to_node_average_3d(grid, var_cells, var_nodes):
     """
-    Compute the 3D cell-to-node averaging for a given grid and cell-centered variable array.
+    Evaluate a variable on nodes of the grid using averaging the already evaluated values on cells.
 
-    Parameters:
-        grid: Grid object
-        var_cells (np.ndarray): A 3D array of cell-centered values of shape (ncx_total, ncy_total, ncz_total).
+    Parameters
+    ----------
+    grid : :py:class:`~atmpy.grid.kgrid.Grid`
+        grid object on which the variable is evaluated.
+    var_cells : np.ndarray
+    A 1D array of cell-centered values of shape (ncx_total,ncx_total).
+    var_nodes : np.ndarray
+    A 1D array of node-centered values of shape (nnx_total,nny_total).
 
-    Returns:
-        np.ndarray: A 3D array of node-centered values with shape (nnx_total, nny_total, nnz_total).
+    Returns
+    -------
+    np.ndarray of shape (nnx_total,nny_total)
     """
-    ngx, ngy, ngz = grid.ngx, grid.ngy, grid.ngz
-    nnx_total, nny_total, nnz_total = grid.nnx_total, grid.nny_total, grid.nnz_total
+    i_slice_node = slice(grid.ngx, grid.ngx + grid.nx + 1)
+    j_slice_node = slice(grid.ngy, grid.ngy + grid.ny + 1)
+    k_slice_node = slice(grid.ngz, grid.ngz + grid.nz + 1)
 
-    var_nodes = np.zeros((nnx_total, nny_total, nnz_total))
+    # Pad cell_data by one cell in each dimension for easier indexing
+    padded = np.pad(var_cells, pad_width=1, mode="constant", constant_values=0.0)
+    # padded shape: (nx_full+2, ny_full+2, nz_full+2)
 
-    # Perform averaging for inner nodes only,
-    # leaving ghost nodes unchanged.
-    var_nodes[ngx:-ngx, ngy:-ngy, ngz:-ngz] = (
-        var_cells[ngx - 1 : -ngx, ngy - 1 : -ngy, ngz - 1 : -ngz]
-        + var_cells[ngx : -ngx + 1, ngy - 1 : -ngy, ngz - 1 : -ngz]
-        + var_cells[ngx - 1 : -ngx, ngy : -ngy + 1, ngz - 1 : -ngz]
-        + var_cells[ngx : -ngx + 1, ngy : -ngy + 1, ngz - 1 : -ngz]
-        + var_cells[ngx - 1 : -ngx, ngy - 1 : -ngy, ngz : -ngz + 1]
-        + var_cells[ngx : -ngx + 1, ngy - 1 : -ngy, ngz : -ngz + 1]
-        + var_cells[ngx - 1 : -ngx, ngy : -ngy + 1, ngz : -ngz + 1]
-        + var_cells[ngx : -ngx + 1, ngy : -ngy + 1, ngz : -ngz + 1]
-    ) / 8.0
-
+    # Each node is the average of 8 surrounding cells.
+    # node_data[i,j,k] = average of padded[i:i+2, j:j+2, k:k+2]
+    # Temp will have the same shape as nodes
+    temp = 0.125 * (
+        padded[:-1, :-1, :-1]
+        + padded[:-1, :-1, 1:]
+        + padded[:-1, 1:, :-1]
+        + padded[:-1, 1:, 1:]
+        + padded[1:, :-1, :-1]
+        + padded[1:, :-1, 1:]
+        + padded[1:, 1:, :-1]
+        + padded[1:, 1:, 1:]
+    )
+    var_nodes[i_slice_node, j_slice_node, k_slice_node] = temp[
+        i_slice_node, j_slice_node, k_slice_node
+    ]
     return var_nodes
 
 
-def node_to_cell_average_3d(grid: Grid, var_nodes: np.ndarray) -> np.ndarray:
-    pass
+def _node_to_cell_average_3d(
+    grid: Grid, var_nodes: np.ndarray, var_cells: np.ndarray = None
+) -> np.ndarray:
+    """
+    Evaluate a variable on cells of the grid using averaging the already evaluated values on nodes.
+
+    Parameters
+    ----------
+    grid : :py:class:`~atmpy.grid.kgrid.Grid`
+        grid object on which the variable is evaluated.
+    var_nodes : np.ndarray
+        A 1D array of node values of shape `grid.nshape`.
+    var_cells : np.ndarray
+        A 1D array of cell values of shape `grid.cshape`.
+
+    Returns
+    -------
+    ndarray of shape `grid.cshape`
+    """
+
+    i_slice_node = slice(grid.ngx, grid.ngx + grid.nx)
+    j_slice_node = slice(grid.ngy, grid.ngy + grid.ny)
+    k_slice_node = slice(grid.ngz, grid.ngz + grid.nz)
+
+    # cell_data[i,j,k] = average of node_data[i:i+2, j:j+2, k:k+2]
+    temp = 0.125 * (
+        var_nodes[:-1, :-1, :-1]
+        + var_nodes[:-1, :-1, 1:]
+        + var_nodes[:-1, 1:, :-1]
+        + var_nodes[:-1, 1:, 1:]
+        + var_nodes[1:, :-1, :-1]
+        + var_nodes[1:, :-1, 1:]
+        + var_nodes[1:, 1:, :-1]
+        + var_nodes[1:, 1:, 1:]
+    )
+    var_cells[i_slice_node, j_slice_node, k_slice_node] = temp[
+        i_slice_node, j_slice_node, k_slice_node
+    ]
+    return var_cells
 
 
 if __name__ == "__main__":
-    # dimensions = [DimensionSpec(n=4, start=0, end=3, ng=1),
-    #               DimensionSpec(n=5, start=0, end=3, ng=2),]
-    dimensions = [DimensionSpec(n=3, start=0, end=3, ng=1)]
+    nx, ny, nz = 2, 3, 4     # number of cells
+    ngx, ngy, ngz = 1, 2, 3  # number of ghost cells
+
+    dimensions = [
+        DimensionSpec(n=nx, start=0, end=3, ng=ngx),
+        DimensionSpec(n=ny, start=0, end=3, ng=ngy),
+        DimensionSpec(n=nz, start=0, end=3, ng=ngz),
+    ]
     grid = create_grid(dimensions)
-    var_nodes = np.zeros(grid.nnx_total)
-    var_cells = grid.x_cells
-    var_nodes = grid.x_nodes
 
-    print(var_cells)
-    print(var_nodes)
-    x = node_to_cell_average(grid, var_nodes)
-    print(x)
-    y = cell_to_node_average(grid, var_cells)
-    print(y)
-
-    # Parameters for the test
-    # nx, ny = 4, 5   # number of cells in each direction
-    # ngx = 1          # number of ghost cells
-    # ngy = 2
-
-    # Create a test cell_data array with a known pattern
-    # We'll use a pattern like: cell_data[i, j] = i * 10 + j,
-    # where i and j include the ghost cells.
-
-    # node_data = np.zeros((nx + 1 + 2 * ngx, ny + 1 + 2 * ngy))
-    # for i in range(nx + 1 + 2 * ngx):
-    #     for j in range(ny + 1 + 2 * ngy):
-    #         node_data[i, j] = i * 10 + j
-    # cell_data = np.zeros((nx+2*ngx, ny+2*ngy))
-    # for i in range(nx+2*ngx):
-    #     for j in range(ny+2*ngy):
-    #         cell_data[i, j] = i * 10 + j
-
-    # print(node_data)
-    # i_slice_node = slice(ngx, ngx + nx + 1)
-    # j_slice_node = slice(ngy, ngy + ny + 1)
-
-    # Convert from cell to node
-    # node_data = cell_to_node_average_2d(grid, cell_data)
-    # print(node_data)
-    # print(node_data[i_slice_node, j_slice_node].shape)
-    # cell_data= node_to_cell_average_2d(grid, node_data)
-    # print(cell_data)

@@ -4,6 +4,7 @@ from atmpy.grid.utility import *
 from atmpy.grid.kgrid import Grid
 from dataclasses import dataclass
 from typing import List
+from numpy.testing import assert_allclose
 
 
 class TestUtility:
@@ -57,101 +58,65 @@ class TestUtility:
         assert grid.ny == 6 and grid.ngy == 2
         assert grid.nz == 7 and grid.ngz == 2
 
-    def test_cell_to_node_average_1d(self):
-        # Create a 1D grid
-        dimensions = [DimensionSpec(10, 0.0, 1.0, 2)]
-        grid = create_grid(dimensions)
-        var_cells = np.arange(grid.nx_total, dtype=float)
-        var_nodes = cell_to_node_average(grid, var_cells)
-        # Check shape
-        assert var_nodes.shape == (grid.nx_total + 1,)
 
-        ngx = grid.ngx
-        inner_slice = slice(ngx, -ngx)
-        expected = 0.5 * (var_cells[ngx - 1 : -ngx] + var_cells[ngx : -ngx + 1])
-        np.testing.assert_allclose(var_nodes[inner_slice], expected)
+    @pytest.fixture
+    def grid_1d(self):
+        dimensions = [DimensionSpec(n=5, start=0.0, end=5.0, ng=1)]
+        return create_grid(dimensions)
 
-    def test_node_to_cell_average_1d(self):
-        # Create a 1D grid
-        dimensions = [DimensionSpec(10, 0.0, 1.0, 2)]
-        grid = create_grid(dimensions)
-        var_nodes = np.arange(grid.nx_total + 1, dtype=float)
-        var_cells = node_to_cell_average(grid, var_nodes)
-        # Check shape
-        assert var_cells.shape == (grid.nx_total,)
-
-        ngx = grid.ngx
-        inner_slice = slice(ngx, -ngx)
-        expected = 0.5 * (var_nodes[ngx:-ngx] + var_nodes[ngx + 1 : -ngx + 1])
-        np.testing.assert_allclose(var_cells[inner_slice], expected)
-
-    def test_cell_to_node_average_3d(self):
+    @pytest.fixture
+    def grid_2d(self):
         dimensions = [
-            DimensionSpec(4, 0.0, 1.0, 1),
-            DimensionSpec(4, 0.0, 1.0, 1),
-            DimensionSpec(4, 0.0, 1.0, 1),
+            DimensionSpec(n=4, start=0.0, end=4.0, ng=1),
+            DimensionSpec(n=3, start=0.0, end=3.0, ng=2),
         ]
-        grid = create_grid(dimensions)
-        nx_total, ny_total, nz_total = grid.nx_total, grid.ny_total, grid.nz_total
-        var_cells = np.zeros((nx_total, ny_total, nz_total), dtype=float)
+        return create_grid(dimensions)
 
-        # Fill var_cells with i+j+k pattern
-        for i in range(nx_total):
-            for j in range(ny_total):
-                for k in range(nz_total):
-                    var_cells[i, j, k] = i + j + k
-
-        var_nodes = cell_to_node_average(grid, var_cells)
-        assert var_nodes.shape == (nx_total + 1, ny_total + 1, nz_total + 1)
-
-        # Check one inner node
-        ngx, ngy, ngz = grid.ngx, grid.ngy, grid.ngz
-        i, j, k = ngx, ngy, ngz
-        # Compute expected manually
-        cells = [
-            (i - 1, j - 1, k - 1),
-            (i, j - 1, k - 1),
-            (i - 1, j, k - 1),
-            (i, j, k - 1),
-            (i - 1, j - 1, k),
-            (i, j - 1, k),
-            (i - 1, j, k),
-            (i, j, k),
-        ]
-        expected_value = np.mean([var_cells[a, b, c] for (a, b, c) in cells])
-        np.testing.assert_allclose(var_nodes[i, j, k], expected_value)
-
-    def test_node_to_cell_average_3d(self):
+    @pytest.fixture
+    def grid_3d(self):
         dimensions = [
-            DimensionSpec(4, 0.0, 1.0, 1),
-            DimensionSpec(4, 0.0, 1.0, 1),
-            DimensionSpec(4, 0.0, 1.0, 1),
+            DimensionSpec(n=2, start=0.0, end=2.0, ng=1),
+            DimensionSpec(n=2, start=0.0, end=2.0, ng=1),
+            DimensionSpec(n=2, start=0.0, end=2.0, ng=1),
         ]
-        grid = create_grid(dimensions)
-        nx_total, ny_total, nz_total = grid.nx_total, grid.ny_total, grid.nz_total
-        var_nodes = np.zeros((nx_total + 1, ny_total + 1, nz_total + 1), dtype=float)
+        return create_grid(dimensions)
 
-        # Fill var_nodes with i+j+k
-        for i in range(nx_total + 1):
-            for j in range(ny_total + 1):
-                for k in range(nz_total + 1):
-                    var_nodes[i, j, k] = i + j + k
+    def test_cell_to_node_average_1d(self, grid_1d):
+        var_cells = np.array([0., 1., 2., 3., 4., 5., 6.])
+        var_nodes = np.zeros(grid_1d.nshape)
+        expected_nodes = np.array([0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 0])
+        computed_nodes = cell_to_node_average(grid_1d, var_cells, var_nodes=var_nodes)
+        assert_allclose(computed_nodes, expected_nodes, atol=1e-12)
 
-        # node_to_cell_average_3d is currently not implemented
-        # We can check that it raises an error or skip this test.
-        with pytest.raises(NotImplementedError):
-            node_to_cell_average_3d(grid, var_nodes)
+    def test_node_to_cell_average_1d(self, grid_1d):
+        var_nodes = np.array([0., 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.])
+        var_cells = np.zeros(grid_1d.cshape)
+        expected_cells = [0, 1, 2, 3, 4, 5, 0]
+        computed_cells = node_to_cell_average(grid_1d, var_nodes, var_cells=var_cells)
+        assert_allclose(computed_cells, expected_cells, atol=1e-12)
 
-    def test_cell_to_node_average_2d_not_implemented(self):
-        dimensions = [DimensionSpec(5, 0, 1, 2), DimensionSpec(5, 0, 1, 2)]
-        grid = create_grid(dimensions)
-        var_cells = np.zeros((grid.nx_total, grid.ny_total))
-        with pytest.raises(NotImplementedError):
-            cell_to_node_average_2d(grid, var_cells)
+    def test_cell_to_node_average_2d(self, grid_2d):
+        var_cells = np.arange(np.prod(grid_2d.cshape)).reshape(grid_2d.cshape)
+        var_nodes = np.zeros(grid_2d.nshape)
+        computed_nodes = cell_to_node_average(grid_2d, var_cells, var_nodes=var_nodes)
+        recovered_cells = node_to_cell_average(grid_2d, computed_nodes, var_cells)
+        assert_allclose(recovered_cells, var_cells, atol=1e-12)
 
-    def test_node_to_cell_average_2d_not_implemented(self):
-        dimensions = [DimensionSpec(5, 0, 1, 2), DimensionSpec(5, 0, 1, 2)]
-        grid = create_grid(dimensions)
-        var_nodes = np.zeros((grid.nx_total + 1, grid.ny_total + 1))
-        with pytest.raises(NotImplementedError):
-            node_to_cell_average_2d(grid, var_nodes)
+    def test_node_to_cell_average_2d(self, grid_2d):
+        var_cells = np.arange(np.prod(grid_2d.cshape)).reshape(grid_2d.cshape)
+        var_nodes = cell_to_node_average(grid_2d, var_cells, np.zeros(grid_2d.nshape))
+        computed_cells = node_to_cell_average(grid_2d, var_nodes, var_cells)
+        assert_allclose(computed_cells, var_cells, atol=1e-12)
+
+    def test_cell_to_node_average_3d(self, grid_3d):
+        var_cells = np.arange(np.prod(grid_3d.cshape)).reshape(grid_3d.cshape)
+        var_nodes = np.zeros(grid_3d.nshape)
+        computed_nodes = cell_to_node_average(grid_3d, var_cells, var_nodes=var_nodes)
+        recovered_cells = node_to_cell_average(grid_3d, computed_nodes, var_cells)
+        assert_allclose(recovered_cells, var_cells, atol=1e-12)
+
+    def test_node_to_cell_average_3d(self, grid_3d):
+        var_cells = np.arange(np.prod(grid_3d.cshape)).reshape(grid_3d.cshape)
+        var_nodes = cell_to_node_average(grid_3d, var_cells, np.zeros(grid_3d.nshape))
+        computed_cells = node_to_cell_average(grid_3d, var_nodes, var_cells)
+        assert_allclose(computed_cells, var_cells, atol=1e-12)

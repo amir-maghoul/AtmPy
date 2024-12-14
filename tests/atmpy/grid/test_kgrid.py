@@ -52,7 +52,7 @@ class TestKgrid:
         assert grid.nx == 10
         assert grid.ngx == 2
         assert grid.ncx_total == 14  # nx + 2 * ngx
-        assert len(grid.x_cell_centers) == grid.ncx_total
+        assert len(grid.x_cells) == grid.ncx_total
         assert len(grid.x_nodes) == grid.ncx_total + 1
 
     def test_grid_initialization_2d(self):
@@ -66,8 +66,8 @@ class TestKgrid:
         assert grid.ngy == 3
         assert grid.ncx_total == 14  # nx + 2 * ngx
         assert grid.ncy_total == 26  # ny + 2 * ngy
-        assert len(grid.x_cell_centers) == grid.ncx_total
-        assert len(grid.y_cell_centers) == grid.ncy_total
+        assert len(grid.x_cells) == grid.ncx_total
+        assert len(grid.y_cells) == grid.ncy_total
         assert len(grid.x_nodes) == grid.ncx_total + 1
         assert len(grid.y_nodes) == grid.ncy_total + 1
 
@@ -198,18 +198,6 @@ class TestKgrid:
         with pytest.raises(ValueError):
             grid.get_inner_cells()
 
-    def test_cell_to_node_average_1d(self):
-        pass
-
-    def test_node_to_cell_average_1d(self):
-        pass
-
-    def test_cell_to_node_average_2d(self):
-        pass
-
-    def test_node_to_cell_average_2d(self):
-        pass
-
     def test_apply_boundary_conditions_cells_1d(self):
         pass
 
@@ -298,3 +286,5 @@ class TestKgrid:
 
     def test_exceptions_in_methods(self):
         pass
+
+
