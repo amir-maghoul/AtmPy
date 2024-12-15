@@ -68,6 +68,8 @@ class Grid:
         the meshgrid created from the cell centers according to the dimension
     node_mesh : Tuple[np.ndarray, ...]
         the meshgrid created from the nodes according to the dimension
+    grid_type : str, default="cartesian"
+        the grid type
 
     """
 
@@ -85,6 +87,7 @@ class Grid:
         z_start: Optional[float] = None,
         z_end: Optional[float] = None,
         ngz: Optional[int] = None,
+        grid_type: str = "cartesian",
     ) -> None:
         """
         Initialize the Grid object for FVM simulations. Notice the number of cells are given as paramters.
@@ -115,8 +118,11 @@ class Grid:
                 Ending coordinate in the z-direction.
             ngz : int, optional
                 Number of ghost cells in the z-direction.
+            grid_type : str, default="cartesian"
+                the grid type
         """
         self.dimensions: int = 1  # Default to 1D
+        self.grid_type: str = grid_type
 
         if nx is None or x_start is None or x_end is None or ngx is None:
             raise ValueError(
@@ -317,6 +323,33 @@ class Grid:
             return left, right, front, back, bottom, top
         else:
             raise ValueError("Invalid grid dimension")
+
+    def compute_normals(self):
+        """Computes the normals based on the grid type"""
+        if self.grid_type == "cartesian":
+            self._cartesian_normals()
+        else:
+            raise NotImplementedError("Currently, only cartesian grids are supported.")
+
+    def _cartesian_normals(self):
+        """
+        Set up normal vectors for a structured Cartesian grid.
+        Since the grid is structured, all interfaces in a given direction have the same normal.
+        """
+        if self.dimensions == 1:
+            # Only one direction: x
+            self.normal_x = np.array([1.0])
+        elif self.dimensions == 2:
+            # Two directions: x and y
+            self.normal_x = np.array([1.0, 0.0])
+            self.normal_y = np.array([0.0, 1.0])
+        elif self.dimensions == 3:
+            # Three directions: x, y, and z
+            self.normal_x = np.array([1.0, 0.0, 0.0])
+            self.normal_y = np.array([0.0, 1.0, 0.0])
+            self.normal_z = np.array([0.0, 0.0, 1.0])
+        else:
+            raise ValueError("Invalid grid dimension. Must be 1, 2, or 3.")
 
     def get_inner_nodes(self) -> Tuple[slice, ...]:
         """
