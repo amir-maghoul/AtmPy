@@ -355,15 +355,3 @@ def _node_to_cell_average_3d(
         i_slice_node, j_slice_node, k_slice_node
     ]
     return var_cells
-
-
-if __name__ == "__main__":
-    nx, ny, nz = 2, 3, 4  # number of cells
-    ngx, ngy, ngz = 1, 2, 3  # number of ghost cells
-
-    dimensions = [
-        DimensionSpec(n=nx, start=0, end=3, ng=ngx),
-        DimensionSpec(n=ny, start=0, end=3, ng=ngy),
-        DimensionSpec(n=nz, start=0, end=3, ng=ngz),
-    ]
-    grid = create_grid(dimensions)

@@ -407,26 +407,3 @@ class Grid:
             raise ValueError("Invalid grid dimension.")
 
 
-if __name__ == "__main__":
-
-    from atmpy.grid.utility import *
-
-    dimensions = [DimensionSpec(n=3, start=0, end=3, ng=1)]
-    grid = create_grid(dimensions)
-    print(grid.x_cells)
-    print(grid.x_nodes)
-    print(grid.inner_slice_x)
-
-    def f(x):
-        return x
-
-    var_cells = f(grid.x_cells)
-    print(var_cells)
-    var_nodes = f(grid.x_nodes)
-    print(var_nodes)
-
-    print("_________________")
-    # print(node_to_cell_average_1d(grid, var_nodes))
-    # x = np.array([1, 2, 3, 4, 5, 6])
-    # ngx = 1
-    # print(x[ngx:-ngx])
