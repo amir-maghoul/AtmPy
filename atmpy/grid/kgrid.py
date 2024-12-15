@@ -405,5 +405,3 @@ class Grid:
             return func(Xn, Yn, Zn)
         else:
             raise ValueError("Invalid grid dimension.")
-
-
