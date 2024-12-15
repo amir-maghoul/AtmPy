@@ -20,7 +20,7 @@
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="config" href="../config/index.html" />
+    <link rel="next" title="kgrid" href="../kgrid/index.html" />
     <link rel="prev" title="flux" href="../flux/index.html" /> 
 </head>
 
@@ -44,15 +44,16 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../../atmpy/grid.html">Grid</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../atmpy/flux.html">Flux</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">API Reference</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../flux/index.html">flux</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">grid</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../config/index.html">config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../kgrid/index.html">kgrid</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../states/index.html">states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utility/index.html">utility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data_config/index.html">data_config</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../TestCaseData/index.html">TestCaseData</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../time_integration/index.html">time_integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../boundary_functions/index.html">boundary_functions</a></li>
 </ul>
 </li>
 </ul>
@@ -245,6 +246,11 @@
 <span class="sig-name descname"><span class="pre">iz</span></span><a class="reference internal" href="../../_modules/grid.html#NodeGrid.iz"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.NodeGrid.iz" title="Permalink to this definition"></a></dt>
 <dd></dd></dl>
 
+<dl class="py attribute">
+<dt class="sig sig-object py" id="grid.NodeGrid.zeros">
+<span class="sig-name descname"><span class="pre">zeros</span></span><a class="reference internal" href="../../_modules/grid.html#NodeGrid.zeros"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.NodeGrid.zeros" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="grid.NodeGrid._compute_outer_lims">
 <em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_compute_outer_lims</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ng</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ds</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/grid.html#NodeGrid._compute_outer_lims"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.NodeGrid._compute_outer_lims" title="Permalink to this definition"></a></dt>
@@ -265,6 +271,16 @@
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">grid.</span></span><span class="sig-name descname"><span class="pre">CellGrid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ranges</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros((3,</span> <span class="pre">2))</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ninodes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros(3)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nghosts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">np.zeros(3)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/grid.html#CellGrid"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#grid.NodeGrid" title="grid.NodeGrid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NodeGrid</span></code></a></p>
 <p>Class of cell grid. The unmentioned attributes of the class are overriden attributes of the parent class.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="grid.CellGrid.new_begin">
+<span class="sig-name descname"><span class="pre">new_begin</span></span><a class="reference internal" href="../../_modules/grid.html#CellGrid.new_begin"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid.new_begin" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="grid.CellGrid.new_end">
+<span class="sig-name descname"><span class="pre">new_end</span></span><a class="reference internal" href="../../_modules/grid.html#CellGrid.new_end"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid.new_end" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
 <dl class="py attribute">
 <dt class="sig sig-object py" id="grid.CellGrid.ninodes">
 <span class="sig-name descname"><span class="pre">ninodes</span></span><a class="reference internal" href="../../_modules/grid.html#CellGrid.ninodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#grid.CellGrid.ninodes" title="Permalink to this definition"></a></dt>
@@ -351,7 +367,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="../flux/index.html" class="btn btn-neutral float-left" title="flux" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="../config/index.html" class="btn btn-neutral float-right" title="config" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="../kgrid/index.html" class="btn btn-neutral float-right" title="kgrid" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

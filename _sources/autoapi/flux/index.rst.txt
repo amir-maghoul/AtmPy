@@ -70,8 +70,6 @@ Module Contents
 
    .. py:attribute:: discretization
       :type:  str
-      :value: 'FDM'
-
 
 
    .. py:attribute:: u
@@ -88,14 +86,10 @@ Module Contents
 
    .. py:attribute:: method
       :type:  str
-      :value: 'upwind'
-
 
 
    .. py:attribute:: boundary
       :type:  str
-      :value: 'zero'
-
 
 
    .. py:attribute:: flux

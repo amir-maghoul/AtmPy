@@ -41,8 +41,6 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
-<li class="toctree-l1"><a class="reference internal" href="atmpy/grid.html">Grid</a></li>
-<li class="toctree-l1"><a class="reference internal" href="atmpy/flux.html">Flux</a></li>
 <li class="toctree-l1"><a class="reference internal" href="autoapi/index.html">API Reference</a></li>
 </ul>
 
@@ -78,13 +76,17 @@
  | <a href="#B"><strong>B</strong></a>
  | <a href="#C"><strong>C</strong></a>
  | <a href="#D"><strong>D</strong></a>
+ | <a href="#E"><strong>E</strong></a>
  | <a href="#F"><strong>F</strong></a>
  | <a href="#G"><strong>G</strong></a>
  | <a href="#I"><strong>I</strong></a>
+ | <a href="#K"><strong>K</strong></a>
  | <a href="#L"><strong>L</strong></a>
  | <a href="#M"><strong>M</strong></a>
  | <a href="#N"><strong>N</strong></a>
  | <a href="#O"><strong>O</strong></a>
+ | <a href="#P"><strong>P</strong></a>
+ | <a href="#Q"><strong>Q</strong></a>
  | <a href="#R"><strong>R</strong></a>
  | <a href="#S"><strong>S</strong></a>
  | <a href="#T"><strong>T</strong></a>
@@ -97,11 +99,23 @@
 <h2 id="_">_</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/utility/index.html#utility._cell_to_node_average_1d">_cell_to_node_average_1d() (in module utility)</a>
+</li>
+      <li><a href="autoapi/utility/index.html#utility._cell_to_node_average_2d">_cell_to_node_average_2d() (in module utility)</a>
+</li>
+      <li><a href="autoapi/utility/index.html#utility._cell_to_node_average_3d">_cell_to_node_average_3d() (in module utility)</a>
+</li>
       <li><a href="autoapi/grid/index.html#grid.NodeGrid._compute_outer_lims">_compute_outer_lims() (grid.NodeGrid static method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="autoapi/grid/index.html#grid.NodeGrid._coordinates">_coordinates() (grid.NodeGrid static method)</a>
+</li>
+      <li><a href="autoapi/utility/index.html#utility._node_to_cell_average_1d">_node_to_cell_average_1d() (in module utility)</a>
+</li>
+      <li><a href="autoapi/utility/index.html#utility._node_to_cell_average_2d">_node_to_cell_average_2d() (in module utility)</a>
+</li>
+      <li><a href="autoapi/utility/index.html#utility._node_to_cell_average_3d">_node_to_cell_average_3d() (in module utility)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -111,13 +125,13 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="autoapi/time_integration/index.html#time_integration.TimeIntegrator.advance_time_step">advance_time_step() (time_integration.TimeIntegrator method)</a>
 </li>
-      <li><a href="autoapi/config/index.html#config.Config.alpha_g">alpha_g (config.Config attribute)</a>
+      <li><a href="autoapi/data_config/index.html#data_config.Config.alpha_g">alpha_g (data_config.Config attribute)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="autoapi/config/index.html#config.Config.alpha_p">alpha_p (config.Config attribute)</a>
+      <li><a href="autoapi/data_config/index.html#data_config.Config.alpha_p">alpha_p (data_config.Config attribute)</a>
 </li>
-      <li><a href="autoapi/config/index.html#config.Config.alpha_w">alpha_w (config.Config attribute)</a>
+      <li><a href="autoapi/data_config/index.html#data_config.Config.alpha_w">alpha_w (data_config.Config attribute)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -127,6 +141,15 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="autoapi/flux/index.html#flux.Flux.boundary">boundary (flux.Flux attribute)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li>
+    boundary_functions
+
+      <ul>
+        <li><a href="autoapi/boundary_functions/index.html#module-boundary_functions">module</a>
+</li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
@@ -139,26 +162,27 @@
         <li><a href="autoapi/grid/index.html#grid.Grid.cell">(grid.Grid attribute)</a>
 </li>
       </ul></li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.cell_mesh">cell_mesh (kgrid.Grid property)</a>
+</li>
+      <li><a href="autoapi/utility/index.html#utility.cell_to_node_average">cell_to_node_average() (in module utility)</a>
+</li>
       <li><a href="autoapi/grid/index.html#grid.CellGrid">CellGrid (class in grid)</a>
 </li>
       <li><a href="autoapi/flux/index.html#flux.Flux.cellu">cellu (flux.Flux attribute)</a>
 </li>
-      <li><a href="autoapi/flux/index.html#flux.Flux.cflux">cflux (flux.Flux attribute)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/flux/index.html#flux.Flux.cflux">cflux (flux.Flux attribute)</a>
+</li>
       <li><a href="autoapi/states/index.html#states.State.compute_residuals">compute_residuals() (states.State method)</a>
 </li>
       <li><a href="autoapi/time_integration/index.html#time_integration.TimeIntegrator.compute_timestep">compute_timestep() (time_integration.TimeIntegrator method)</a>
 </li>
-      <li>
-    config
-
-      <ul>
-        <li><a href="autoapi/config/index.html#module-config">module</a>
+      <li><a href="autoapi/data_config/index.html#data_config.Config">Config (class in data_config)</a>
 </li>
-      </ul></li>
-      <li><a href="autoapi/config/index.html#config.Config">Config (class in config)</a>
+      <li><a href="autoapi/utility/index.html#utility.create_grid">create_grid() (in module utility)</a>
+</li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.cshape">cshape (kgrid.Grid attribute)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -166,19 +190,48 @@
 <h2 id="D">D</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li>
+    data_config
+
+      <ul>
+        <li><a href="autoapi/data_config/index.html#module-data_config">module</a>
+</li>
+      </ul></li>
       <li><a href="autoapi/grid/index.html#grid.NodeGrid.dim">dim (grid.NodeGrid attribute)</a>
 </li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.dimensions">dimensions (kgrid.Grid attribute)</a>
+</li>
+      <li><a href="autoapi/utility/index.html#utility.DimensionSpec">DimensionSpec (class in utility)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="autoapi/flux/index.html#flux.Flux.discretization">discretization (flux.Flux attribute)</a>
 </li>
       <li><a href="autoapi/grid/index.html#grid.NodeGrid.ds">ds (grid.NodeGrid attribute)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="autoapi/grid/index.html#grid.NodeGrid.dx">dx (grid.NodeGrid attribute)</a>
+
+      <ul>
+        <li><a href="autoapi/kgrid/index.html#kgrid.Grid.dx">(kgrid.Grid attribute)</a>
 </li>
+      </ul></li>
       <li><a href="autoapi/grid/index.html#grid.NodeGrid.dy">dy (grid.NodeGrid attribute)</a>
 </li>
       <li><a href="autoapi/grid/index.html#grid.NodeGrid.dz">dz (grid.NodeGrid attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="E">E</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/utility/index.html#utility.DimensionSpec.end">end (utility.DimensionSpec attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.evaluate_function_on_cells">evaluate_function_on_cells() (kgrid.Grid method)</a>
+</li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.evaluate_function_on_nodes">evaluate_function_on_nodes() (kgrid.Grid method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -205,8 +258,18 @@
 <h2 id="G">G</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="autoapi/config/index.html#config.Thermodynamics.gamma">gamma (config.Thermodynamics attribute)</a>
+      <li><a href="autoapi/data_config/index.html#data_config.Thermodynamics.gamma">gamma (data_config.Thermodynamics attribute)</a>
 </li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.get_boundary_cells">get_boundary_cells() (kgrid.Grid method)</a>
+</li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.get_boundary_nodes">get_boundary_nodes() (kgrid.Grid method)</a>
+</li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.get_inner_cells">get_inner_cells() (kgrid.Grid method)</a>
+</li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.get_inner_nodes">get_inner_nodes() (kgrid.Grid method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li>
     grid
 
@@ -214,10 +277,12 @@
         <li><a href="autoapi/grid/index.html#module-grid">module</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="autoapi/grid/index.html#grid.Grid">Grid (class in grid)</a>
+
+      <ul>
+        <li><a href="autoapi/kgrid/index.html#kgrid.Grid">(class in kgrid)</a>
 </li>
+      </ul></li>
       <li><a href="autoapi/flux/index.html#flux.Flux.grid">grid (flux.Flux attribute)</a>
 </li>
   </ul></td>
@@ -227,6 +292,8 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="autoapi/states/index.html#states.State.initialize_state">initialize_state() (states.State method)</a>
+</li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.inner_slice_x">inner_slice_x (kgrid.Grid attribute)</a>
 </li>
       <li><a href="autoapi/flux/index.html#flux.Flux.inner_u">inner_u (flux.Flux attribute)</a>
 </li>
@@ -253,10 +320,27 @@
   </ul></td>
 </tr></table>
 
+<h2 id="K">K</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li>
+    kgrid
+
+      <ul>
+        <li><a href="autoapi/kgrid/index.html#module-kgrid">module</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
 <h2 id="L">L</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="autoapi/grid/index.html#grid.NodeGrid.L">L (grid.NodeGrid attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/boundary_functions/index.html#boundary_functions.linear_boundary">linear_boundary() (in module boundary_functions)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -268,21 +352,29 @@
 </li>
       <li><a href="autoapi/flux/index.html#flux.Flux.method">method (flux.Flux attribute)</a>
 </li>
+      <li><a href="autoapi/boundary_functions/index.html#boundary_functions.mirror_boundary">mirror_boundary() (in module boundary_functions)</a>
+</li>
       <li>
     module
 
       <ul>
-        <li><a href="autoapi/config/index.html#module-config">config</a>
+        <li><a href="autoapi/boundary_functions/index.html#module-boundary_functions">boundary_functions</a>
+</li>
+        <li><a href="autoapi/data_config/index.html#module-data_config">data_config</a>
 </li>
         <li><a href="autoapi/flux/index.html#module-flux">flux</a>
 </li>
         <li><a href="autoapi/grid/index.html#module-grid">grid</a>
+</li>
+        <li><a href="autoapi/kgrid/index.html#module-kgrid">kgrid</a>
 </li>
         <li><a href="autoapi/states/index.html#module-states">states</a>
 </li>
         <li><a href="autoapi/TestCaseData/index.html#module-TestCaseData">TestCaseData</a>
 </li>
         <li><a href="autoapi/time_integration/index.html#module-time_integration">time_integration</a>
+</li>
+        <li><a href="autoapi/utility/index.html#module-utility">utility</a>
 </li>
       </ul></li>
   </ul></td>
@@ -291,7 +383,19 @@
 <h2 id="N">N</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/utility/index.html#utility.DimensionSpec.n">n (utility.DimensionSpec attribute)</a>
+</li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.ncx_total">ncx_total (kgrid.Grid attribute)</a>
+</li>
+      <li><a href="autoapi/grid/index.html#grid.CellGrid.new_begin">new_begin (grid.CellGrid attribute)</a>
+</li>
+      <li><a href="autoapi/grid/index.html#grid.CellGrid.new_end">new_end (grid.CellGrid attribute)</a>
+</li>
+      <li><a href="autoapi/utility/index.html#utility.DimensionSpec.ng">ng (utility.DimensionSpec attribute)</a>
+</li>
       <li><a href="autoapi/grid/index.html#grid.NodeGrid.nghosts">nghosts (grid.NodeGrid attribute)</a>
+</li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.ngx">ngx (kgrid.Grid attribute)</a>
 </li>
       <li><a href="autoapi/grid/index.html#grid.CellGrid.ninodes">ninodes (grid.CellGrid attribute)</a>
 
@@ -299,21 +403,31 @@
         <li><a href="autoapi/grid/index.html#grid.NodeGrid.ninodes">(grid.NodeGrid attribute)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="autoapi/grid/index.html#grid.CellGrid.nnodes">nnodes (grid.CellGrid attribute)</a>
 
       <ul>
         <li><a href="autoapi/grid/index.html#grid.NodeGrid.nnodes">(grid.NodeGrid attribute)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.nnx_total">nnx_total (kgrid.Grid attribute)</a>
+</li>
       <li><a href="autoapi/flux/index.html#flux.Flux.node">node (flux.Flux attribute)</a>
 
       <ul>
         <li><a href="autoapi/grid/index.html#grid.Grid.node">(grid.Grid attribute)</a>
 </li>
       </ul></li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.node_mesh">node_mesh (kgrid.Grid property)</a>
+</li>
+      <li><a href="autoapi/utility/index.html#utility.node_to_cell_average">node_to_cell_average() (in module utility)</a>
+</li>
       <li><a href="autoapi/grid/index.html#grid.NodeGrid">NodeGrid (class in grid)</a>
+</li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.nshape">nshape (kgrid.Grid attribute)</a>
+</li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.nx">nx (kgrid.Grid attribute)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -344,10 +458,30 @@
   </ul></td>
 </tr></table>
 
+<h2 id="P">P</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/boundary_functions/index.html#boundary_functions.periodic_boundary">periodic_boundary() (in module boundary_functions)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="Q">Q</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/boundary_functions/index.html#boundary_functions.quadratic_boundary">quadratic_boundary() (in module boundary_functions)</a>
+</li>
+  </ul></td>
+</tr></table>
+
 <h2 id="R">R</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="autoapi/grid/index.html#grid.NodeGrid.ranges">ranges (grid.NodeGrid attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/boundary_functions/index.html#boundary_functions.relaxation_boundary">relaxation_boundary() (in module boundary_functions)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -355,6 +489,8 @@
 <h2 id="S">S</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/utility/index.html#utility.DimensionSpec.start">start (utility.DimensionSpec attribute)</a>
+</li>
       <li><a href="autoapi/states/index.html#states.State">State (class in states)</a>
 </li>
   </ul></td>
@@ -381,10 +517,10 @@
       </ul></li>
       <li><a href="autoapi/TestCaseData/index.html#TestCaseData.TestCaseData">TestCaseData (class in TestCaseData)</a>
 </li>
+      <li><a href="autoapi/data_config/index.html#data_config.Thermodynamics">Thermodynamics (class in data_config)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="autoapi/config/index.html#config.Thermodynamics">Thermodynamics (class in config)</a>
-</li>
       <li>
     time_integration
 
@@ -393,6 +529,8 @@
 </li>
       </ul></li>
       <li><a href="autoapi/time_integration/index.html#time_integration.TimeIntegrator">TimeIntegrator (class in time_integration)</a>
+</li>
+      <li><a href="autoapi/utility/index.html#utility.to_grid_args">to_grid_args() (in module utility)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -404,14 +542,21 @@
 </li>
       <li><a href="autoapi/flux/index.html#flux.Flux.u0">u0 (flux.Flux attribute)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="autoapi/flux/index.html#flux.Flux.uint">uint (flux.Flux attribute)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="autoapi/states/index.html#states.State.update_state">update_state() (states.State method)</a>
 </li>
       <li><a href="autoapi/TestCaseData/index.html#TestCaseData.TestCaseData.update_test_case">update_test_case() (TestCaseData.TestCaseData method)</a>
 </li>
+      <li>
+    utility
+
+      <ul>
+        <li><a href="autoapi/utility/index.html#module-utility">module</a>
+</li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
@@ -424,6 +569,16 @@
         <li><a href="autoapi/grid/index.html#grid.NodeGrid.x">(grid.NodeGrid attribute)</a>
 </li>
       </ul></li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.x_cells">x_cells (kgrid.Grid attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.x_end">x_end (kgrid.Grid attribute)</a>
+</li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.x_nodes">x_nodes (kgrid.Grid attribute)</a>
+</li>
+      <li><a href="autoapi/kgrid/index.html#kgrid.Grid.x_start">x_start (kgrid.Grid attribute)</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -448,6 +603,10 @@
         <li><a href="autoapi/grid/index.html#grid.NodeGrid.z">(grid.NodeGrid attribute)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="autoapi/grid/index.html#grid.NodeGrid.zeros">zeros (grid.NodeGrid attribute)</a>
+</li>
   </ul></td>
 </tr></table>
 

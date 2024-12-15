@@ -1,0 +1,404 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>utility &mdash; Atmpy 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css" />
+
+  
+      <script src="../../_static/jquery.js"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+      <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+      <script src="../../_static/doctools.js"></script>
+      <script src="../../_static/sphinx_highlight.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="data_config" href="../data_config/index.html" />
+    <link rel="prev" title="states" href="../states/index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Atmpy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../flux/index.html">flux</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../grid/index.html">grid</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../kgrid/index.html">kgrid</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../states/index.html">states</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">utility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data_config/index.html">data_config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../TestCaseData/index.html">TestCaseData</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../time_integration/index.html">time_integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../boundary_functions/index.html">boundary_functions</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Atmpy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">API Reference</a></li>
+      <li class="breadcrumb-item active">utility</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/autoapi/utility/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-utility">
+<span id="utility"></span><h1>utility<a class="headerlink" href="#module-utility" title="Permalink to this heading"></a></h1>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Permalink to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#utility.DimensionSpec" title="utility.DimensionSpec"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DimensionSpec</span></code></a></p></td>
+<td><p>The data class for creating the dimensions of the problem</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Permalink to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#utility.to_grid_args" title="utility.to_grid_args"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_grid_args</span></code></a>(dimensions)</p></td>
+<td><p>Convert list of dimensions to grid arguments</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#utility.create_grid" title="utility.create_grid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_grid</span></code></a>(dimensions)</p></td>
+<td><p>Unpacks the dimensions parameter (which is a list of DimensionSpec objects)</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#utility.cell_to_node_average" title="utility.cell_to_node_average"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cell_to_node_average</span></code></a>(→ numpy.ndarray)</p></td>
+<td><p>Averages the values of the primary/secondary variables from cells onto nodes</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#utility.node_to_cell_average" title="utility.node_to_cell_average"><code class="xref py py-obj docutils literal notranslate"><span class="pre">node_to_cell_average</span></code></a>(→ numpy.ndarray)</p></td>
+<td><p>Averages the values of the primary/secondary variables from nodes onto cells</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#utility._cell_to_node_average_1d" title="utility._cell_to_node_average_1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_cell_to_node_average_1d</span></code></a>(→ numpy.ndarray)</p></td>
+<td><p>Compute the 1D cell-to-node averaging for a given grid and cell-centered variable array.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#utility._node_to_cell_average_1d" title="utility._node_to_cell_average_1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_node_to_cell_average_1d</span></code></a>(→ numpy.ndarray)</p></td>
+<td><p>Compute the 1D node-to-cell averaging for a given grid and node-centered variable array.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#utility._cell_to_node_average_2d" title="utility._cell_to_node_average_2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_cell_to_node_average_2d</span></code></a>(→ numpy.ndarray)</p></td>
+<td><p>Evaluate a variable on nodes of the grid using averaging the already evaluated values on cells.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#utility._node_to_cell_average_2d" title="utility._node_to_cell_average_2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_node_to_cell_average_2d</span></code></a>(→ numpy.ndarray)</p></td>
+<td><p>Evaluate a variable on cells of the grid using averaging the already evaluated values on nodes.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#utility._cell_to_node_average_3d" title="utility._cell_to_node_average_3d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_cell_to_node_average_3d</span></code></a>(grid, var_cells, var_nodes)</p></td>
+<td><p>Evaluate a variable on nodes of the grid using averaging the already evaluated values on cells.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#utility._node_to_cell_average_3d" title="utility._node_to_cell_average_3d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_node_to_cell_average_3d</span></code></a>(→ numpy.ndarray)</p></td>
+<td><p>Evaluate a variable on cells of the grid using averaging the already evaluated values on nodes.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Permalink to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="utility.DimensionSpec">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">utility.</span></span><span class="sig-name descname"><span class="pre">DimensionSpec</span></span><a class="reference internal" href="../../_modules/utility.html#DimensionSpec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility.DimensionSpec" title="Permalink to this definition"></a></dt>
+<dd><p>The data class for creating the dimensions of the problem</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="utility.DimensionSpec.n">
+<span class="sig-name descname"><span class="pre">n</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="reference internal" href="../../_modules/utility.html#DimensionSpec.n"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility.DimensionSpec.n" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="utility.DimensionSpec.start">
+<span class="sig-name descname"><span class="pre">start</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="reference internal" href="../../_modules/utility.html#DimensionSpec.start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility.DimensionSpec.start" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="utility.DimensionSpec.end">
+<span class="sig-name descname"><span class="pre">end</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="reference internal" href="../../_modules/utility.html#DimensionSpec.end"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility.DimensionSpec.end" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="utility.DimensionSpec.ng">
+<span class="sig-name descname"><span class="pre">ng</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="reference internal" href="../../_modules/utility.html#DimensionSpec.ng"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility.DimensionSpec.ng" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utility.to_grid_args">
+<span class="sig-prename descclassname"><span class="pre">utility.</span></span><span class="sig-name descname"><span class="pre">to_grid_args</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dimensions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#utility.DimensionSpec" title="utility.DimensionSpec"><span class="pre">DimensionSpec</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/utility.html#to_grid_args"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility.to_grid_args" title="Permalink to this definition"></a></dt>
+<dd><p>Convert list of dimensions to grid arguments</p>
+<section id="parameters">
+<h3>Parameters<a class="headerlink" href="#parameters" title="Permalink to this heading"></a></h3>
+<dl class="simple">
+<dt>dimensions<span class="classifier">List[DimensionSpec]</span></dt><dd><p>List of dimensions in forms of objects of the Dimension class</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h3>Returns<a class="headerlink" href="#returns" title="Permalink to this heading"></a></h3>
+<dl class="simple">
+<dt>dict</dt><dd><p>Dictionary of grid arguments</p>
+</dd>
+</dl>
+</section>
+<section id="examples">
+<h3>Examples<a class="headerlink" href="#examples" title="Permalink to this heading"></a></h3>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">dims</span> <span class="o">=</span> <span class="p">[</span><span class="n">DimensionSpec</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">DimensionSpec</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">to_grid_args</span><span class="p">(</span><span class="n">dims</span><span class="p">)</span> 
+<span class="go">{&#39;nx&#39;: 5, &#39;x_start&#39;: 0, &#39;x_end&#39;: 3, &#39;ngx&#39;: 2, &#39;ny&#39;: 6, &#39;y_start&#39;: 1, &#39;y_end&#39;: 4, &#39;ngy&#39;: 3}</span>
+</pre></div>
+</div>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utility.create_grid">
+<span class="sig-prename descclassname"><span class="pre">utility.</span></span><span class="sig-name descname"><span class="pre">create_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dimensions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#utility.DimensionSpec" title="utility.DimensionSpec"><span class="pre">DimensionSpec</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/utility.html#create_grid"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility.create_grid" title="Permalink to this definition"></a></dt>
+<dd><p>Unpacks the dimensions parameter (which is a list of DimensionSpec objects)
+into a dictionary and pass it to create a Grid object using them</p>
+<section id="id1">
+<h3>Parameters<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h3>
+<dl class="simple">
+<dt>dimensions<span class="classifier">List[DimensionSpec]</span></dt><dd><p>List of dimensions in forms of objects of the Dimension class</p>
+</dd>
+</dl>
+</section>
+<section id="id2">
+<h3>Returns<a class="headerlink" href="#id2" title="Permalink to this heading"></a></h3>
+<p>atmpy.grid.kgrid.Grid</p>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utility.cell_to_node_average">
+<span class="sig-prename descclassname"><span class="pre">utility.</span></span><span class="sig-name descname"><span class="pre">cell_to_node_average</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">atmpy.grid.kgrid.Grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_nodes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">numpy.ndarray</span></span></span><a class="reference internal" href="../../_modules/utility.html#cell_to_node_average"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility.cell_to_node_average" title="Permalink to this definition"></a></dt>
+<dd><p>Averages the values of the primary/secondary variables from cells onto nodes</p>
+<section id="id3">
+<h3>Parameters<a class="headerlink" href="#id3" title="Permalink to this heading"></a></h3>
+<dl>
+<dt>grid<span class="classifier"><code class="xref py py-class docutils literal notranslate"><span class="pre">Grid</span></code></span></dt><dd><p>grid object on which the averaging takes place</p>
+</dd>
+<dt>var_cells<span class="classifier">np.ndarray</span></dt><dd><p>the discrete function values (defined on the cells) from which the averaging takes place</p>
+</dd>
+</dl>
+</section>
+<section id="id4">
+<h3>Returns<a class="headerlink" href="#id4" title="Permalink to this heading"></a></h3>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>The values of the var_cells averages on nodes</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utility.node_to_cell_average">
+<span class="sig-prename descclassname"><span class="pre">utility.</span></span><span class="sig-name descname"><span class="pre">node_to_cell_average</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">atmpy.grid.kgrid.Grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_nodes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">numpy.ndarray</span></span></span><a class="reference internal" href="../../_modules/utility.html#node_to_cell_average"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility.node_to_cell_average" title="Permalink to this definition"></a></dt>
+<dd><p>Averages the values of the primary/secondary variables from nodes onto cells</p>
+<blockquote>
+<div><p>Parameters</p>
+</div></blockquote>
+<dl class="simple">
+<dt>var_nodes<span class="classifier">np.ndarray</span></dt><dd><p>the discrete function values (defined on the nodes) from which the averaging takes place</p>
+</dd>
+</dl>
+<section id="id5">
+<h3>Returns<a class="headerlink" href="#id5" title="Permalink to this heading"></a></h3>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>The values of the var_cells averages on nodes</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utility._cell_to_node_average_1d">
+<span class="sig-prename descclassname"><span class="pre">utility.</span></span><span class="sig-name descname"><span class="pre">_cell_to_node_average_1d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">atmpy.grid.kgrid.Grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_nodes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">numpy.ndarray</span></span></span><a class="reference internal" href="../../_modules/utility.html#_cell_to_node_average_1d"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility._cell_to_node_average_1d" title="Permalink to this definition"></a></dt>
+<dd><p>Compute the 1D cell-to-node averaging for a given grid and cell-centered variable array.</p>
+<p>In 1D, each inner node value is computed as the average of the two adjacent cells.
+Ghost nodes remain unchanged, as we never overwrite them.</p>
+<dl>
+<dt>Parameters:</dt><dd><p>grid: <code class="xref py py-class docutils literal notranslate"><span class="pre">Grid</span></code>
+var_cells (np.ndarray): A 1D array of cell-centered values of shape (ncx_total,).
+var_nodes : np.ndarray, default=None</p>
+<blockquote>
+<div><p>A 1D array of node-centered values of shape (nx,).
+If it is None, an array of zeros is created.</p>
+</div></blockquote>
+</dd>
+<dt>Returns:</dt><dd><p>np.ndarray: A 1D array of node-centered values with shape (nnx_total,).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utility._node_to_cell_average_1d">
+<span class="sig-prename descclassname"><span class="pre">utility.</span></span><span class="sig-name descname"><span class="pre">_node_to_cell_average_1d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">atmpy.grid.kgrid.Grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_nodes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">numpy.ndarray</span></span></span><a class="reference internal" href="../../_modules/utility.html#_node_to_cell_average_1d"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility._node_to_cell_average_1d" title="Permalink to this definition"></a></dt>
+<dd><p>Compute the 1D node-to-cell averaging for a given grid and node-centered variable array.</p>
+<p>In 1D, each inner cell is computed as the average of the two adjacent nodes.
+Ghost cells remain unchanged, as we never overwrite them.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><p>grid: <code class="xref py py-class docutils literal notranslate"><span class="pre">Grid</span></code>
+var_nodes (np.ndarray): A 1D array of node-centered values of shape (nnx_total,).</p>
+</dd>
+<dt>Returns:</dt><dd><p>np.ndarray: A 1D array of cell-centered values with shape (ncx_total,).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utility._cell_to_node_average_2d">
+<span class="sig-prename descclassname"><span class="pre">utility.</span></span><span class="sig-name descname"><span class="pre">_cell_to_node_average_2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">atmpy.grid.kgrid.Grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_nodes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">numpy.ndarray</span></span></span><a class="reference internal" href="../../_modules/utility.html#_cell_to_node_average_2d"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility._cell_to_node_average_2d" title="Permalink to this definition"></a></dt>
+<dd><p>Evaluate a variable on nodes of the grid using averaging the already evaluated values on cells.</p>
+<section id="id6">
+<h3>Parameters<a class="headerlink" href="#id6" title="Permalink to this heading"></a></h3>
+<dl>
+<dt>grid<span class="classifier"><code class="xref py py-class docutils literal notranslate"><span class="pre">Grid</span></code></span></dt><dd><p>grid object on which the variable is evaluated.</p>
+</dd>
+</dl>
+<p>var_cells : np.ndarray
+A 1D array of cell-centered values of shape (ncx_total,ncx_total).
+var_nodes : np.ndarray
+A 1D array of node-centered values of shape (nnx_total,nny_total).</p>
+</section>
+<section id="id7">
+<h3>Returns<a class="headerlink" href="#id7" title="Permalink to this heading"></a></h3>
+<p>np.ndarray of shape (nnx_total,nny_total)</p>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utility._node_to_cell_average_2d">
+<span class="sig-prename descclassname"><span class="pre">utility.</span></span><span class="sig-name descname"><span class="pre">_node_to_cell_average_2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">atmpy.grid.kgrid.Grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_nodes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">numpy.ndarray</span></span></span><a class="reference internal" href="../../_modules/utility.html#_node_to_cell_average_2d"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility._node_to_cell_average_2d" title="Permalink to this definition"></a></dt>
+<dd><p>Evaluate a variable on cells of the grid using averaging the already evaluated values on nodes.</p>
+<section id="id8">
+<h3>Parameters<a class="headerlink" href="#id8" title="Permalink to this heading"></a></h3>
+<dl>
+<dt>grid<span class="classifier"><code class="xref py py-class docutils literal notranslate"><span class="pre">Grid</span></code></span></dt><dd><p>grid object on which the variable is evaluated.</p>
+</dd>
+<dt>var_nodes<span class="classifier">np.ndarray</span></dt><dd><p>A 1D array of node values of shape <cite>grid.nshape</cite>.</p>
+</dd>
+<dt>var_cells<span class="classifier">np.ndarray</span></dt><dd><p>A 1D array of cell values of shape <cite>grid.cshape</cite>.</p>
+</dd>
+</dl>
+</section>
+<section id="id9">
+<h3>Returns<a class="headerlink" href="#id9" title="Permalink to this heading"></a></h3>
+<p>ndarray of shape <cite>grid.cshape</cite></p>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utility._cell_to_node_average_3d">
+<span class="sig-prename descclassname"><span class="pre">utility.</span></span><span class="sig-name descname"><span class="pre">_cell_to_node_average_3d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_cells</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_nodes</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/utility.html#_cell_to_node_average_3d"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility._cell_to_node_average_3d" title="Permalink to this definition"></a></dt>
+<dd><p>Evaluate a variable on nodes of the grid using averaging the already evaluated values on cells.</p>
+<section id="id10">
+<h3>Parameters<a class="headerlink" href="#id10" title="Permalink to this heading"></a></h3>
+<dl>
+<dt>grid<span class="classifier"><code class="xref py py-class docutils literal notranslate"><span class="pre">Grid</span></code></span></dt><dd><p>grid object on which the variable is evaluated.</p>
+</dd>
+</dl>
+<p>var_cells : np.ndarray
+A 1D array of cell-centered values of shape (ncx_total,ncx_total).
+var_nodes : np.ndarray
+A 1D array of node-centered values of shape (nnx_total,nny_total).</p>
+</section>
+<section id="id11">
+<h3>Returns<a class="headerlink" href="#id11" title="Permalink to this heading"></a></h3>
+<p>np.ndarray of shape (nnx_total,nny_total)</p>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utility._node_to_cell_average_3d">
+<span class="sig-prename descclassname"><span class="pre">utility.</span></span><span class="sig-name descname"><span class="pre">_node_to_cell_average_3d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">atmpy.grid.kgrid.Grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_nodes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">numpy.ndarray</span></span></span><a class="reference internal" href="../../_modules/utility.html#_node_to_cell_average_3d"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utility._node_to_cell_average_3d" title="Permalink to this definition"></a></dt>
+<dd><p>Evaluate a variable on cells of the grid using averaging the already evaluated values on nodes.</p>
+<section id="id12">
+<h3>Parameters<a class="headerlink" href="#id12" title="Permalink to this heading"></a></h3>
+<dl>
+<dt>grid<span class="classifier"><code class="xref py py-class docutils literal notranslate"><span class="pre">Grid</span></code></span></dt><dd><p>grid object on which the variable is evaluated.</p>
+</dd>
+<dt>var_nodes<span class="classifier">np.ndarray</span></dt><dd><p>A 1D array of node values of shape <cite>grid.nshape</cite>.</p>
+</dd>
+<dt>var_cells<span class="classifier">np.ndarray</span></dt><dd><p>A 1D array of cell values of shape <cite>grid.cshape</cite>.</p>
+</dd>
+</dl>
+</section>
+<section id="id13">
+<h3>Returns<a class="headerlink" href="#id13" title="Permalink to this heading"></a></h3>
+<p>ndarray of shape <cite>grid.cshape</cite></p>
+</section>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../states/index.html" class="btn btn-neutral float-left" title="states" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../data_config/index.html" class="btn btn-neutral float-right" title="data_config" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amir Maghoul.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

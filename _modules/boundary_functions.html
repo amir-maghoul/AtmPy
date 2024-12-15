@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>time_integration &mdash; Atmpy 0.1 documentation</title>
+  <title>boundary_functions &mdash; Atmpy 0.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css" />
       <link rel="stylesheet" type="text/css" href="../_static/graphviz.css" />
@@ -59,7 +59,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="index.html">Module code</a></li>
-      <li class="breadcrumb-item active">time_integration</li>
+      <li class="breadcrumb-item active">boundary_functions</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -68,16 +68,28 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>Source code for time_integration</h1><div class="highlight"><pre>
-<div class="viewcode-block" id="TimeIntegrator"><a class="viewcode-back" href="../autoapi/time_integration/index.html#time_integration.TimeIntegrator">[docs]</a><span></span><span class="k">class</span> <span class="nc">TimeIntegrator</span><span class="p">:</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">grid</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">flux_calculator</span><span class="p">):</span>
-        <span class="k">pass</span>
+  <h1>Source code for boundary_functions</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">atmpy.grid.kgrid</span> <span class="kn">import</span> <span class="n">Grid</span>
 
-<div class="viewcode-block" id="TimeIntegrator.advance_time_step"><a class="viewcode-back" href="../autoapi/time_integration/index.html#time_integration.TimeIntegrator.advance_time_step">[docs]</a>    <span class="k">def</span> <span class="nf">advance_time_step</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">pass</span></div>
 
-<div class="viewcode-block" id="TimeIntegrator.compute_timestep"><a class="viewcode-back" href="../autoapi/time_integration/index.html#time_integration.TimeIntegrator.compute_timestep">[docs]</a>    <span class="k">def</span> <span class="nf">compute_timestep</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">pass</span></div></div>
+<div class="viewcode-block" id="mirror_boundary"><a class="viewcode-back" href="../autoapi/boundary_functions/index.html#boundary_functions.mirror_boundary">[docs]</a><span class="k">def</span> <span class="nf">mirror_boundary</span><span class="p">():</span>
+    <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="linear_boundary"><a class="viewcode-back" href="../autoapi/boundary_functions/index.html#boundary_functions.linear_boundary">[docs]</a><span class="k">def</span> <span class="nf">linear_boundary</span><span class="p">():</span>
+    <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="quadratic_boundary"><a class="viewcode-back" href="../autoapi/boundary_functions/index.html#boundary_functions.quadratic_boundary">[docs]</a><span class="k">def</span> <span class="nf">quadratic_boundary</span><span class="p">():</span>
+    <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="periodic_boundary"><a class="viewcode-back" href="../autoapi/boundary_functions/index.html#boundary_functions.periodic_boundary">[docs]</a><span class="k">def</span> <span class="nf">periodic_boundary</span><span class="p">():</span>
+    <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="relaxation_boundary"><a class="viewcode-back" href="../autoapi/boundary_functions/index.html#boundary_functions.relaxation_boundary">[docs]</a><span class="k">def</span> <span class="nf">relaxation_boundary</span><span class="p">():</span>
+    <span class="k">pass</span></div>
 </pre></div>
 
            </div>

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>config &mdash; Atmpy 0.1 documentation</title>
+  <title>data_config &mdash; Atmpy 0.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css" />
       <link rel="stylesheet" type="text/css" href="../_static/graphviz.css" />
@@ -41,8 +41,6 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
-<li class="toctree-l1"><a class="reference internal" href="../atmpy/grid.html">Grid</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../atmpy/flux.html">Flux</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../autoapi/index.html">API Reference</a></li>
 </ul>
 
@@ -61,7 +59,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="index.html">Module code</a></li>
-      <li class="breadcrumb-item active">config</li>
+      <li class="breadcrumb-item active">data_config</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -70,16 +68,17 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>Source code for config</h1><div class="highlight"><pre>
+  <h1>Source code for data_config</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot; This module contains configuration values for the project. It contains the global and regime dependent constants</span>
 <span class="sd">and  pysical quantities&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
 <span class="kn">from</span> <span class="nn">atmpy.data.TestCaseData</span> <span class="kn">import</span> <span class="n">TestCaseData</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 
 
 <span class="nd">@dataclass</span>
-<div class="viewcode-block" id="Config"><a class="viewcode-back" href="../autoapi/config/index.html#config.Config">[docs]</a><span class="k">class</span> <span class="nc">Config</span><span class="p">:</span>
+<div class="viewcode-block" id="Config"><a class="viewcode-back" href="../autoapi/data_config/index.html#data_config.Config">[docs]</a><span class="k">class</span> <span class="nc">Config</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Data class for the global values and quantities</span>
 
 <span class="sd">    Attributes</span>
@@ -92,12 +91,12 @@
 
 <span class="sd">    &quot;&quot;&quot;</span>
 
-<div class="viewcode-block" id="Config.alpha_g"><a class="viewcode-back" href="../autoapi/config/index.html#config.Config.alpha_g">[docs]</a>    <span class="n">alpha_g</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span></div>
-<div class="viewcode-block" id="Config.alpha_w"><a class="viewcode-back" href="../autoapi/config/index.html#config.Config.alpha_w">[docs]</a>    <span class="n">alpha_w</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span></div>
-<div class="viewcode-block" id="Config.alpha_p"><a class="viewcode-back" href="../autoapi/config/index.html#config.Config.alpha_p">[docs]</a>    <span class="n">alpha_p</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span></div></div>
+<div class="viewcode-block" id="Config.alpha_g"><a class="viewcode-back" href="../autoapi/data_config/index.html#data_config.Config.alpha_g">[docs]</a>    <span class="n">alpha_g</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span></div>
+<div class="viewcode-block" id="Config.alpha_w"><a class="viewcode-back" href="../autoapi/data_config/index.html#data_config.Config.alpha_w">[docs]</a>    <span class="n">alpha_w</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span></div>
+<div class="viewcode-block" id="Config.alpha_p"><a class="viewcode-back" href="../autoapi/data_config/index.html#data_config.Config.alpha_p">[docs]</a>    <span class="n">alpha_p</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span></div></div>
 
 
-<div class="viewcode-block" id="Thermodynamics"><a class="viewcode-back" href="../autoapi/config/index.html#config.Thermodynamics">[docs]</a><span class="k">class</span> <span class="nc">Thermodynamics</span><span class="p">:</span>
+<div class="viewcode-block" id="Thermodynamics"><a class="viewcode-back" href="../autoapi/data_config/index.html#data_config.Thermodynamics">[docs]</a><span class="k">class</span> <span class="nc">Thermodynamics</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Data class for thermodynamic values and constants</span>
 
 <span class="sd">    Attributes</span>
@@ -118,7 +117,7 @@
 <span class="sd">            quantities</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-<div class="viewcode-block" id="Thermodynamics.gamma"><a class="viewcode-back" href="../autoapi/config/index.html#config.Thermodynamics.gamma">[docs]</a>        <span class="bp">self</span><span class="o">.</span><span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">gamma</span></div></div>
+<div class="viewcode-block" id="Thermodynamics.gamma"><a class="viewcode-back" href="../autoapi/data_config/index.html#data_config.Thermodynamics.gamma">[docs]</a>        <span class="bp">self</span><span class="o">.</span><span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">gamma</span></div></div>
 </pre></div>
 
            </div>

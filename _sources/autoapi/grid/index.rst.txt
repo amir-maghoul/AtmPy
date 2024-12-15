@@ -123,6 +123,9 @@ Module Contents
    .. py:attribute:: iz
 
 
+   .. py:attribute:: zeros
+
+
    .. py:method:: _compute_outer_lims(lim, ng, ds)
       :staticmethod:
 
@@ -145,6 +148,12 @@ Module Contents
 
 
    Class of cell grid. The unmentioned attributes of the class are overriden attributes of the parent class.
+
+
+   .. py:attribute:: new_begin
+
+
+   .. py:attribute:: new_end
 
 
    .. py:attribute:: ninodes

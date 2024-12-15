@@ -8,9 +8,12 @@ This page contains auto-generated API reference documentation [#f1]_.
 
    /autoapi/flux/index
    /autoapi/grid/index
-   /autoapi/config/index
+   /autoapi/kgrid/index
    /autoapi/states/index
+   /autoapi/utility/index
+   /autoapi/data_config/index
    /autoapi/TestCaseData/index
    /autoapi/time_integration/index
+   /autoapi/boundary_functions/index
 
 .. [#f1] Created with `sphinx-autoapi <https://github.com/readthedocs/sphinx-autoapi>`_

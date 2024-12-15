@@ -1,0 +1,211 @@
+kgrid
+=====
+
+.. py:module:: kgrid
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   kgrid.Grid
+
+
+Module Contents
+---------------
+
+.. py:class:: Grid(nx: int, x_start: float, x_end: float, ngx: int = 2, ny: Optional[int] = None, y_start: Optional[float] = None, y_end: Optional[float] = None, ngy: Optional[int] = None, nz: Optional[int] = None, z_start: Optional[float] = None, z_end: Optional[float] = None, ngz: Optional[int] = None)
+
+   Basic grid data structure for the FVM solver.
+
+   Attributes
+   ----------
+   nx : int
+       Number of cells in the x-direction.
+   x_start : float
+       Starting coordinate in the x-direction.
+   x_end : float
+       Ending coordinate in the x-direction.
+   ngx : int, optional
+       Number of ghost cells in the x-direction. Default is 2.
+   ny : int, optional
+       Number of cells in the y-direction (for 2D/3D grids).
+   y_start : float, optional
+       Starting coordinate in the y-direction.
+   y_end : float, optional
+       Ending coordinate in the y-direction.
+   ngy : int, optional
+       Number of ghost cells in the y-direction.
+   nz : int, optional
+       Number of cells in the z-direction (for 3D grids).
+   z_start : float, optional
+       Starting coordinate in the z-direction.
+   z_end : float, optional
+       Ending coordinate in the z-direction.
+   ngz : int, optional
+       Number of ghost cells in the z-direction.
+   dimensions : int
+       dimension of the grid
+   inner_slice_x, inner_slice_y, inner_slice_z : slice
+       the index slices of inner cells/nodes in each direction
+   ncx_total : int
+       Total number of cells in the x-direction (inner cells + ghost cells)
+   ncy_total : int
+       Total number of cells in the y-direction (inner cells + ghost cells)
+   ncz_total : int
+       Total number of cells in the z-direction (inner cells + ghost cells)
+   nnx_total : int
+       Total number of nodes in the x-direction (inner nodes + ghost nodes)
+   nny_total : int
+       Total number of nodes in the y-direction (inner nodes + ghost nodes)
+   nnz_total : int
+       Total number of nodes in the z-direction (inner nodes + ghost nodes)
+   cshape : Tuple[int, ...]
+       The total shape of the cell grid
+   nshape : Tuple[int, ...]
+       The total shape of the node grid
+   x_cells : ndarray
+       Coordinate array of cell centers in x-direction
+   y_cells : ndarray, optional
+       Coordinate array of cell centers in y-direction
+   z_cells : ndarray, optional
+       Coordinate array of cell centers in z-direction
+   x_nodes : np.ndarray
+       Coordinate array of nodes in x-direction
+   y_nodes : np.ndarray, optional
+       Coordinate array of nodes in y-direction
+   z_nodes : np.ndarray, optional
+       Coordinate array of nodes in z-direction
+   cell_mesh : Tuple[np.ndarray, ...]
+       the meshgrid created from the cell centers according to the dimension
+   node_mesh : Tuple[np.ndarray, ...]
+       the meshgrid created from the nodes according to the dimension
+
+
+
+   .. py:attribute:: dimensions
+      :type:  int
+      :value: 1
+
+
+
+   .. py:attribute:: nx
+      :type:  int
+
+
+   .. py:attribute:: x_start
+      :type:  float
+
+
+   .. py:attribute:: x_end
+      :type:  float
+
+
+   .. py:attribute:: dx
+      :type:  float
+
+
+   .. py:attribute:: ngx
+      :type:  int
+
+
+   .. py:attribute:: ncx_total
+      :type:  int
+
+
+   .. py:attribute:: nnx_total
+      :type:  int
+
+
+   .. py:attribute:: cshape
+      :type:  Tuple[int, Ellipsis]
+
+
+   .. py:attribute:: nshape
+      :type:  Tuple[int, Ellipsis]
+
+
+   .. py:attribute:: x_cells
+      :type:  numpy.ndarray
+
+
+   .. py:attribute:: x_nodes
+      :type:  numpy.ndarray
+
+
+   .. py:attribute:: inner_slice_x
+
+
+   .. py:property:: cell_mesh
+      Create a mesh using the dimension and cell coordinates
+
+
+
+   .. py:property:: node_mesh
+      Create a mesh using the dimension and node coordinates
+
+
+
+   .. py:method:: get_inner_cells() -> Tuple[slice, Ellipsis]
+
+      Get slices corresponding to the inner cells (excluding ghost cells).
+
+      Returns:
+          Tuple[slice, ...]: Slices for indexing inner cells.
+
+
+
+   .. py:method:: get_boundary_cells() -> Tuple[slice, Ellipsis]
+
+      Get slices corresponding to the boundary cells (ghost cells).
+
+      Returns:
+          Tuple[slice, ...]: Slices for indexing boundary cells.
+
+
+
+   .. py:method:: get_inner_nodes() -> Tuple[slice, Ellipsis]
+
+      Get slices corresponding to the inner nodes (excluding ghost nodes).
+
+      Returns:
+          Tuple[slice, ...]: Slices for indexing inner nodes.
+
+
+
+   .. py:method:: get_boundary_nodes() -> Tuple[slice, Ellipsis]
+
+      Get slices corresponding to the boundary nodes (ghost nodes).
+
+      Returns:
+          Tuple[slice, ...]: Slices for indexing boundary nodes.
+
+
+
+   .. py:method:: evaluate_function_on_cells(func)
+
+      Evaluate a given function on the cell-centered coordinates of the grid.
+      The function signature depends on the grid dimension:
+      - 1D: func(x)
+      - 2D: func(x, y)
+      - 3D: func(x, y, z)
+
+      Returns:
+          np.ndarray: Array of function values at each cell center.
+
+
+
+   .. py:method:: evaluate_function_on_nodes(func)
+
+      Evaluate a given function on the node-centered coordinates of the grid.
+      The function signature depends on the grid dimension:
+      - 1D: func(x)
+      - 2D: func(x, y)
+      - 3D: func(x, y, z)
+
+      Returns:
+          np.ndarray: Array of function values at each node.
+
+
+
