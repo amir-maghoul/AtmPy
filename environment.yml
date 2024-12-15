@@ -4,23 +4,22 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - cupy
-  - numpy
-  - numba
-  - scipy
-  - matplotlib
-  - pytest
-  - pytest-cov
-  - black
-  - flake8
+  - cupy == 13.2
+  - numpy == 1.26
+  - numba == 0.60
+  - scipy == 1.14.0
+  - matplotlib == 3.9.1
+  - pytest == 8.3.2
+  - pytest-cov == 6.0.0
+  - black == 24.4.2
+  - flake8 ==7.1.1
   - sphinx=6.2.1
-  - jupyter
-  - sphinx-autoapi
-  - pytest-cov
-  - pytest-doctestplus
-  - doctest
-  - mypy
-  - pip
+  - jupyter==1.0.0
+  - sphinx-autoapi==3.2.1
+  - pytest-doctestplus==0.11.1
+  - doctest==2.4.11
+  - mypy==1.11.1
+  - pip == 24.2
   - pip:
       -  sphinx-rtd-theme
       - -e .
