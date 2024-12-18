@@ -215,14 +215,3 @@ class NodeVariable(BaseVariableContainer):
             The new variable values to be assigned, matching the shape of self.vars.
         """
         self.vars = new_values
-
-
-if __name__ == "__main__":
-    dim = [DimensionSpec(n=3, start=0, end=1, ng=1)]
-    grid = create_grid(dim)
-    vars = Variable(grid, num_vars=4)
-    # vars.to_primitive()
-
-    from enum import Enum
-
-    print(VarInd1D.values())
