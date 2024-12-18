@@ -1,0 +1,28 @@
+states
+======
+
+.. py:module:: states
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   states.State
+
+
+Module Contents
+---------------
+
+.. py:class:: State(grid)
+
+   .. py:method:: initialize_state()
+
+
+   .. py:method:: update_state(fluxes)
+
+
+   .. py:method:: compute_residuals()
+
+

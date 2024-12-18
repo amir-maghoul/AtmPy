@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>utility &mdash; Atmpy 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Atmpy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../atmpy/grid.html">Grid</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../atmpy/flux.html">Flux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../autoapi/index.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Atmpy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Module code</a></li>
+      <li class="breadcrumb-item active">utility</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for utility</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">atmpy.grid.kgrid</span> <span class="kn">import</span> <span class="n">Grid</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+
+
+<span class="nd">@dataclass</span>
+<div class="viewcode-block" id="DimensionSpec"><a class="viewcode-back" href="../autoapi/utility/index.html#utility.DimensionSpec">[docs]</a><span class="k">class</span> <span class="nc">DimensionSpec</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The data class for creating the dimensions of the problem&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="DimensionSpec.n"><a class="viewcode-back" href="../autoapi/utility/index.html#utility.DimensionSpec.n">[docs]</a>    <span class="n">n</span><span class="p">:</span> <span class="nb">int</span></div>
+<div class="viewcode-block" id="DimensionSpec.start"><a class="viewcode-back" href="../autoapi/utility/index.html#utility.DimensionSpec.start">[docs]</a>    <span class="n">start</span><span class="p">:</span> <span class="nb">float</span></div>
+<div class="viewcode-block" id="DimensionSpec.end"><a class="viewcode-back" href="../autoapi/utility/index.html#utility.DimensionSpec.end">[docs]</a>    <span class="n">end</span><span class="p">:</span> <span class="nb">float</span></div>
+<div class="viewcode-block" id="DimensionSpec.ng"><a class="viewcode-back" href="../autoapi/utility/index.html#utility.DimensionSpec.ng">[docs]</a>    <span class="n">ng</span><span class="p">:</span> <span class="nb">int</span></div></div>
+
+
+<div class="viewcode-block" id="to_grid_args"><a class="viewcode-back" href="../autoapi/utility/index.html#utility.to_grid_args">[docs]</a><span class="k">def</span> <span class="nf">to_grid_args</span><span class="p">(</span><span class="n">dimensions</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">DimensionSpec</span><span class="p">]):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert list of dimensions to grid arguments</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dimensions : List[DimensionSpec]</span>
+<span class="sd">        List of dimensions in forms of objects of the Dimension class</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        Dictionary of grid arguments</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; dims = [DimensionSpec(5, 0, 3, 2), DimensionSpec(6, 1, 4, 3)]</span>
+<span class="sd">    &gt;&gt;&gt; to_grid_args(dims) # doctest: +NORMALIZE_WHITESPACE</span>
+<span class="sd">    {&#39;nx&#39;: 5, &#39;x_start&#39;: 0, &#39;x_end&#39;: 3, &#39;ngx&#39;: 2, &#39;ny&#39;: 6, &#39;y_start&#39;: 1, &#39;y_end&#39;: 4, &#39;ngy&#39;: 3}</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># We&#39;ll build a dictionary of arguments for the Grid constructor</span>
+    <span class="c1"># Dimension order: x=0, y=1, z=2</span>
+    <span class="n">dim_letters</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">]</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">dimensions</span><span class="p">):</span>
+        <span class="n">letter</span> <span class="o">=</span> <span class="n">dim_letters</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">args</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;n</span><span class="si">{</span><span class="n">letter</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dim</span><span class="o">.</span><span class="n">n</span>
+        <span class="n">args</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">letter</span><span class="si">}</span><span class="s2">_start&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dim</span><span class="o">.</span><span class="n">start</span>
+        <span class="n">args</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">letter</span><span class="si">}</span><span class="s2">_end&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dim</span><span class="o">.</span><span class="n">end</span>
+        <span class="n">args</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;ng</span><span class="si">{</span><span class="n">letter</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dim</span><span class="o">.</span><span class="n">ng</span>
+    <span class="k">return</span> <span class="n">args</span></div>
+
+
+<div class="viewcode-block" id="create_grid"><a class="viewcode-back" href="../autoapi/utility/index.html#utility.create_grid">[docs]</a><span class="k">def</span> <span class="nf">create_grid</span><span class="p">(</span><span class="n">dimensions</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">DimensionSpec</span><span class="p">]):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Unpacks the dimensions parameter (which is a list of DimensionSpec objects)</span>
+<span class="sd">    into a dictionary and pass it to create a Grid object using them</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dimensions : List[DimensionSpec]</span>
+<span class="sd">        List of dimensions in forms of objects of the Dimension class</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    atmpy.grid.kgrid.Grid</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Grid(nx, x_start, x_end, ngx, ny=None, y_start=None, y_end=None, ngy=None, nz=None, z_start=None, z_end=None, ngz=None)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">to_grid_args</span><span class="p">(</span><span class="n">dimensions</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">Grid</span><span class="p">(</span><span class="o">**</span><span class="n">args</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="cell_to_node_average"><a class="viewcode-back" href="../autoapi/utility/index.html#utility.cell_to_node_average">[docs]</a><span class="k">def</span> <span class="nf">cell_to_node_average</span><span class="p">(</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">Grid</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Averages the values of the primary/secondary variables from cells onto nodes</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    grid : :py:class:`~atmpy.grid.kgrid.Grid`</span>
+<span class="sd">        grid object on which the averaging takes place</span>
+
+<span class="sd">    var_cells : np.ndarray</span>
+<span class="sd">        the discrete function values (defined on the cells) from which the averaging takes place</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    np.ndarray</span>
+<span class="sd">        The values of the var_cells averages on nodes</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">var_nodes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">var_nodes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">nshape</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">var_nodes</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">grid</span><span class="o">.</span><span class="n">nshape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Not an expected shape for the given variable evaluated on nodes&quot;</span>
+            <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">dimensions</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_cell_to_node_average_1d</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">grid</span><span class="o">.</span><span class="n">dimensions</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_cell_to_node_average_2d</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">grid</span><span class="o">.</span><span class="n">dimensions</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_cell_to_node_average_3d</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid grid dimension&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="node_to_cell_average"><a class="viewcode-back" href="../autoapi/utility/index.html#utility.node_to_cell_average">[docs]</a><span class="k">def</span> <span class="nf">node_to_cell_average</span><span class="p">(</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">Grid</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Averages the values of the primary/secondary variables from nodes onto cells</span>
+
+<span class="sd">       Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    grid : :py:class:`~atmpy.grid.kgrid.Grid`</span>
+<span class="sd">        grid object on which the averaging takes place</span>
+
+<span class="sd">    var_nodes : np.ndarray</span>
+<span class="sd">        the discrete function values (defined on the nodes) from which the averaging takes place</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    np.ndarray</span>
+<span class="sd">        The values of the var_cells averages on nodes</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">var_cells</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">var_cells</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">cshape</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">var_cells</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">grid</span><span class="o">.</span><span class="n">cshape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Not an expected shape for the given variable evaluated on cells&quot;</span>
+            <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">dimensions</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_node_to_cell_average_1d</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">grid</span><span class="o">.</span><span class="n">dimensions</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_node_to_cell_average_2d</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">grid</span><span class="o">.</span><span class="n">dimensions</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_node_to_cell_average_3d</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid grid dimension&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="_cell_to_node_average_1d"><a class="viewcode-back" href="../autoapi/utility/index.html#utility._cell_to_node_average_1d">[docs]</a><span class="k">def</span> <span class="nf">_cell_to_node_average_1d</span><span class="p">(</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">Grid</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the 1D cell-to-node averaging for a given grid and cell-centered variable array.</span>
+
+<span class="sd">    In 1D, each inner node value is computed as the average of the two adjacent cells.</span>
+<span class="sd">    Ghost nodes remain unchanged, as we never overwrite them.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        grid: :py:class:`~atmpy.grid.kgrid.Grid`</span>
+<span class="sd">        var_cells (np.ndarray): A 1D array of cell-centered values of shape (ncx_total,).</span>
+<span class="sd">        var_nodes : np.ndarray, default=None</span>
+<span class="sd">            A 1D array of node-centered values of shape (nx,).</span>
+<span class="sd">            If it is None, an array of zeros is created.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        np.ndarray: A 1D array of node-centered values with shape (nnx_total,).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">i_slice_node</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">ngx</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">ngx</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">nx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Pad the var_cells by one cell in each direction (to create an array with the same shape as var_nodes)</span>
+    <span class="c1"># This makes indexing easier: now padded[i] corresponds to var_cells[i-1],</span>
+    <span class="c1"># and we can form averages with consistent slicing.</span>
+    <span class="n">padded</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">var_cells</span><span class="p">,</span> <span class="n">pad_width</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;constant&quot;</span><span class="p">,</span> <span class="n">constant_values</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+    <span class="c1"># var_nodes[i] = 0.5 * (var_cells[i+1] + var_cells[i]) for i in inner region</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">padded</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">padded</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+    <span class="n">var_nodes</span><span class="p">[</span><span class="n">i_slice_node</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp</span><span class="p">[</span><span class="n">i_slice_node</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">var_nodes</span></div>
+
+
+<div class="viewcode-block" id="_node_to_cell_average_1d"><a class="viewcode-back" href="../autoapi/utility/index.html#utility._node_to_cell_average_1d">[docs]</a><span class="k">def</span> <span class="nf">_node_to_cell_average_1d</span><span class="p">(</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">Grid</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the 1D node-to-cell averaging for a given grid and node-centered variable array.</span>
+
+<span class="sd">    In 1D, each inner cell is computed as the average of the two adjacent nodes.</span>
+<span class="sd">    Ghost cells remain unchanged, as we never overwrite them.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        grid: :py:class:`~atmpy.grid.kgrid.Grid`</span>
+<span class="sd">        var_nodes (np.ndarray): A 1D array of node-centered values of shape (nnx_total,).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        np.ndarray: A 1D array of cell-centered values with shape (ncx_total,).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">i_slice_node</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">ngx</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">ngx</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">nx</span><span class="p">)</span>
+
+    <span class="c1"># var_cells[i] = 0.5 * (var_nodes[i] + var_nodes[i+1]) for inner region</span>
+    <span class="c1"># Temp will have the same shape as nodes</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">var_nodes</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">var_nodes</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+    <span class="n">var_cells</span><span class="p">[</span><span class="n">i_slice_node</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp</span><span class="p">[</span><span class="n">i_slice_node</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">var_cells</span></div>
+
+
+<div class="viewcode-block" id="_cell_to_node_average_2d"><a class="viewcode-back" href="../autoapi/utility/index.html#utility._cell_to_node_average_2d">[docs]</a><span class="k">def</span> <span class="nf">_cell_to_node_average_2d</span><span class="p">(</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">Grid</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Evaluate a variable on nodes of the grid using averaging the already evaluated values on cells.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    grid : :py:class:`~atmpy.grid.kgrid.Grid`</span>
+<span class="sd">        grid object on which the variable is evaluated.</span>
+<span class="sd">    var_cells : np.ndarray</span>
+<span class="sd">    A 1D array of cell-centered values of shape (ncx_total,ncx_total).</span>
+<span class="sd">    var_nodes : np.ndarray</span>
+<span class="sd">    A 1D array of node-centered values of shape (nnx_total,nny_total).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    np.ndarray of shape (nnx_total,nny_total)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">i_slice_node</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">ngx</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">ngx</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">nx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">j_slice_node</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">ngy</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">ngy</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">ny</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Pad the var_cells by one cell in each direction (to create an array with the same shape as var_nodes)</span>
+    <span class="c1"># This makes indexing easier: now padded[i,j] corresponds to var_cells[i-1,j-1],</span>
+    <span class="c1"># and we can form averages with consistent slicing.</span>
+    <span class="n">padded</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">var_cells</span><span class="p">,</span> <span class="n">pad_width</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;constant&quot;</span><span class="p">,</span> <span class="n">constant_values</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+    <span class="c1"># padded shape: (nnx_total+1, nny_total+1)</span>
+
+    <span class="c1"># Note: The indexing here corresponds to shifted indices after padding.</span>
+    <span class="c1"># Temp will have the same shape as nodes</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="mf">0.25</span> <span class="o">*</span> <span class="p">(</span>
+        <span class="n">padded</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># top-left corner</span>
+        <span class="o">+</span> <span class="n">padded</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]</span>  <span class="c1"># top-right corner</span>
+        <span class="o">+</span> <span class="n">padded</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># bottom-left corner</span>
+        <span class="o">+</span> <span class="n">padded</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:]</span>  <span class="c1"># bottom-right corner</span>
+    <span class="p">)</span>
+    <span class="c1"># temp shape: (nnx_total, nny_total)</span>
+    <span class="c1"># fill out the inner nodes of the var_nodes</span>
+    <span class="n">var_nodes</span><span class="p">[</span><span class="n">i_slice_node</span><span class="p">,</span> <span class="n">j_slice_node</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp</span><span class="p">[</span><span class="n">i_slice_node</span><span class="p">,</span> <span class="n">j_slice_node</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">var_nodes</span></div>
+
+
+<div class="viewcode-block" id="_node_to_cell_average_2d"><a class="viewcode-back" href="../autoapi/utility/index.html#utility._node_to_cell_average_2d">[docs]</a><span class="k">def</span> <span class="nf">_node_to_cell_average_2d</span><span class="p">(</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">Grid</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Evaluate a variable on cells of the grid using averaging the already evaluated values on nodes.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    grid : :py:class:`~atmpy.grid.kgrid.Grid`</span>
+<span class="sd">        grid object on which the variable is evaluated.</span>
+<span class="sd">    var_nodes : np.ndarray</span>
+<span class="sd">        A 1D array of node values of shape `grid.nshape`.</span>
+<span class="sd">    var_cells : np.ndarray</span>
+<span class="sd">        A 1D array of cell values of shape `grid.cshape`.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    ndarray of shape `grid.cshape`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">i_slice_node</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">ngx</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">ngx</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">nx</span><span class="p">)</span>
+    <span class="n">j_slice_node</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">ngy</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">ngy</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">ny</span><span class="p">)</span>
+
+    <span class="c1"># Compute cell_data by averaging the four corner nodes.</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="mf">0.25</span> <span class="o">*</span> <span class="p">(</span>
+        <span class="n">var_nodes</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># top-left nodes</span>
+        <span class="o">+</span> <span class="n">var_nodes</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># bottom-left nodes</span>
+        <span class="o">+</span> <span class="n">var_nodes</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]</span>  <span class="c1"># top-right nodes</span>
+        <span class="o">+</span> <span class="n">var_nodes</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:]</span>  <span class="c1"># bottom-right nodes</span>
+    <span class="p">)</span>
+    <span class="n">var_cells</span><span class="p">[</span><span class="n">i_slice_node</span><span class="p">,</span> <span class="n">j_slice_node</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp</span><span class="p">[</span><span class="n">i_slice_node</span><span class="p">,</span> <span class="n">j_slice_node</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">var_cells</span></div>
+
+
+<div class="viewcode-block" id="_cell_to_node_average_3d"><a class="viewcode-back" href="../autoapi/utility/index.html#utility._cell_to_node_average_3d">[docs]</a><span class="k">def</span> <span class="nf">_cell_to_node_average_3d</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Evaluate a variable on nodes of the grid using averaging the already evaluated values on cells.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    grid : :py:class:`~atmpy.grid.kgrid.Grid`</span>
+<span class="sd">        grid object on which the variable is evaluated.</span>
+<span class="sd">    var_cells : np.ndarray</span>
+<span class="sd">    A 1D array of cell-centered values of shape (ncx_total,ncx_total).</span>
+<span class="sd">    var_nodes : np.ndarray</span>
+<span class="sd">    A 1D array of node-centered values of shape (nnx_total,nny_total).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    np.ndarray of shape (nnx_total,nny_total)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">i_slice_node</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">ngx</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">ngx</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">nx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">j_slice_node</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">ngy</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">ngy</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">ny</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">k_slice_node</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">ngz</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">ngz</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">nz</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Pad cell_data by one cell in each dimension for easier indexing</span>
+    <span class="n">padded</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">var_cells</span><span class="p">,</span> <span class="n">pad_width</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;constant&quot;</span><span class="p">,</span> <span class="n">constant_values</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+    <span class="c1"># padded shape: (nx_full+2, ny_full+2, nz_full+2)</span>
+
+    <span class="c1"># Each node is the average of 8 surrounding cells.</span>
+    <span class="c1"># node_data[i,j,k] = average of padded[i:i+2, j:j+2, k:k+2]</span>
+    <span class="c1"># Temp will have the same shape as nodes</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="mf">0.125</span> <span class="o">*</span> <span class="p">(</span>
+        <span class="n">padded</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="o">+</span> <span class="n">padded</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]</span>
+        <span class="o">+</span> <span class="n">padded</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="o">+</span> <span class="n">padded</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:]</span>
+        <span class="o">+</span> <span class="n">padded</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="o">+</span> <span class="n">padded</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]</span>
+        <span class="o">+</span> <span class="n">padded</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="o">+</span> <span class="n">padded</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:]</span>
+    <span class="p">)</span>
+    <span class="n">var_nodes</span><span class="p">[</span><span class="n">i_slice_node</span><span class="p">,</span> <span class="n">j_slice_node</span><span class="p">,</span> <span class="n">k_slice_node</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp</span><span class="p">[</span>
+        <span class="n">i_slice_node</span><span class="p">,</span> <span class="n">j_slice_node</span><span class="p">,</span> <span class="n">k_slice_node</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">var_nodes</span></div>
+
+
+<div class="viewcode-block" id="_node_to_cell_average_3d"><a class="viewcode-back" href="../autoapi/utility/index.html#utility._node_to_cell_average_3d">[docs]</a><span class="k">def</span> <span class="nf">_node_to_cell_average_3d</span><span class="p">(</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">Grid</span><span class="p">,</span> <span class="n">var_nodes</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">var_cells</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Evaluate a variable on cells of the grid using averaging the already evaluated values on nodes.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    grid : :py:class:`~atmpy.grid.kgrid.Grid`</span>
+<span class="sd">        grid object on which the variable is evaluated.</span>
+<span class="sd">    var_nodes : np.ndarray</span>
+<span class="sd">        A 1D array of node values of shape `grid.nshape`.</span>
+<span class="sd">    var_cells : np.ndarray</span>
+<span class="sd">        A 1D array of cell values of shape `grid.cshape`.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    ndarray of shape `grid.cshape`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">i_slice_node</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">ngx</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">ngx</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">nx</span><span class="p">)</span>
+    <span class="n">j_slice_node</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">ngy</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">ngy</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">ny</span><span class="p">)</span>
+    <span class="n">k_slice_node</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">ngz</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">ngz</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">nz</span><span class="p">)</span>
+
+    <span class="c1"># cell_data[i,j,k] = average of node_data[i:i+2, j:j+2, k:k+2]</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="mf">0.125</span> <span class="o">*</span> <span class="p">(</span>
+        <span class="n">var_nodes</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="o">+</span> <span class="n">var_nodes</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]</span>
+        <span class="o">+</span> <span class="n">var_nodes</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="o">+</span> <span class="n">var_nodes</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:]</span>
+        <span class="o">+</span> <span class="n">var_nodes</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="o">+</span> <span class="n">var_nodes</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]</span>
+        <span class="o">+</span> <span class="n">var_nodes</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="o">+</span> <span class="n">var_nodes</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:]</span>
+    <span class="p">)</span>
+    <span class="n">var_cells</span><span class="p">[</span><span class="n">i_slice_node</span><span class="p">,</span> <span class="n">j_slice_node</span><span class="p">,</span> <span class="n">k_slice_node</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp</span><span class="p">[</span>
+        <span class="n">i_slice_node</span><span class="p">,</span> <span class="n">j_slice_node</span><span class="p">,</span> <span class="n">k_slice_node</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">var_cells</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amir Maghoul.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
