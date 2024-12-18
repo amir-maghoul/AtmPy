@@ -1,7 +1,8 @@
 from enum import IntEnum, Enum
 
+
 class VariableIndices1D(Enum):
-    """ Create constants for 1D variable indices in the variable container (ndarray) for better readability
+    """Create constants for 1D variable indices in the variable container (ndarray) for better readability
 
     Notes
     -----
@@ -9,6 +10,7 @@ class VariableIndices1D(Enum):
     one after the other. So in 1D, index i = 2 is P since no other velocity exist, in 2d and 3d is RHOV. Similar thing
     happens for RHOW and index 3. The indices of P and PX are shifted by the dimension.
     """
+
     RHO = 0
     RHOU = 1
     P = 2
@@ -18,14 +20,16 @@ class VariableIndices1D(Enum):
     def values(cls):
         return [color.value for color in cls]
 
+
 class VariableIndices2D(Enum):
-    """ Create constants for 2D variable indices in the variable container (ndarray) for better readability
+    """Create constants for 2D variable indices in the variable container (ndarray) for better readability
 
     Notes
     -----
     We need to separate the index container for different dimensions since the variable container holds the velocities
     one after the other. So in 1D, index i = 2 is P since no other velocity exist, in 2d and 3d is RHOV. Similar thing
-    happens for RHOW and index 3. The indices of P and PX are shifted by the dimension."""
+    happens for RHOW and index 3. The indices of P and PX are shifted by the dimension.
+    """
 
     RHO = 0
     RHOU = 1
@@ -37,8 +41,9 @@ class VariableIndices2D(Enum):
     def values(cls):
         return [color.value for color in cls]
 
+
 class VariableIndices3D(Enum):
-    """ Create constants for 3D variable indices in the variable container (ndarray) for better readability
+    """Create constants for 3D variable indices in the variable container (ndarray) for better readability
 
     Notes
     -----
@@ -46,6 +51,7 @@ class VariableIndices3D(Enum):
     one after the other. So in 1D, index i = 2 is P since no other velocity exist, in 2d and 3d is RHOV. Similar thing
     happens for RHOW and index 3. The indices of P and PX are shifted by the dimension.
     """
+
     RHO = 0
     RHOU = 1
     RHOV = 2
@@ -56,4 +62,3 @@ class VariableIndices3D(Enum):
     @classmethod
     def values(cls):
         return [color.value for color in cls]
-

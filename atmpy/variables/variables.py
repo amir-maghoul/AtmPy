@@ -4,9 +4,10 @@ from atmpy.grid.utility import DimensionSpec, create_grid
 
 
 class BaseVariableContainer:
-    """ Base class for all conservative variables"""
+    """Base class for all conservative variables"""
+
     def __init__(self, grid, num_vars):
-        """ Constructor of the base class
+        """Constructor of the base class
 
         Parameters
         ----------
@@ -28,7 +29,7 @@ class BaseVariableContainer:
         print(f"{self.__class__.__name__} Info:")
         print("Dimensions:", self.ndim)
         print("Number of vars:", self.num_vars)
-        if hasattr(self, 'vars'):
+        if hasattr(self, "vars"):
             print("Shape of vars:", self.vars.shape)
 
 
@@ -46,15 +47,25 @@ class Variable(BaseVariableContainer):
          - 2D: (num_cells_x, num_cells_y, num_vars)
          - 3D: (num_cells_x, num_cells_y, num_cells_z, num_vars)
     """
+
     def __init__(self, grid, num_vars):
         super().__init__(grid, num_vars)
         # Allocate cell-based conservative variables
         if self.ndim == 1:
             self.vars = np.zeros((self.grid.ncx_total, self.num_vars))
         elif self.ndim == 2:
-            self.vars = np.zeros((self.grid.ncx_total, self.grid.ncy_total, self.num_vars))
+            self.vars = np.zeros(
+                (self.grid.ncx_total, self.grid.ncy_total, self.num_vars)
+            )
         elif self.ndim == 3:
-            self.vars = np.zeros((self.grid.ncx_total, self.grid.ncy_total, self.grid.ncz_total, self.num_vars))
+            self.vars = np.zeros(
+                (
+                    self.grid.ncx_total,
+                    self.grid.ncy_total,
+                    self.grid.ncz_total,
+                    self.num_vars,
+                )
+            )
 
     def get_conservative_vars(self):
         """
@@ -114,7 +125,6 @@ class Variable(BaseVariableContainer):
         # ndim=2: variables[..., RHO, RHOU, RHOV, P, PX]
         # ndim=3: variables[..., RHO, RHOU, RHOV, RHOW, P, PX]
 
-
         if ndim == 1:
             RHO, RHOU, P, PX = VariableIndices1D.values()
             rho = variables[..., RHO]
@@ -125,7 +135,6 @@ class Variable(BaseVariableContainer):
             X = PX / P
             # Primitive: [u, P, X]
             primitive_vars = np.stack((u, P, X), axis=-1)
-
 
         elif ndim == 2:
             RHO, RHOU, RHOV, P, PX = VariableIndices2D.values()
@@ -217,4 +226,3 @@ if __name__ == "__main__":
     from enum import Enum
 
     print(VarInd1D.values())
-

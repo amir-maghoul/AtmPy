@@ -6,8 +6,6 @@ from atmpy.data.TestCaseData import TestCaseData
 from typing import List
 
 
-
-
 @dataclass
 class Config:
     """Data class for the global values and quantities
