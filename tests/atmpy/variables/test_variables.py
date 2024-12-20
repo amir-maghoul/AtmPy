@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from unittest.mock import MagicMock
-from atmpy.variables.variables import BaseVariableContainer, Variable, NodeVariable
+from atmpy.variables.variables import BaseVariableContainer, CellVariable, NodeVariable
 
 
 # Mock variable indices for testing:
@@ -83,21 +83,21 @@ def test_variable_init_and_shape(dims):
     num_vars = 4
     if dims == 1:
         g = MockGrid(dimensions=1, ncx=10)
-        var = Variable(g, num_vars)
+        var = CellVariable(g, num_vars)
         assert var.vars.shape == (10, num_vars)
     elif dims == 2:
         g = MockGrid(dimensions=2, ncx=10, ncy=20)
-        var = Variable(g, num_vars)
+        var = CellVariable(g, num_vars)
         assert var.vars.shape == (10, 20, num_vars)
     elif dims == 3:
         g = MockGrid(dimensions=3, ncx=10, ncy=20, ncz=30)
-        var = Variable(g, num_vars)
+        var = CellVariable(g, num_vars)
         assert var.vars.shape == (10, 20, 30, num_vars)
 
 
 def test_variable_update_get():
     g = MockGrid(dimensions=1, ncx=5)
-    var = Variable(g, 4)
+    var = CellVariable(g, 4)
     new_values = np.ones((5, 4))
     var.update_vars(new_values)
     assert np.all(var.get_conservative_vars() == new_values)
@@ -132,7 +132,7 @@ def test_node_variable_update_get():
 def test_to_primitive(dims):
     if dims == 1:
         g = MockGrid(dimensions=1, ncx=5)
-        var = Variable(g, 4)  # [rho, rho*u, P, PX]
+        var = CellVariable(g, 4)  # [rho, rho*u, P, PX]
         var.vars[..., 0] = 9999.0  # Unused index, filler
         var.vars[..., 1] = 4.0  # rho*u
         var.vars[..., 2] = 600.0  # P
@@ -145,7 +145,7 @@ def test_to_primitive(dims):
 
     elif dims == 2:
         g = MockGrid(dimensions=2, ncx=5, ncy=5)
-        var = Variable(g, 5)  # [rho, rho*u, rho*v, P, PX]
+        var = CellVariable(g, 5)  # [rho, rho*u, rho*v, P, PX]
         var.vars[..., 0] = 9999.0
         var.vars[..., 1] = 4.0  # rho*u
         var.vars[..., 2] = 6.0  # rho*v
@@ -160,7 +160,7 @@ def test_to_primitive(dims):
 
     elif dims == 3:
         g = MockGrid(dimensions=3, ncx=5, ncy=5, ncz=5)
-        var = Variable(g, 6)  # [rho, rho*u, rho*v, rho*w, P, PX]
+        var = CellVariable(g, 6)  # [rho, rho*u, rho*v, rho*w, P, PX]
         var.vars[..., 0] = 9999.0  # rho
         var.vars[..., 1] = 4.0  # rho*u
         var.vars[..., 2] = 6.0  # rho*v
