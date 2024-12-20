@@ -1,3 +1,5 @@
+from abc import abstractmethod
+
 import numpy as np
 from atmpy.data.constants import VariableIndices1D, VariableIndices2D, VariableIndices3D
 from atmpy.grid.utility import DimensionSpec, create_grid
@@ -33,7 +35,7 @@ class BaseVariableContainer:
             print("Shape of vars:", self.vars.shape)
 
 
-class Variable(BaseVariableContainer):
+class CellVariable(BaseVariableContainer):
     """
     A class for storing cell-centered state of the conservative variables.
 
@@ -88,6 +90,7 @@ class Variable(BaseVariableContainer):
             The new variable values to be assigned, matching the shape of self.vars.
         """
         self.vars = new_values
+
 
     def to_primitive(self):
         """
@@ -215,3 +218,5 @@ class NodeVariable(BaseVariableContainer):
             The new variable values to be assigned, matching the shape of self.vars.
         """
         self.vars = new_values
+
+
