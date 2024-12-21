@@ -1,5 +1,5 @@
 import numpy as np
-from variables import CellVariable, NodeVariable
+from atmpy.variables.variables import CellVariable, NodeVariable
 
 def create_variables(grid, num_cell_vars, num_node_vars):
     """ Creates both cell and node variable containers
