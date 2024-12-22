@@ -74,7 +74,7 @@ def exner_sound_speed_numba(rho_arr, p_arr, gamma):
     rho_arr : np.ndarray
         the array containing the density
     p_arr : np.ndarray
-        the array containing the unphysical pressure P = rho*Theta
+        the array containing the pressure
     gamma : float
         the heat capacity in constant pressure
     """
