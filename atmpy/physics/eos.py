@@ -75,6 +75,10 @@ class ExnerBasedEOS(EOS):
           - If pi_arr is provided, compute p from pi.
           - If P_arr is provided, compute p from P.
           (In reality, you might pass both or keep separate methods.)
+
+        Parameters
+        ----------
+
         """
         if P is not None:
             return P_to_pressure_numba(P, self.p_ref, self.cp, self.cv)
@@ -94,7 +98,7 @@ class ExnerBasedEOS(EOS):
         rho_arr : np.ndarray
             density
         p_arr : np.ndarray
-            capital P. The unphysical pressure in our form of EOS. P = rho*Theta
+            The real pressure
 
         Returns
         -------

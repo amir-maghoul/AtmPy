@@ -1,5 +1,5 @@
 """ This module contains configuration values for the project. It contains the global and regime dependent constants
-and  pysical quantities"""
+and  physical quantities"""
 
 from dataclasses import dataclass
 from atmpy.data.TestCaseData import TestCaseData
