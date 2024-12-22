@@ -49,21 +49,35 @@ class ExnerBasedEOS(EOS):
     Demonstrates an EOS using Exner-based relationships, but leveraging
     Numba-friendly free functions for performance.
     """
-    def __init__(self, R, cp, cv, p_ref):
-        self.R = R
+    def __init__(self,cp, cv, p_ref):
+        """ Constructor.
+
+        Attributes
+        ----------
+        p_ref : float
+            the reference pressure
+        cp : float
+            the heat capacity in constant pressure
+        cv : float
+            the heat capacity in constant volume
+        R : float
+            Specific gas constant for dry air
+        """
         self.cp = cp
         self.cv = cv
+        self.R = cp - cv
         self.p_ref = p_ref
 
     def pressure(self, P: np.ndarray=None, pi: np.ndarray=None):
         """
+        Calculate pressure given unphysical pressure P or Exner pressure pi.
         Examples of usage:
           - If pi_arr is provided, compute p from pi.
           - If P_arr is provided, compute p from P.
           (In reality, you might pass both or keep separate methods.)
         """
         if P is not None:
-            return P_to_pressure_numba(P, self.R, self.p_ref, self.cp, self.cv)
+            return P_to_pressure_numba(P, self.p_ref, self.cp, self.cv)
         elif pi is not None:
             return exner_to_pressure_numba(pi, self.p_ref, self.cp, self.R)
         else:
@@ -71,8 +85,21 @@ class ExnerBasedEOS(EOS):
 
     def sound_speed(self, rho_arr: np.ndarray, p_arr: np.ndarray):
         """
+        Calculate sound speed given density and pressure.
         Speed of sound can be approximated via gamma = cp/cv, or a more
         specialized formula. Here we use c = sqrt(gamma * p / rho).
+
+        Parameters
+        ----------
+        rho_arr : np.ndarray
+            density
+        p_arr : np.ndarray
+            capital P. The unphysical pressure in our form of EOS. P = rho*Theta
+
+        Returns
+        -------
+        np.ndarray
+            the speed of sound as an array
         """
         gamma = self.cp / self.cv
         return exner_sound_speed_numba(rho_arr, p_arr, gamma)

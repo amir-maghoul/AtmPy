@@ -4,9 +4,23 @@ from numba import njit, prange
 @njit(parallel=True)
 def exner_to_pressure_numba(pi: np.ndarray, p_ref: float, cp: float, R: float):
     """
-    Example function converting Exner pi -> pressure in a vectorized way.
-    pi_arr, p_ref, cp, R must be numeric (arrays or scalars).
-    Returns array of p = p_ref * (pi)^(cp/R).
+    Convert Exner pi to real pressure using numba.
+
+    Parameters
+    ----------
+    pi : np.ndarray
+        the array containing the Exner pressure
+    p_ref : float
+        the reference pressure
+    cp : float
+        the heat capacity in constant pressure
+    R : float
+        cp - cv
+
+    Return
+    ------
+    np.ndarray
+        the array containing the real pressure
     """
     n = len(pi)
     p_out = np.empty(n, dtype=np.float64)
@@ -16,13 +30,32 @@ def exner_to_pressure_numba(pi: np.ndarray, p_ref: float, cp: float, R: float):
 
 
 @njit(parallel=True)
-def P_to_pressure_numba(P: np.ndarray, R: float, p_ref: float, cp: float, cv: float):
+def P_to_pressure_numba(P: np.ndarray, p_ref: float, cp: float, cv: float):
     """
-    Example function converting P (= rho*Theta) -> pressure.
+    convert P (= rho*Theta) to pressure.
     P = (p_ref / R)*(p / p_ref)^(cv/cp).
     Solving for p => p = p_ref * [ (P*R)/p_ref ]^(cp/cv).
+
+    Parameters
+    ----------
+    pi : np.ndarray
+        the array containing the Exner pressure
+    p_ref : float
+        the reference pressure
+    cp : float
+        the heat capacity in constant pressure
+    cv : float
+        the heat capacity in constant volume
+
+    Returns
+    -------
+    np.ndarray
+        the array containing the real pressure
+
+
     """
     n = len(P)
+    R = cp - cv
     p_out = np.empty(n, dtype=np.float64)
     for i in prange(n):
         fac = P[i] * R / p_ref
@@ -35,6 +68,15 @@ def exner_sound_speed_numba(rho_arr, p_arr, gamma):
     Calculate sound speed using numba for the ExnerBasedEOS.
     If 'rho' is zero, returning NaN is mathematically consistent (division by zero).
     Whether you treat sound speed as zero or NaN depends on your physical / solver constraints.
+
+    Parameters
+    ----------
+    rho_arr : np.ndarray
+        the array containing the density
+    p_arr : np.ndarray
+        the array containing the unphysical pressure P = rho*Theta
+    gamma : float
+        the heat capacity in constant pressure
     """
     n = len(rho_arr)
     a_out = np.empty(n, dtype=np.float64)
