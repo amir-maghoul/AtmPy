@@ -1,6 +1,4 @@
 # Test utility functions directly
-import pytest
-from atmpy.physics.utility import *
 from atmpy.physics.eos import *
 
 def test_exner_to_pressure_numba():
