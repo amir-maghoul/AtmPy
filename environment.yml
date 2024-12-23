@@ -17,6 +17,7 @@ dependencies:
   - jupyter==1.0.0
   - sphinx-autoapi==3.2.1
   - pytest-doctestplus==0.11.1
+  - pytest-mock==3.14.0
   - doctest==2.4.11
   - mypy==1.11.1
   - pip == 24.2

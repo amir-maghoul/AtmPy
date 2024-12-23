@@ -72,11 +72,14 @@ def cell_to_node_average(
 
     Parameters
     ----------
-    grid : :py:class:`~atmpy.grid.kgrid.Grid`
-        grid object on which the averaging takes place
+    grid: :py:class:`~atmpy.grid.kgrid.Grid`
 
-    var_cells : np.ndarray
-        the discrete function values (defined on the cells) from which the averaging takes place
+    var_cells: np.ndarray
+        An array of cell-centered values of shape (ncx, ncy, ncz).
+
+    var_nodes : np.ndarray, default=None
+        An array of node-centered values of shape (nnx,nny,nnz), depending on the dimensions
+        If it is None, an array of zeros is created.
 
     Returns
     -------
@@ -114,6 +117,9 @@ def node_to_cell_average(
     var_nodes : np.ndarray
         the discrete function values (defined on the nodes) from which the averaging takes place
 
+    var_cells: np.ndarray, default=None
+        An array of cell-centered values of shape (ncx, ncy, ncz).
+
     Returns
     -------
     np.ndarray
@@ -147,7 +153,8 @@ def _cell_to_node_average_1d(
     In 1D, each inner node value is computed as the average of the two adjacent cells.
     Ghost nodes remain unchanged, as we never overwrite them.
 
-    Parameters:
+    Parameters
+    ----------
         grid: :py:class:`~atmpy.grid.kgrid.Grid`
         var_cells (np.ndarray): A 1D array of cell-centered values of shape (ncx_total,).
         var_nodes : np.ndarray, default=None

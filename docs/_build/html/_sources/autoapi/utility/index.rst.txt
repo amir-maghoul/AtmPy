@@ -1,0 +1,235 @@
+utility
+=======
+
+.. py:module:: utility
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   utility.DimensionSpec
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   utility.to_grid_args
+   utility.create_grid
+   utility.cell_to_node_average
+   utility.node_to_cell_average
+   utility._cell_to_node_average_1d
+   utility._node_to_cell_average_1d
+   utility._cell_to_node_average_2d
+   utility._node_to_cell_average_2d
+   utility._cell_to_node_average_3d
+   utility._node_to_cell_average_3d
+
+
+Module Contents
+---------------
+
+.. py:class:: DimensionSpec
+
+   The data class for creating the dimensions of the problem
+
+
+   .. py:attribute:: n
+      :type:  int
+
+
+   .. py:attribute:: start
+      :type:  float
+
+
+   .. py:attribute:: end
+      :type:  float
+
+
+   .. py:attribute:: ng
+      :type:  int
+
+
+.. py:function:: to_grid_args(dimensions: List[DimensionSpec])
+
+   Convert list of dimensions to grid arguments
+
+   Parameters
+   ----------
+   dimensions : List[DimensionSpec]
+       List of dimensions in forms of objects of the Dimension class
+
+   Returns
+   -------
+   dict
+       Dictionary of grid arguments
+
+   Examples
+   --------
+   >>> dims = [DimensionSpec(5, 0, 3, 2), DimensionSpec(6, 1, 4, 3)]
+   >>> to_grid_args(dims) # doctest: +NORMALIZE_WHITESPACE
+   {'nx': 5, 'x_start': 0, 'x_end': 3, 'ngx': 2, 'ny': 6, 'y_start': 1, 'y_end': 4, 'ngy': 3}
+
+
+
+.. py:function:: create_grid(dimensions: List[DimensionSpec])
+
+   Unpacks the dimensions parameter (which is a list of DimensionSpec objects)
+   into a dictionary and pass it to create a Grid object using them
+
+   Parameters
+   ----------
+   dimensions : List[DimensionSpec]
+       List of dimensions in forms of objects of the Dimension class
+
+   Returns
+   -------
+   atmpy.grid.kgrid.Grid
+
+
+.. py:function:: cell_to_node_average(grid: atmpy.grid.kgrid.Grid, var_cells: numpy.ndarray, var_nodes: numpy.ndarray = None) -> numpy.ndarray
+
+   Averages the values of the primary/secondary variables from cells onto nodes
+
+   Parameters
+   ----------
+   grid : :py:class:`~atmpy.grid.kgrid.Grid`
+       grid object on which the averaging takes place
+
+   var_cells : np.ndarray
+       the discrete function values (defined on the cells) from which the averaging takes place
+
+   Returns
+   -------
+   np.ndarray
+       The values of the var_cells averages on nodes
+
+
+.. py:function:: node_to_cell_average(grid: atmpy.grid.kgrid.Grid, var_nodes: numpy.ndarray, var_cells: numpy.ndarray = None) -> numpy.ndarray
+
+   Averages the values of the primary/secondary variables from nodes onto cells
+
+      Parameters
+   ----------
+   grid : :py:class:`~atmpy.grid.kgrid.Grid`
+       grid object on which the averaging takes place
+
+   var_nodes : np.ndarray
+       the discrete function values (defined on the nodes) from which the averaging takes place
+
+   Returns
+   -------
+   np.ndarray
+       The values of the var_cells averages on nodes
+
+
+.. py:function:: _cell_to_node_average_1d(grid: atmpy.grid.kgrid.Grid, var_cells: numpy.ndarray, var_nodes: numpy.ndarray = None) -> numpy.ndarray
+
+   Compute the 1D cell-to-node averaging for a given grid and cell-centered variable array.
+
+   In 1D, each inner node value is computed as the average of the two adjacent cells.
+   Ghost nodes remain unchanged, as we never overwrite them.
+
+   Parameters:
+       grid: :py:class:`~atmpy.grid.kgrid.Grid`
+       var_cells (np.ndarray): A 1D array of cell-centered values of shape (ncx_total,).
+       var_nodes : np.ndarray, default=None
+           A 1D array of node-centered values of shape (nx,).
+           If it is None, an array of zeros is created.
+
+   Returns:
+       np.ndarray: A 1D array of node-centered values with shape (nnx_total,).
+
+
+
+.. py:function:: _node_to_cell_average_1d(grid: atmpy.grid.kgrid.Grid, var_nodes: numpy.ndarray, var_cells: numpy.ndarray = None) -> numpy.ndarray
+
+   Compute the 1D node-to-cell averaging for a given grid and node-centered variable array.
+
+   In 1D, each inner cell is computed as the average of the two adjacent nodes.
+   Ghost cells remain unchanged, as we never overwrite them.
+
+   Parameters:
+       grid: :py:class:`~atmpy.grid.kgrid.Grid`
+       var_nodes (np.ndarray): A 1D array of node-centered values of shape (nnx_total,).
+
+   Returns:
+       np.ndarray: A 1D array of cell-centered values with shape (ncx_total,).
+
+
+
+.. py:function:: _cell_to_node_average_2d(grid: atmpy.grid.kgrid.Grid, var_cells: numpy.ndarray, var_nodes: numpy.ndarray = None) -> numpy.ndarray
+
+   Evaluate a variable on nodes of the grid using averaging the already evaluated values on cells.
+
+   Parameters
+   ----------
+   grid : :py:class:`~atmpy.grid.kgrid.Grid`
+       grid object on which the variable is evaluated.
+   var_cells : np.ndarray
+   A 1D array of cell-centered values of shape (ncx_total,ncx_total).
+   var_nodes : np.ndarray
+   A 1D array of node-centered values of shape (nnx_total,nny_total).
+
+   Returns
+   -------
+   np.ndarray of shape (nnx_total,nny_total)
+
+
+.. py:function:: _node_to_cell_average_2d(grid: atmpy.grid.kgrid.Grid, var_nodes: numpy.ndarray, var_cells: numpy.ndarray = None) -> numpy.ndarray
+
+   Evaluate a variable on cells of the grid using averaging the already evaluated values on nodes.
+
+   Parameters
+   ----------
+   grid : :py:class:`~atmpy.grid.kgrid.Grid`
+       grid object on which the variable is evaluated.
+   var_nodes : np.ndarray
+       A 1D array of node values of shape `grid.nshape`.
+   var_cells : np.ndarray
+       A 1D array of cell values of shape `grid.cshape`.
+
+   Returns
+   -------
+   ndarray of shape `grid.cshape`
+
+
+.. py:function:: _cell_to_node_average_3d(grid, var_cells, var_nodes)
+
+   Evaluate a variable on nodes of the grid using averaging the already evaluated values on cells.
+
+   Parameters
+   ----------
+   grid : :py:class:`~atmpy.grid.kgrid.Grid`
+       grid object on which the variable is evaluated.
+   var_cells : np.ndarray
+   A 1D array of cell-centered values of shape (ncx_total,ncx_total).
+   var_nodes : np.ndarray
+   A 1D array of node-centered values of shape (nnx_total,nny_total).
+
+   Returns
+   -------
+   np.ndarray of shape (nnx_total,nny_total)
+
+
+.. py:function:: _node_to_cell_average_3d(grid: atmpy.grid.kgrid.Grid, var_nodes: numpy.ndarray, var_cells: numpy.ndarray = None) -> numpy.ndarray
+
+   Evaluate a variable on cells of the grid using averaging the already evaluated values on nodes.
+
+   Parameters
+   ----------
+   grid : :py:class:`~atmpy.grid.kgrid.Grid`
+       grid object on which the variable is evaluated.
+   var_nodes : np.ndarray
+       A 1D array of node values of shape `grid.nshape`.
+   var_cells : np.ndarray
+       A 1D array of cell values of shape `grid.cshape`.
+
+   Returns
+   -------
+   ndarray of shape `grid.cshape`
+
+

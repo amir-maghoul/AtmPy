@@ -1,7 +1,7 @@
 """ This is an abstract class for the test cases. It brings the given test case into a
 uniform class for the whole project.
 
-The code is taken from PyBella+ Library by Ray Chew https://github.com/ray-chew/pyBELLA """
+The code snippet is taken from PyBella+ Library by Ray Chew https://github.com/ray-chew/pyBELLA """
 
 
 class TestCaseData(object):

@@ -1,0 +1,72 @@
+config
+======
+
+.. py:module:: config
+
+.. autoapi-nested-parse::
+
+   This module contains configuration values for the project. It contains the global and regime dependent constants
+   and  pysical quantities
+
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   config.Config
+   config.Thermodynamics
+
+
+Module Contents
+---------------
+
+.. py:class:: Config
+
+   Data class for the global values and quantities
+
+   Attributes
+   ----------
+   alpha_g, alpha_w, alpha_p : int in {0, 1} (default = 1)
+       values of the switches for different dynamical regimes
+       alpha_g: geostrophic / non-geostrophic
+       alpha_w: hydrostatic / non_hydrostatic
+       alpha_p: compressible / soundproof
+
+
+
+   .. py:attribute:: alpha_g
+      :type:  int
+      :value: 1
+
+
+
+   .. py:attribute:: alpha_w
+      :type:  int
+      :value: 1
+
+
+
+   .. py:attribute:: alpha_p
+      :type:  int
+      :value: 1
+
+
+
+.. py:class:: Thermodynamics(data: atmpy.data.TestCaseData.TestCaseData)
+
+   Data class for thermodynamic values and constants
+
+   Attributes
+   ----------
+   gamma : float
+   gamma_inv : float
+   Gamma : float
+   Gamma_inv : float
+
+
+   .. py:attribute:: gamma
+      :type:  float
+
+
