@@ -7,11 +7,11 @@ class VariableIndices(IntEnum):
 
     # Indices of Conserved Quantities
     RHO = 0                 # Density
-    RHOX = 2                # Potential Temperature inversed? or Exner Pressure?
-    RHOY = 3                # Potential Temperature
-    RHOU = 4                # Horizontal Velocity x-component
-    RHOV = 5                # Horizontal Velocity y-component
-    RHOW = 6                # Vertical Velocity
+    RHOX = 1                # Potential Temperature inversed? or Exner Pressure?
+    RHOY = 2                # Potential Temperature
+    RHOU = 3                # Horizontal Velocity x-component
+    RHOV = 4                # Horizontal Velocity y-component
+    RHOW = 5                # Vertical Velocity
 
     @classmethod
     def values(cls):
