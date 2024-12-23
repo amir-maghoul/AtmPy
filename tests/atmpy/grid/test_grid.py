@@ -2,7 +2,7 @@ import numpy as np
 from atmpy.grid.grid import NodeGrid, CellGrid
 import numpy.testing as npt
 import pytest
-from pytest_cases import PyTestCases1D, PyTestCases2D, PyTestCases3D
+from tests.atmpy.grid.pytest_cases import PyTestCases1D, PyTestCases2D, PyTestCases3D
 
 
 class TestGrid:

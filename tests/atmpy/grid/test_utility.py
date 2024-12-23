@@ -1,9 +1,5 @@
-import numpy as np
 import pytest
 from atmpy.grid.utility import *
-from atmpy.grid.kgrid import Grid
-from dataclasses import dataclass
-from typing import List
 from numpy.testing import assert_allclose
 
 
