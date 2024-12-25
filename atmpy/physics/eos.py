@@ -60,7 +60,7 @@ class ExnerBasedEOS(EOS):
     Numba-friendly free functions for performance.
     """
 
-    def __init__(self, cp, cv, p_ref):
+    def __init__(self, cp: float=1000, cv: float=750, p_ref: float=1.0):
         """Constructor.
 
         Attributes
