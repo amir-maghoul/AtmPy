@@ -134,7 +134,7 @@ class Variables:
             )
         self.cell_vars = new_values
 
-    def to_primitive(self, gamma):
+    def to_primitive(self, eos):
         """
         Converts cell-centered conservative variables to primitive variables.
 
@@ -145,8 +145,8 @@ class Variables:
 
         Parameters
         ----------
-        gamma : float
-            The constant adiabatic ration (ration of specific heats)
+        eos : :py:class:`atmpy.physics.eos.EOS`
+            The equation of state.
 
         Returns
         -------
@@ -158,8 +158,8 @@ class Variables:
         P, X, Y, U, V, W = PrimitiveVariableIndices.values()
 
         rho = self.cell_vars[..., RHO]
-        self.primitives[..., P] = self.cell_vars[..., RHOY] ** gamma  # Pressure p
-        self.primitives[..., U] = self.cell_vars[..., RHOU] / rho  #
+        self.primitives[..., P] = eos.pressure(self.cell_vars[..., RHOY])
+        self.primitives[..., U] = self.cell_vars[..., RHOU] / rho
         self.primitives[..., X] = self.cell_vars[..., RHOX] / rho
         self.primitives[..., Y] = self.cell_vars[..., RHOY] / rho
 
