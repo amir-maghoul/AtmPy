@@ -20,6 +20,7 @@ def periodic_boundary():
 def relaxation_boundary():
     pass
 
+
 # def apply_transmissive(grid, variable, side):
 #     """
 #     Apply transmissive (zero-gradient) boundary condition.

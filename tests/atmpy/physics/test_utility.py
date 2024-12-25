@@ -1,6 +1,7 @@
 # Test utility functions directly
 from atmpy.physics.eos import *
 
+
 def test_exner_to_pressure_numba():
     pi_arr = np.array([1.0, 1.2, 0.8])
     p_ref = 100000.0

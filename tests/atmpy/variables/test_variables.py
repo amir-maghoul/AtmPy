@@ -3,6 +3,7 @@ import numpy as np
 from unittest.mock import MagicMock
 from atmpy.variables.variables import Variables  # Updated import statement
 
+
 # Mock variable indices for testing:
 class MockVariableIndices:
     RHO = 0
@@ -23,6 +24,7 @@ class MockVariableIndices:
             MockVariableIndices.RHOW,
         )
 
+
 # Mocking a simple Grid class
 class MockGrid:
     def __init__(self, dimensions, ncx, ncy=0, ncz=0):
@@ -40,19 +42,17 @@ class MockGrid:
         if dimensions == 3:
             self.nnz_total = ncz + 1
 
+
 # Temporarily modify sys.modules to replace atmpy.data.constants with
 # MagicMock defined above to isolate the test
 import sys
 
-sys.modules["atmpy.data.constants"] = MagicMock(
-    VariableIndices=MockVariableIndices
-)
+sys.modules["atmpy.data.constants"] = MagicMock(VariableIndices=MockVariableIndices)
 
-@pytest.mark.parametrize("dims, num_cell_vars, num_node_vars", [
-    (1, 4, 1),
-    (2, 5, 2),
-    (3, 6, 3)
-])
+
+@pytest.mark.parametrize(
+    "dims, num_cell_vars, num_node_vars", [(1, 4, 1), (2, 5, 2), (3, 6, 3)]
+)
 def test_variables_init(dims, num_cell_vars, num_node_vars):
     """
     Test the initialization of the Variables class for different dimensions.
@@ -64,7 +64,9 @@ def test_variables_init(dims, num_cell_vars, num_node_vars):
     elif dims == 3:
         g = MockGrid(dimensions=3, ncx=10, ncy=20, ncz=30)
 
-    vars_container = Variables(grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars)
+    vars_container = Variables(
+        grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars
+    )
     assert vars_container.ndim == dims
     assert vars_container.num_vars_cell == num_cell_vars
     assert vars_container.num_vars_node == num_node_vars
@@ -93,6 +95,7 @@ def test_variables_init(dims, num_cell_vars, num_node_vars):
             expected_node_shape = (g.nnx_total, g.nny_total, g.nnz_total, num_node_vars)
         assert vars_container.node_vars.shape == expected_node_shape
 
+
 def test_variables_init_invalid_dims():
     """
     Test that Variables class raises a ValueError for unsupported dimensions.
@@ -101,11 +104,10 @@ def test_variables_init_invalid_dims():
     with pytest.raises(ValueError):
         Variables(grid=g, num_vars_cell=4, num_vars_node=1)
 
-@pytest.mark.parametrize("dims, num_cell_vars, num_node_vars", [
-    (1, 4, 2),
-    (2, 5, 3),
-    (3, 6, 4)
-])
+
+@pytest.mark.parametrize(
+    "dims, num_cell_vars, num_node_vars", [(1, 4, 2), (2, 5, 3), (3, 6, 4)]
+)
 def test_variables_update_and_get_cell_vars(dims, num_cell_vars, num_node_vars):
     """
     Test updating and retrieving cell-centered variables.
@@ -120,7 +122,9 @@ def test_variables_update_and_get_cell_vars(dims, num_cell_vars, num_node_vars):
         g = MockGrid(dimensions=3, ncx=5, ncy=5, ncz=5)
         expected_shape = (5, 5, 5, num_cell_vars)
 
-    vars_container = Variables(grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars)
+    vars_container = Variables(
+        grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars
+    )
 
     # Create new cell data
     new_cell_data = np.ones(expected_shape) * 42.0  # Arbitrary test value
@@ -131,11 +135,10 @@ def test_variables_update_and_get_cell_vars(dims, num_cell_vars, num_node_vars):
     # Ensure primitives are unchanged until to_primitive is called
     assert np.all(vars_container.primitives == 0.0)
 
-@pytest.mark.parametrize("dims, num_cell_vars, num_node_vars", [
-    (1, 3, 2),
-    (2, 4, 3),
-    (3, 5, 4)
-])
+
+@pytest.mark.parametrize(
+    "dims, num_cell_vars, num_node_vars", [(1, 3, 2), (2, 4, 3), (3, 5, 4)]
+)
 def test_variables_update_and_get_node_vars(dims, num_cell_vars, num_node_vars):
     """
     Test updating and retrieving node-based variables.
@@ -150,7 +153,9 @@ def test_variables_update_and_get_node_vars(dims, num_cell_vars, num_node_vars):
         g = MockGrid(dimensions=3, ncx=4, ncy=4, ncz=4)
         expected_shape = (5, 5, 5, num_node_vars)
 
-    vars_container = Variables(grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars)
+    vars_container = Variables(
+        grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars
+    )
 
     # Create new node data
     new_node_data = np.ones(expected_shape) * 24.0  # Arbitrary test value
@@ -158,11 +163,11 @@ def test_variables_update_and_get_node_vars(dims, num_cell_vars, num_node_vars):
     retrieved_node_data = vars_container.get_node_vars()
     assert np.all(retrieved_node_data == new_node_data)
 
-@pytest.mark.parametrize("dims, num_cell_vars, num_node_vars, gamma", [
-    (1, 4, 1, 1.4),
-    (2, 5, 2, 1.4),
-    (3, 6, 3, 1.4)
-])
+
+@pytest.mark.parametrize(
+    "dims, num_cell_vars, num_node_vars, gamma",
+    [(1, 4, 1, 1.4), (2, 5, 2, 1.4), (3, 6, 3, 1.4)],
+)
 def test_variables_to_primitive(dims, num_cell_vars, num_node_vars, gamma):
     """
     Test the to_primitive method for converting conservative to primitive variables.
@@ -177,7 +182,9 @@ def test_variables_to_primitive(dims, num_cell_vars, num_node_vars, gamma):
         g = MockGrid(dimensions=3, ncx=5, ncy=5, ncz=5)
         expected_cell_shape = (5, 5, 5, num_cell_vars)
 
-    vars_container = Variables(grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars)
+    vars_container = Variables(
+        grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars
+    )
 
     # Populate cell_vars with test data
     # Set rho, rhoX, rhoY, rho*u, rho*v, rho*w as per the variable ordering
@@ -193,13 +200,18 @@ def test_variables_to_primitive(dims, num_cell_vars, num_node_vars, gamma):
     vars_container.cell_vars[..., MockVariableIndices.RHOX] = 3.0  # rhoX = 3.0
     vars_container.cell_vars[..., MockVariableIndices.RHOY] = 2.0  # rhoY = 2.0
 
-
     # Set momentum variables
-    vars_container.cell_vars[..., MockVariableIndices.RHOU] = 4.0  # rho*u = 4.0 => u = 2.0
+    vars_container.cell_vars[..., MockVariableIndices.RHOU] = (
+        4.0  # rho*u = 4.0 => u = 2.0
+    )
     if dims >= 2:
-        vars_container.cell_vars[..., MockVariableIndices.RHOV] = 6.0  # rho*v = 6.0 => v = 3.0
+        vars_container.cell_vars[..., MockVariableIndices.RHOV] = (
+            6.0  # rho*v = 6.0 => v = 3.0
+        )
     if dims == 3:
-        vars_container.cell_vars[..., MockVariableIndices.RHOW] = 8.0  # rho*w = 8.0 => w = 4.0
+        vars_container.cell_vars[..., MockVariableIndices.RHOW] = (
+            8.0  # rho*w = 8.0 => w = 4.0
+        )
 
     # Invoke to_primitive
     vars_container.to_primitive(gamma=gamma)
@@ -208,7 +220,7 @@ def test_variables_to_primitive(dims, num_cell_vars, num_node_vars, gamma):
     prim = vars_container.primitives
 
     # Calculate expected primitives
-    expected_p = 2.0 ** gamma  # p = rhoY ** gamma = 2.0 ** 1.4 ≈ 2.639
+    expected_p = 2.0**gamma  # p = rhoY ** gamma = 2.0 ** 1.4 ≈ 2.639
     expected_X_over_rho = 3.0 / 2.0  # 1.5
     expected_Y_over_rho = 2.0 / 2.0  # 1.0
     expected_u = 4.0 / 2.0  # 2.0
@@ -255,6 +267,7 @@ def test_variables_to_primitive(dims, num_cell_vars, num_node_vars, gamma):
         assert np.allclose(prim[..., 4], expected_v, atol=1e-6)
         assert np.allclose(prim[..., 5], expected_w, atol=1e-6)
 
+
 def test_variables_print_debug_info(capfd):
     """
     Test the print_debug_info method of the Variables class.
@@ -262,7 +275,9 @@ def test_variables_print_debug_info(capfd):
     num_cell_vars = 3
     num_node_vars = 2
     g = MockGrid(dimensions=2, ncx=10, ncy=20)
-    vars_container = Variables(grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars)
+    vars_container = Variables(
+        grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars
+    )
 
     # Call the debug method
     vars_container.print_debug_info()
@@ -276,6 +291,7 @@ def test_variables_print_debug_info(capfd):
     assert f"Shape of cell_vars: {vars_container.cell_vars.shape}" in captured.out
     assert f"Shape of primitives: {vars_container.primitives.shape}" in captured.out
     assert f"Shape of node_vars: {vars_container.node_vars.shape}" in captured.out
+
 
 def test_variables_no_cell_vars():
     """
@@ -292,6 +308,7 @@ def test_variables_no_cell_vars():
     with pytest.raises(ValueError):
         Variables(grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars)
 
+
 def test_variables_negative_cell_vars():
     """
     Test Variables class initialization when cell variables are not provided.
@@ -302,6 +319,7 @@ def test_variables_negative_cell_vars():
     g = MockGrid(dimensions=2, ncx=4, ncy=4)
     with pytest.raises(ValueError):
         Variables(grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars)
+
 
 def test_variables_no_node_vars():
     """
@@ -318,6 +336,7 @@ def test_variables_no_node_vars():
     with pytest.raises(ValueError):
         Variables(grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars)
 
+
 def test_variables_negative_node_vars():
     """
     Test Variables class initialization when cell variables are not provided.
@@ -329,6 +348,7 @@ def test_variables_negative_node_vars():
     with pytest.raises(ValueError):
         Variables(grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars)
 
+
 def test_variables_partial_update():
     """
     Test updating only cell_vars or node_vars without affecting the other.
@@ -337,7 +357,9 @@ def test_variables_partial_update():
     num_node_vars = 2
 
     g = MockGrid(dimensions=3, ncx=3, ncy=3, ncz=3)
-    vars_container = Variables(grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars)
+    vars_container = Variables(
+        grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars
+    )
 
     # Update node_vars
     new_node_data = np.full((4, 4, 4, num_node_vars), 5.0)
@@ -376,7 +398,7 @@ def test_variables_partial_update():
     prim = vars_container.primitives
 
     # Calculate expected primitives
-    expected_p = 2.0 ** gamma  # p = rhoY ** gamma = 2.0 ** 1.4 ≈ 2.639
+    expected_p = 2.0**gamma  # p = rhoY ** gamma = 2.0 ** 1.4 ≈ 2.639
     expected_X_over_rho = 3.0 / 2.0  # 1.5
     expected_Y_over_rho = 2.0 / 2.0  # 1.0
     expected_u = 4.0 / 2.0  # 2.0
@@ -392,6 +414,5 @@ def test_variables_partial_update():
     assert np.allclose(prim[..., 5], expected_w, atol=1e-6)
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_variables_to_primitive(3, 6, 3, 1.4)

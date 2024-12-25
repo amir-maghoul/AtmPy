@@ -3,11 +3,17 @@ must be implemented here as a class and then passed to the riemann solvers in th
 
 from abc import ABC, abstractmethod
 import numpy as np
-from atmpy.physics.utility import P_to_pressure_numba, exner_to_pressure_numba, exner_sound_speed_numba
+from atmpy.physics.utility import (
+    P_to_pressure_numba,
+    exner_to_pressure_numba,
+    exner_sound_speed_numba,
+)
+
 
 class EOS(ABC):
-    """ A common interface for any EOS. Each concrete class must define
+    """A common interface for any EOS. Each concrete class must define
     how to get pressure and sound speed at minimum."""
+
     @abstractmethod
     def pressure(self, *args, **kwargs) -> np.ndarray:
         """Compute pressure given density and internal energy."""
@@ -18,9 +24,11 @@ class EOS(ABC):
         """Compute sound speed given density and pressure."""
         pass
 
+
 class IdealGasEOS(EOS):
-    """ The conventional ideal-gas EOS with gamma. """
-    def __init__(self, gamma: float=1.4):
+    """The conventional ideal-gas EOS with gamma."""
+
+    def __init__(self, gamma: float = 1.4):
         self.gamma = gamma
 
     def pressure(self, rho: np.ndarray, e: np.ndarray):
@@ -33,24 +41,27 @@ class IdealGasEOS(EOS):
 
 
 class BarotropicEOS(EOS):
-    """ The Barotropic EOS class. """
-    def __init__(self, K: float=1.0, gamma: float=1.4):
+    """The Barotropic EOS class."""
+
+    def __init__(self, K: float = 1.0, gamma: float = 1.4):
         self.K = K
         self.gamma = gamma
 
-    def pressure(self, rho: np.ndarray, e: np.ndarray=None):
-        return self.K * rho ** self.gamma
+    def pressure(self, rho: np.ndarray, e: np.ndarray = None):
+        return self.K * rho**self.gamma
 
     def sound_speed(self, rho: np.ndarray, p: np.ndarray):
         return np.sqrt(self.gamma * p / rho)
+
 
 class ExnerBasedEOS(EOS):
     """
     Demonstrates an EOS using Exner-based relationships, but leveraging
     Numba-friendly free functions for performance.
     """
-    def __init__(self,cp, cv, p_ref):
-        """ Constructor.
+
+    def __init__(self, cp, cv, p_ref):
+        """Constructor.
 
         Attributes
         ----------
@@ -68,7 +79,7 @@ class ExnerBasedEOS(EOS):
         self.R = cp - cv
         self.p_ref = p_ref
 
-    def pressure(self, P: np.ndarray=None, pi: np.ndarray=None):
+    def pressure(self, P: np.ndarray = None, pi: np.ndarray = None):
         """
         Calculate pressure given unphysical pressure P or Exner pressure pi.
         Examples of usage:
@@ -85,7 +96,9 @@ class ExnerBasedEOS(EOS):
         elif pi is not None:
             return exner_to_pressure_numba(pi, self.p_ref, self.cp, self.R)
         else:
-            raise ValueError("Must provide either 'P_arr' or 'pi_arr' to compute pressure.")
+            raise ValueError(
+                "Must provide either 'P_arr' or 'pi_arr' to compute pressure."
+            )
 
     def sound_speed(self, rho_arr: np.ndarray, p_arr: np.ndarray):
         """

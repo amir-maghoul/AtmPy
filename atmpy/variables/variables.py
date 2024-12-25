@@ -1,6 +1,6 @@
 from abc import abstractmethod
 import numpy as np
-from atmpy.data.constants import VariableIndices
+from atmpy.data.constants import VariableIndices, PrimitiveVariableIndices
 from atmpy.grid.utility import DimensionSpec, create_grid
 
 
@@ -66,7 +66,9 @@ class Variables:
                     )
                 )
         else:
-            raise ValueError("Number of cell-based variables should not be None, zero or negative.")
+            raise ValueError(
+                "Number of cell-based variables should not be None, zero or negative."
+            )
 
         self.primitives = np.zeros(self.cell_vars.shape)
 
@@ -83,7 +85,9 @@ class Variables:
                 nnz = self.grid.nnz_total
                 self.node_vars = np.zeros((nnx, nny, nnz, self.num_vars_node))
         else:
-            raise ValueError("Number of node-based variables should not be None, zero or negative.")
+            raise ValueError(
+                "Number of node-based variables should not be None, zero or negative."
+            )
 
     def print_debug_info(self):
         """
@@ -151,24 +155,22 @@ class Variables:
         """
         ndim = self.ndim
         RHO, RHOX, RHOY, RHOU, RHOV, RHOW = VariableIndices.values()
+        P, X, Y, U, V, W = PrimitiveVariableIndices.values()
 
         rho = self.cell_vars[..., RHO]
-        self.primitives[..., 0] = self.cell_vars[..., RHOY] ** gamma        # Pressure p
-        self.primitives[..., RHOU] = self.cell_vars[..., RHOU] / rho        #
-        self.primitives[..., RHOX] = self.cell_vars[..., RHOX] / rho
-        self.primitives[..., RHOY] = self.cell_vars[..., RHOY] / rho
+        self.primitives[..., P] = self.cell_vars[..., RHOY] ** gamma  # Pressure p
+        self.primitives[..., U] = self.cell_vars[..., RHOU] / rho  #
+        self.primitives[..., X] = self.cell_vars[..., RHOX] / rho
+        self.primitives[..., Y] = self.cell_vars[..., RHOY] / rho
 
         if ndim == 2:
-            self.primitives[..., RHOV] = self.cell_vars[..., RHOV] / rho
+            self.primitives[..., V] = self.cell_vars[..., RHOV] / rho
         elif ndim == 3:
-            self.primitives[..., RHOV] = self.cell_vars[..., RHOV] / rho
-            self.primitives[..., RHOW] = self.cell_vars[..., RHOW] / rho
-
+            self.primitives[..., V] = self.cell_vars[..., RHOV] / rho
+            self.primitives[..., W] = self.cell_vars[..., RHOW] / rho
 
         elif ndim > 3 or ndim < 1:
             raise ValueError("Unsupported number of dimensions.")
-
-
 
     # -------------------
     # Node-Based Methods
@@ -199,4 +201,3 @@ class Variables:
                 f"Shape mismatch: expected {self.node_vars.shape}, got {new_values.shape}"
             )
         self.node_vars = new_values
-

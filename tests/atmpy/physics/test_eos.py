@@ -1,7 +1,13 @@
 # tests/test_eos.py
 import pytest
 import numpy as np
-from atmpy.physics.eos import IdealGasEOS, BarotropicEOS, ExnerBasedEOS, P_to_pressure_numba, exner_to_pressure_numba
+from atmpy.physics.eos import (
+    IdealGasEOS,
+    BarotropicEOS,
+    ExnerBasedEOS,
+    P_to_pressure_numba,
+    exner_to_pressure_numba,
+)
 
 
 # Test cases for IdealGasEOS
@@ -31,7 +37,7 @@ def test_barotropic_eos_pressure():
     gamma = 1.4
     eos = BarotropicEOS(K=K, gamma=gamma)
     rho = np.array([1.0, 2.0, 3.0, 4.0])
-    expected_p = K * rho ** gamma
+    expected_p = K * rho**gamma
     computed_p = eos.pressure(rho)
     np.testing.assert_allclose(computed_p, expected_p, rtol=1e-6)
 
@@ -41,7 +47,7 @@ def test_barotropic_eos_sound_speed():
     gamma = 1.4
     eos = BarotropicEOS(K=K, gamma=gamma)
     rho = np.array([1.0, 2.0, 3.0])
-    p = K * rho ** gamma
+    p = K * rho**gamma
     expected_a = np.sqrt(gamma * p / rho)
     computed_a = eos.sound_speed(rho, p)
     np.testing.assert_allclose(computed_a, expected_a, rtol=1e-6)
@@ -100,6 +106,7 @@ def test_exner_based_eos_sound_speed():
     computed_a = eos.sound_speed(rho_arr, p_arr)
     np.testing.assert_allclose(computed_a, expected_a, rtol=1e-6)
 
+
 # Edge case tests
 def test_eos_ideal_gas_zero_density():
     gamma = 1.4
@@ -123,14 +130,14 @@ def test_barotropic_eos_zero_density():
     eos = BarotropicEOS(K=K, gamma=gamma)
     rho = np.array([0.0, 2.0])
     # Pressure should be zero where density is zero
-    expected_p = np.array([0.0, K * 2.0 ** gamma])
+    expected_p = np.array([0.0, K * 2.0**gamma])
     computed_p = eos.pressure(rho)
     np.testing.assert_allclose(computed_p, expected_p, rtol=1e-6)
 
     p = expected_p
     expected_a = np.sqrt(gamma * p / rho)
     # Handle division by zero for density = 0
-    with np.errstate(divide='ignore', invalid='ignore'):
+    with np.errstate(divide="ignore", invalid="ignore"):
         computed_a = eos.sound_speed(rho, p)
     expected_a[0] = 0.0  # Define sound speed as zero where density is zero
     np.testing.assert_allclose(computed_a, expected_a, rtol=1e-6)
@@ -167,7 +174,9 @@ def test_exner_based_eos_zero_density_sound_speed():
     np.testing.assert_allclose(computed_a, expected_a, rtol=1e-6)
 
     # Additionally, verify that sound speed is zero where rho_arr is zero
-    assert np.all(computed_a[rho_arr == 0] == 0.0), "Sound speed should be 0 where density is zero."
+    assert np.all(
+        computed_a[rho_arr == 0] == 0.0
+    ), "Sound speed should be 0 where density is zero."
 
 
 def test_exner_based_eos_negative_pressure():
@@ -190,5 +199,3 @@ def test_exner_based_eos_negative_pi():
     pi_arr = np.array([1.0, -1.0])  # Negative pi is physically invalid
     with pytest.raises(ValueError):
         eos.pressure(pi=pi_arr)
-
-

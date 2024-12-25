@@ -1,6 +1,7 @@
 import numpy as np
 from numba import njit, prange
 
+
 @njit(parallel=True)
 def exner_to_pressure_numba(pi: np.ndarray, p_ref: float, cp: float, R: float):
     """
@@ -61,6 +62,7 @@ def P_to_pressure_numba(P: np.ndarray, p_ref: float, cp: float, cv: float):
         fac = P[i] * R / p_ref
         p_out[i] = p_ref * (fac ** (cp / cv))
     return p_out
+
 
 @njit(parallel=True)
 def exner_sound_speed_numba(rho_arr, p_arr, gamma):

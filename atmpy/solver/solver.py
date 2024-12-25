@@ -1,11 +1,14 @@
 class Solver:
-    def __init__(self, grid,
+    def __init__(
+        self,
+        grid,
         eos,
         initial_conditions,
         flux_method,
         boundary_conditions,
         CFL,
-        t_final):
+        t_final,
+    ):
         pass
 
     def advance_time_step(self):
