@@ -2,6 +2,7 @@ import pytest
 import numpy as np
 from unittest.mock import MagicMock
 from atmpy.variables.variables import Variables  # Updated import statement
+from atmpy.physics.eos import *
 
 
 # Mock variable indices for testing:
@@ -41,7 +42,6 @@ class MockGrid:
             self.nny_total = ncy + 1
         if dimensions == 3:
             self.nnz_total = ncz + 1
-
 
 # Temporarily modify sys.modules to replace atmpy.data.constants with
 # MagicMock defined above to isolate the test
@@ -182,6 +182,8 @@ def test_variables_to_primitive(dims, num_cell_vars, num_node_vars, gamma):
         g = MockGrid(dimensions=3, ncx=5, ncy=5, ncz=5)
         expected_cell_shape = (5, 5, 5, num_cell_vars)
 
+    eos = ExnerBasedEOS()
+
     vars_container = Variables(
         grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars
     )
@@ -214,13 +216,15 @@ def test_variables_to_primitive(dims, num_cell_vars, num_node_vars, gamma):
         )
 
     # Invoke to_primitive
-    vars_container.to_primitive(gamma=gamma)
+    vars_container.to_primitive(eos=eos)
 
     # Retrieve primitives
     prim = vars_container.primitives
 
     # Calculate expected primitives
-    expected_p = 2.0**gamma  # p = rhoY ** gamma = 2.0 ** 1.4 ≈ 2.639
+    R, cp, cv, pref = eos.R, eos.cp, eos.cv, eos.p_ref
+    expected_p = pref*((2.0*(R / pref))**(cp / cv))
+    # expected_p = 2.0**gamma  # p = rhoY ** gamma = 2.0 ** 1.4 ≈ 2.639
     expected_X_over_rho = 3.0 / 2.0  # 1.5
     expected_Y_over_rho = 2.0 / 2.0  # 1.0
     expected_u = 4.0 / 2.0  # 2.0
@@ -393,12 +397,14 @@ def test_variables_partial_update():
     assert np.all(vars_container.primitives == 0.0)
 
     # Now call to_primitive and ensure primitives are updated correctly
-    gamma = 1.4
-    vars_container.to_primitive(gamma=gamma)
+    eos = ExnerBasedEOS()
+    vars_container.to_primitive(eos=eos)
     prim = vars_container.primitives
 
     # Calculate expected primitives
-    expected_p = 2.0**gamma  # p = rhoY ** gamma = 2.0 ** 1.4 ≈ 2.639
+    R, cp, cv, pref = eos.R, eos.cp, eos.cv, eos.p_ref
+    expected_p = pref*((2.0*(R / pref))**(cp / cv))
+    # expected_p = 2.0**gamma  # p = rhoY ** gamma = 2.0 ** 1.4 ≈ 2.639
     expected_X_over_rho = 3.0 / 2.0  # 1.5
     expected_Y_over_rho = 2.0 / 2.0  # 1.0
     expected_u = 4.0 / 2.0  # 2.0
