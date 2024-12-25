@@ -6,7 +6,9 @@ from numba import njit, prange
 
 
 @njit(parallel=True)
-def exner_to_pressure_numba(pi: np.ndarray, p_ref: float, cp: float, R: float) -> np.ndarray:
+def exner_to_pressure_numba(
+    pi: np.ndarray, p_ref: float, cp: float, R: float
+) -> np.ndarray:
     """
     Convert Exner pressure (pi) to real pressure using Numba.
 
@@ -44,7 +46,9 @@ def exner_to_pressure_numba(pi: np.ndarray, p_ref: float, cp: float, R: float) -
 
 
 @njit(parallel=True)
-def P_to_pressure_numba(P: np.ndarray, p_ref: float, cp: float, cv: float) -> np.ndarray:
+def P_to_pressure_numba(
+    P: np.ndarray, p_ref: float, cp: float, cv: float
+) -> np.ndarray:
     """
     Convert unphysical pressure (P) to real pressure (p).
 
@@ -83,7 +87,9 @@ from numba import njit, prange
 
 
 @njit(parallel=True)
-def exner_sound_speed_numba(rho_arr: np.ndarray, p_arr: np.ndarray, gamma: float) -> np.ndarray:
+def exner_sound_speed_numba(
+    rho_arr: np.ndarray, p_arr: np.ndarray, gamma: float
+) -> np.ndarray:
     """
     Calculate sound speed using Numba for the Exner-Based Equation of State (EOS).
 
@@ -124,15 +130,14 @@ def exner_sound_speed_numba(rho_arr: np.ndarray, p_arr: np.ndarray, gamma: float
         p_val = p_arr.flat[idx]
 
         if rho_val <= 0.0:
-            #TODO: Handle division by zero
+            # TODO: Handle division by zero
             # Option 1: Set to NaN (mathematically consistent but might break a solver)
             a_out.flat[idx] = np.nan
 
-            #TODO: Handle division by zero
+            # TODO: Handle division by zero
             # Option 2: Set to 0.0 (uncomment the following line if preferred)
             # a_out.flat[idx] = 0.0
         else:
             a_out.flat[idx] = np.sqrt(gamma * p_val / rho_val)
 
     return a_out
-

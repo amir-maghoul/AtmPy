@@ -43,6 +43,7 @@ class MockGrid:
         if dimensions == 3:
             self.nnz_total = ncz + 1
 
+
 # Temporarily modify sys.modules to replace atmpy.data.constants with
 # MagicMock defined above to isolate the test
 import sys
@@ -223,7 +224,7 @@ def test_variables_to_primitive(dims, num_cell_vars, num_node_vars, gamma):
 
     # Calculate expected primitives
     R, cp, cv, pref = eos.R, eos.cp, eos.cv, eos.p_ref
-    expected_p = pref*((2.0*(R / pref))**(cp / cv))
+    expected_p = pref * ((2.0 * (R / pref)) ** (cp / cv))
     # expected_p = 2.0**gamma  # p = rhoY ** gamma = 2.0 ** 1.4 ≈ 2.639
     expected_X_over_rho = 3.0 / 2.0  # 1.5
     expected_Y_over_rho = 2.0 / 2.0  # 1.0
@@ -403,7 +404,7 @@ def test_variables_partial_update():
 
     # Calculate expected primitives
     R, cp, cv, pref = eos.R, eos.cp, eos.cv, eos.p_ref
-    expected_p = pref*((2.0*(R / pref))**(cp / cv))
+    expected_p = pref * ((2.0 * (R / pref)) ** (cp / cv))
     # expected_p = 2.0**gamma  # p = rhoY ** gamma = 2.0 ** 1.4 ≈ 2.639
     expected_X_over_rho = 3.0 / 2.0  # 1.5
     expected_Y_over_rho = 2.0 / 2.0  # 1.0

@@ -202,4 +202,3 @@ class Variables:
                 f"Shape mismatch: expected {self.node_vars.shape}, got {new_values.shape}"
             )
         self.node_vars = new_values
-
