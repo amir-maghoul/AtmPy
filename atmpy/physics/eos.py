@@ -78,6 +78,7 @@ class ExnerBasedEOS(EOS):
         self.cv = cv
         self.R = cp - cv
         self.p_ref = p_ref
+        self.gamma = self.cp / self.cv
 
     def pressure(self, P: np.ndarray = None, pi: np.ndarray = None):
         """
