@@ -2,6 +2,7 @@ from abc import abstractmethod
 import numpy as np
 from atmpy.data.constants import VariableIndices, PrimitiveVariableIndices
 from atmpy.grid.utility import DimensionSpec, create_grid
+from atmpy.physics import eos
 
 
 class Variables:
@@ -201,3 +202,4 @@ class Variables:
                 f"Shape mismatch: expected {self.node_vars.shape}, got {new_values.shape}"
             )
         self.node_vars = new_values
+
