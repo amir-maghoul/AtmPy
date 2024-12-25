@@ -92,6 +92,8 @@ class ExnerBasedEOS(EOS):
 
         """
         if P is not None:
+            print(P.shape)
+            print(type(P))
             return P_to_pressure_numba(P, self.p_ref, self.cp, self.cv)
         elif pi is not None:
             return exner_to_pressure_numba(pi, self.p_ref, self.cp, self.R)
