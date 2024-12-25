@@ -14,7 +14,7 @@ class VariableIndices(IntEnum):
 
     @classmethod
     def values(cls):
-        return [color.value for color in cls]
+        return [index.value for index in cls]
 
 
 class PrimitiveVariableIndices(IntEnum):
@@ -30,4 +30,4 @@ class PrimitiveVariableIndices(IntEnum):
 
     @classmethod
     def values(cls):
-        return [color.value for color in cls]
+        return [index.value for index in cls]
