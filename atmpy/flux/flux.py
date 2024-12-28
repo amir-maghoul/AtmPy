@@ -8,8 +8,10 @@ from numba import njit
 
 from atmpy.flux.boundary_conditions import apply_boundary_conditions
 from .reconstruction import muscl_reconstruct_1d
+
 # from .slope_limiters import ...
 # from atmpy.physics import eos (if needed or pass in the constructor)
+
 
 class Flux:
     """
@@ -17,7 +19,9 @@ class Flux:
     Emphasizes in-place updates and optional numba for performance.
     """
 
-    def __init__(self, eos, bc=apply_boundary_conditions, recon_fn=muscl_reconstruct_1d):
+    def __init__(
+        self, eos, bc=apply_boundary_conditions, recon_fn=muscl_reconstruct_1d
+    ):
         """
         Parameters
         ----------
@@ -61,7 +65,7 @@ class Flux:
         fluxes = np.zeros_like(cell_vals)  # shape (nx, num_vars)
         for i in range(1, nx):
             # left state from right_states[i-1], right state from left_states[i]
-            ul = right_states[i-1]
+            ul = right_states[i - 1]
             ur = left_states[i]
 
             # Example: Rusanov flux in 1D
@@ -80,14 +84,14 @@ class Flux:
             # simple flux
             f_left = self._physical_flux(ul)
             f_right = self._physical_flux(ur)
-            flux_face = 0.5*(f_left + f_right) - 0.5*s_max*(ur - ul)
+            flux_face = 0.5 * (f_left + f_right) - 0.5 * s_max * (ur - ul)
 
             # store in flux array
             fluxes[i] = flux_face
 
         # 4) Update the cell averages in place (Godunov's method or similar)
-        for i in range(1, nx-1):
-            cell_vals[i] -= dt/dx * (fluxes[i] - fluxes[i-1])
+        for i in range(1, nx - 1):
+            cell_vals[i] -= dt / dx * (fluxes[i] - fluxes[i - 1])
 
     @staticmethod
     @njit
@@ -104,8 +108,6 @@ class Flux:
 
         # Real 1D Euler example (requires more details: gamma, etc.).
         # We'll keep it short to highlight structure.
-
-
 
 
 # class Flux:

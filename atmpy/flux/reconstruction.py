@@ -1,10 +1,13 @@
 """ This module contains function for different ways of flux reconstruction for different orders of accuracy."""
+
 import numpy as np
 from numba import njit
 from atmpy.flux.limiters import *
 
+
 def piecewise_constant():
-    """ First order Gudonov scheme."""
+    """First order Gudonov scheme."""
+
 
 @njit
 def muscl_reconstruct(cell_values, dx, limiter=minmod):
@@ -29,10 +32,10 @@ def muscl_reconstruct(cell_values, dx, limiter=minmod):
     left_states = np.zeros_like(cell_values)
     right_states = np.zeros_like(cell_values)
 
-    for i in range(1, n-1):
+    for i in range(1, n - 1):
         # slopes
-        slope_left = (cell_values[i]   - cell_values[i-1]) / dx
-        slope_right = (cell_values[i+1] - cell_values[i])  / dx
+        slope_left = (cell_values[i] - cell_values[i - 1]) / dx
+        slope_right = (cell_values[i + 1] - cell_values[i]) / dx
 
         # slope-limited
         slope = np.zeros_like(slope_left)
@@ -40,7 +43,7 @@ def muscl_reconstruct(cell_values, dx, limiter=minmod):
             slope[k] = limiter(slope_left[k], slope_right[k])
 
         # Reconstructed states
-        left_states[i+1]  = cell_values[i] + 0.5*dx*slope
-        right_states[i]   = cell_values[i] - 0.5*dx*slope
+        left_states[i + 1] = cell_values[i] + 0.5 * dx * slope
+        right_states[i] = cell_values[i] - 0.5 * dx * slope
 
     return left_states, right_states

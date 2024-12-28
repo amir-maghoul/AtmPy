@@ -1,5 +1,7 @@
 import numpy as np
+
 # from numba import njit
+
 
 def apply_boundary_conditions(variables, grid, bc_type="periodic"):
     """
@@ -27,9 +29,9 @@ def apply_boundary_conditions(variables, grid, bc_type="periodic"):
             nx = grid.cell.nnx  # or grid.node.nnx depending on your usage
             for var_idx in range(variables.num_vars_cell):
                 # left ghost cells = last cells
-                variables.cell_vars[0, var_idx] = variables.cell_vars[nx-2, var_idx]
+                variables.cell_vars[0, var_idx] = variables.cell_vars[nx - 2, var_idx]
                 # right ghost cells = first cells
-                variables.cell_vars[nx-1, var_idx] = variables.cell_vars[1, var_idx]
+                variables.cell_vars[nx - 1, var_idx] = variables.cell_vars[1, var_idx]
         # Extend to 2D, 3D, or other BC types as needed
     else:
         # Implement other BC types similarly
