@@ -1,4 +1,4 @@
-from enum import IntEnum
+from enum import IntEnum, Enum
 
 
 class VariableIndices(IntEnum):
@@ -31,3 +31,28 @@ class PrimitiveVariableIndices(IntEnum):
     @classmethod
     def values(cls):
         return [index.value for index in cls]
+
+
+class SlopeLimiters(Enum):
+    """Map name to function for the slope limiter"""
+
+    MINMOD = "minmod"
+    VAN_LEER = "van_leer"
+    SUPERBEE = "superbee"
+    MC_LIMITER = "mc_limiter"
+
+
+class RiemannSolvers(Enum):
+    """Map name to function for the Riemann solver"""
+
+    RUSANOV = "rusanov"
+    HLL = "hll"
+    HLLC = "hllc"
+    ROE = "roe"
+
+
+class FluxReconstructions(Enum):
+    """Map name to function for the reconstruction"""
+
+    PIECEWISE_CONSTANT = "piecewise_constant"
+    MUSCL = "muscl"
