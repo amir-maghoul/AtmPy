@@ -59,7 +59,7 @@ def muscl_reconstruct(cell_values, dx, limiter=minmod):
 
 from numba import njit
 import numpy as np
-from .slope_limiters import minmod
+from .limiters import minmod
 
 
 @njit
