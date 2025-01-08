@@ -185,8 +185,8 @@ class Grid:
             # Total number of cells and nodes including ghost cells in y-direction
             self.ncy_total: int = ny + 2 * self.ngy
             self.nny_total: int = self.ncy_total + 1
-            self.cshape = (self.ncy_total, self.ncy_total)
-            self.nshape = (self.nny_total, self.nny_total)
+            self.cshape = (self.ncx_total, self.ncy_total)
+            self.nshape = (self.nnx_total, self.nny_total)
 
             # Generate y-coordinate arrays
             self.y_cells: np.ndarray = np.linspace(
