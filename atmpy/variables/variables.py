@@ -1,6 +1,6 @@
 from abc import abstractmethod
 import numpy as np
-from atmpy.data.enums import VariableIndices, PrimitiveVariableIndices
+from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
 from atmpy.grid.utility import DimensionSpec, create_grid
 from atmpy.physics import eos
 
@@ -50,7 +50,7 @@ class Variables:
             raise ValueError("Number of dimensions not supported.")
 
         # Initialize cell-centered variables
-        if self.num_vars_cell is not None and self.num_vars_cell > 0:
+        if self.num_vars_cell is not None and self.num_vars_cell >= 4:
             if self.ndim == 1:
                 self.cell_vars = np.zeros((self.grid.ncx_total, self.num_vars_cell))
             elif self.ndim == 2:
@@ -68,7 +68,7 @@ class Variables:
                 )
         else:
             raise ValueError(
-                "Number of cell-based variables should not be None, zero or negative."
+                "Number of cell-based variables should not be None or less than 4."
             )
 
         self.primitives = np.zeros(self.cell_vars.shape)
@@ -155,20 +155,18 @@ class Variables:
             Array of primitive variables with one additional dimension.
         """
         ndim = self.ndim
-        RHO, RHOX, RHOY, RHOU, RHOV, RHOW = VariableIndices.values()
-        P, X, Y, U, V, W = PrimitiveVariableIndices.values()
 
-        rho = self.cell_vars[..., RHO]
-        self.primitives[..., P] = eos.pressure(self.cell_vars[..., RHOY])
-        self.primitives[..., U] = self.cell_vars[..., RHOU] / rho
-        self.primitives[..., X] = self.cell_vars[..., RHOX] / rho
-        self.primitives[..., Y] = self.cell_vars[..., RHOY] / rho
+        rho = self.cell_vars[..., VI.RHO]
+        self.primitives[..., PVI.P] = eos.pressure(self.cell_vars[..., VI.RHOY])
+        self.primitives[..., PVI.U] = self.cell_vars[..., VI.RHOU] / rho
+        self.primitives[..., PVI.X] = self.cell_vars[..., VI.RHOX] / rho
+        self.primitives[..., PVI.Y] = self.cell_vars[..., VI.RHOY] / rho
 
         if ndim == 2:
-            self.primitives[..., V] = self.cell_vars[..., RHOV] / rho
+            self.primitives[..., PVI.V] = self.cell_vars[..., VI.RHOV] / rho
         elif ndim == 3:
-            self.primitives[..., V] = self.cell_vars[..., RHOV] / rho
-            self.primitives[..., W] = self.cell_vars[..., RHOW] / rho
+            self.primitives[..., PVI.V] = self.cell_vars[..., VI.RHOV] / rho
+            self.primitives[..., PVI.W] = self.cell_vars[..., VI.RHOW] / rho
 
         elif ndim > 3 or ndim < 1:
             raise ValueError("Unsupported number of dimensions.")

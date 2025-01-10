@@ -12,10 +12,6 @@ class VariableIndices(IntEnum):
     RHOV = 4  # Horizontal Velocity y-component
     RHOW = 5  # Vertical Velocity
 
-    @classmethod
-    def values(cls):
-        return [index.value for index in cls]
-
 
 class PrimitiveVariableIndices(IntEnum):
     """Create constants for variable indices in the variable container (ndarray) for better readability"""
@@ -27,10 +23,6 @@ class PrimitiveVariableIndices(IntEnum):
     U = 3  # Horizontal Velocity x-component
     V = 4  # Horizontal Velocity y-component
     W = 5  # Vertical Velocity
-
-    @classmethod
-    def values(cls):
-        return [index.value for index in cls]
 
 
 class SlopeLimiters(Enum):
