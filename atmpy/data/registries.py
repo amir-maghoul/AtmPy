@@ -1,6 +1,5 @@
 """ This is a registry container to map names to their corresponding functions. """
 
-from atmpy.flux.limiters import *
 from atmpy.flux.riemann_solvers import *
 from atmpy.flux.reconstruction import *
 from atmpy.data.enums import SlopeLimiters, RiemannSolvers, FluxReconstructions

@@ -3,7 +3,7 @@
 # factories.py
 
 from atmpy.data.enums import SlopeLimiters, RiemannSolvers, FluxReconstructions
-from .registries import SLOPE_LIMITERS, RIEMANN_SOLVERS, FLUX_RECONSTRUCTION
+from atmpy.data.registries import SLOPE_LIMITERS, RIEMANN_SOLVERS, FLUX_RECONSTRUCTION
 
 
 def get_slope_limiter(name: SlopeLimiters):

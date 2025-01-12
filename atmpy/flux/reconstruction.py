@@ -1,7 +1,5 @@
 """ This module contains function for different ways of flux reconstruction for different orders of accuracy."""
 
-import numpy as np
-from numba import njit
 from atmpy.flux.limiters import *
 from typing import Tuple
 
@@ -59,7 +57,7 @@ def muscl_reconstruct(cell_values, dx, limiter=minmod):
 
 from numba import njit
 import numpy as np
-from .limiters import minmod
+from atmpy.flux.limiters import minmod
 
 
 @njit

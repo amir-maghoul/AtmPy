@@ -1,30 +1,45 @@
 import numpy as np
-from typing import Callable, Union, Tuple, Sequence, List
+from typing import List
 
 from atmpy.flux.utility import create_averaging_kernels
 from atmpy.grid.kgrid import Grid
-from atmpy.grid.utility import cell_to_node_average
 from atmpy.variables.variables import Variables
 from atmpy.physics.eos import EOS
-from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
+from atmpy.data.enums import VariableIndices as VI
 from atmpy.data.enums import SlopeLimiters, RiemannSolvers, FluxReconstructions
-from atmpy.flux._factory import (
-    get_slope_limiter,
+from atmpy.data._factory import (
     get_riemann_solver,
     get_reconstruction_method,
+    get_slope_limiter
 )
 import scipy as sp
 
 
 class Flux:
+    """ Flux container. The attributes shared with the constructor parameters have docstrings there.
+
+    Attributes
+    ----------
+    ndim : int
+        The dimension of the problem
+    flux : dict[str, np.ndarray]
+        The full flux container. This contains the main numerical flux of the problem. The keys are the direction of
+         the flux. There is a full variable ndarray for each direction in this container.
+    iflux : np.ndarray
+        The intermediate flux container. This is basically an array of [Pu, Pv, Pw] of the unphysical flux. The main
+        flux in each direction would be for example Flux["x"] = Pu*Psi where Psi is the variable container.
+    kernels : List[np.ndarray]
+        The averaging kernels for the flux calculation in each direction.
+    """
     def __init__(
         self,
         grid: Grid,
         variables: Variables,
         eos: EOS,
+        dt: float,
         solver: RiemannSolvers = RiemannSolvers.HLL,
-        limiter: SlopeLimiters = SlopeLimiters.MINMOD,
         reconstruction: FluxReconstructions = FluxReconstructions.MUSCL,
+        limiter: SlopeLimiters = SlopeLimiters.MINMOD
     ):
         """
         Parameters
@@ -33,42 +48,51 @@ class Flux:
             The computational grid.
         variables : :py:class:`atmpy.variables.variables.Variables`
             The variable container
+        eos : :py:class:`atmpy.physics.eos.EOS`
+            The equation of state
+        dt : float
+            The time step of the problem.
         solver : RiemannSolvers (Enum)
             An enum name from the implemented RiemannSolvers Enum,
             e.g. RiemannSolvers.HLL, RiemannSolvers.RUSANOV, etc.
-        limiter : SlopeLimiters
-            An enum name from the implemented SlopeLimiters Enum,
-            e.g. SlopeLimiters.MINMOD, SlopeLimiters.MC_LIMITER etc.
-        reconstruction : FluxReconstructions
-            An enum name from the implemented FluxReconstructions Enum,
-            e.g. FluxReconstructions.MUSCL, etc.
+
+        Notes
+        -----
+        Note that the timestep of the problem should be an attribute of the flux class since the CFL condition
+        restricts the physical fineness and the reconstruction schemes like MUSCL depend on the time step and the
+        slope of the state.
         """
         self.grid = grid
         self.variables = variables
         self.eos = eos
-        self.limiter = get_slope_limiter(limiter)
+        self.dt = dt
         self.riemann_solver = get_riemann_solver(solver)
-        self.reconstruction_function = get_reconstruction_method(reconstruction)
+        self.reconstructions = get_reconstruction_method(reconstruction)
+        self.limiter = get_slope_limiter(limiter)
         self.ndim = self.grid.dimensions
+        self.kernels = create_averaging_kernels(self.ndim)  # [kernel_x, kernel_y, ...]
 
         if self.ndim == 1:
             self.flux = {
-                "x": np.empty((grid.nx + 1, variables.num_vars_cell), dtype=np.float16)
+                "x": np.zeros((grid.ncx_total, variables.num_vars_cell), dtype=np.float16)
             }
+            self.iflux = np.zeros((grid.ncx_total, self.ndim), dtype=np.float16)
         elif self.ndim == 2:
             self.flux = {
-                "x": np.empty(
-                    (grid.nx + 1, grid.ny, variables.num_vars_cell),
+                "x": np.zeros(
+                    (grid.ncx_total, grid.ncy_total, variables.num_vars_cell),
                     dtype=np.float16,
                 ),
-                "y": np.empty(
-                    (grid.nx, grid.ny + 1, variables.num_vars_cell),
+                "y": np.zeros(
+                    (grid.ncx_total, grid.ncy_total, variables.num_vars_cell),
                     dtype=np.float16,
                 ),
             }
+            self.iflux = np.zeros((grid.ncx_total, grid.ncy_total, self.ndim), dtype=np.float16)
+
         elif self.ndim == 3:
             self.flux = {
-                "x": np.empty(
+                "x": np.zeros(
                     (
                         grid.ncx_total + 1,
                         grid.ncy_total,
@@ -77,7 +101,7 @@ class Flux:
                     ),
                     dtype=np.float16,
                 ),
-                "y": np.empty(
+                "y": np.zeros(
                     (
                         grid.ncx_total,
                         grid.ncy_total + 1,
@@ -86,7 +110,7 @@ class Flux:
                     ),
                     dtype=np.float16,
                 ),
-                "z": np.empty(
+                "z": np.zeros(
                     (
                         grid.ncx_total,
                         grid.ncy_total,
@@ -96,35 +120,39 @@ class Flux:
                     dtype=np.float16,
                 ),
             }
+            self.iflux = np.zeros((grid.ncx_total, grid.ncy_total, grid.ncz_total, self.ndim), dtype=np.float16)
 
-        self.compute_averaging_fluxes()
 
-    def compute_fluxes(self) -> None:
+    def compute_fluxes(self, left_state:np.ndarray, right_state) -> None:
         """Compute fluxes in the x, y, and z directions."""
+
+        # update the ifluxes with the new variable values
+        self._compute_averaging_fluxes()
+
         if self.ndim == 1:
             self.flux["x"] = self._compute_directional_flux(
-                self.variables, direction="x"
+                left_state, right_state, direction="x"
             )
         if self.ndim == 2:
             self.flux["x"] = self._compute_directional_flux(
-                self.variables, direction="x"
+                left_state, right_state, direction="x"
             )
             self.flux["y"] = self._compute_directional_flux(
-                self.variables, direction="y"
+                left_state, right_state, direction="y"
             )
         if self.ndim == 3:
             self.flux["x"] = self._compute_directional_flux(
-                self.variables, direction="x"
+                left_state, right_state, direction="x"
             )
             self.flux["y"] = self._compute_directional_flux(
-                self.variables, direction="y"
+                left_state, right_state, direction="y"
             )
             self.flux["z"] = self._compute_directional_flux(
-                self.variables, direction="z"
+                left_state, right_state, direction="z"
             )
 
     def _compute_directional_flux(
-        self, variables: Variables, direction: str
+        self, left_state, right_state, direction: str
     ) -> np.ndarray:
         """
         Compute the numerical flux in a specific direction.
@@ -144,14 +172,11 @@ class Flux:
         # TODO: Either preallocate left_state and right_state, or do an inplace calculation in reconstruction
         #     : Question to answer: Whether the reconstruction function should return two Variable objects or
         #     : Simply two arrays.
-        left_state, right_state = self.reconstruction_function(
-            variables, direction, self.ndim
-        )
         flux = self.riemann_solver(self.flux, left_state, right_state, direction)
 
         return flux
 
-    def compute_unphysical_fluxes(self) -> None:
+    def _compute_unphysical_fluxes(self) -> List[np.ndarray]:
         """
         Compute unphysical fluxes in the x, y, and z directions. The unphysical fluxes are Pu, Pv and Pw in BK19 paper.
         Reminder: P = rho*Theta.
@@ -183,12 +208,12 @@ class Flux:
 
         return fluxes
 
-    def compute_averaging_fluxes(self, mode: str = "constant") -> None:
+    def _compute_averaging_fluxes(self, mode: str = "constant") -> None:
         """
         Compute the physical flux in x, y, and z directions. The physical flux in the BK19 algorithm is
         calculated starting with averaging of the Pu variable from cell to nodes and then averaging nodes to get
         the value on the corresponding interface. But in the end, it is a weighted average of the immediate cells.
-        This algorithm updates the flux attribute in-place.
+        This algorithm updates the iflux attribute in-place.
 
         Parameters
         ----------
@@ -196,13 +221,11 @@ class Flux:
             mode of boundary handling for the sp.ndimage.convolve.
         """
 
-        unphysical_fluxes = self.compute_unphysical_fluxes()  # [Pu, Pv, ...]
-        kernels = create_averaging_kernels(self.ndim)  # [kernel_x, kernel_y, ...]
-        directions = ["x", "y", "z"]
+        unphysical_fluxes = self._compute_unphysical_fluxes()  # [Pu, Pv, ...]
+        directions = [0, 1, 2] # direction of the flux calculation: x: 0, y: 1 and z: 2
 
-        for flux, kernel, direction in zip(unphysical_fluxes, kernels, directions):
-            self.flux[direction] = sp.ndimage.convolve(flux, kernel, mode=mode)
-            # self.flux[direction] = sp.signal.fftconvolve(flux, kernel, mode="valid")
+        for flux, kernel, direction in zip(unphysical_fluxes, self.kernels, directions):
+            self.iflux[..., direction] = sp.ndimage.convolve(flux, kernel, mode=mode)
 
 def main():
     from atmpy.grid.utility import DimensionSpec, create_grid
@@ -222,13 +245,20 @@ def main():
     variables.cell_vars[..., VI.RHOV] = np.ones((5, 6)) * 2
     eos = ExnerBasedEOS()
     flux = Flux(grid, variables, eos)
-    print(flux.flux["x"])
-    print(flux.flux["y"].shape)
-    # print(variables.cell_vars[..., VI.RHOV])
-    # print(variables.cell_vars[..., VI.RHOU])
-    Pu, Pv = flux.compute_unphysical_fluxes()
-    print(Pu)
-    print(arr)
+    print(flux.variables.cell_vars[..., VI.RHOV])
+    # print(flux.iflux[..., 0])
+    # print(flux.flux["y"].shape)
+    # # print(variables.cell_vars[..., VI.RHOV])
+    # # print(variables.cell_vars[..., VI.RHOU])
+    # Pu, Pv = flux.compute_unphysical_fluxes()
+    # print(Pu)
+    # print(arr)
+    variables.cell_vars[..., VI.RHOV] = np.ones((5, 6)) * 3
+    print(flux.variables.cell_vars[..., VI.RHOV])
+
+
+
+
 
     # TODO: The current implementation evaluates the flux on the whole grid including ghost cells.
     #       This is correct. What remains is choosing indices from the flux the make it have one element
