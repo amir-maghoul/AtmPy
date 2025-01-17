@@ -10,13 +10,13 @@ from atmpy.data.enums import SlopeLimiters, RiemannSolvers, FluxReconstructions
 from atmpy.data._factory import (
     get_riemann_solver,
     get_reconstruction_method,
-    get_slope_limiter
+    get_slope_limiter,
 )
 import scipy as sp
 
 
 class Flux:
-    """ Flux container. The attributes shared with the constructor parameters have docstrings there.
+    """Flux container. The attributes shared with the constructor parameters have docstrings there.
 
     Attributes
     ----------
@@ -31,6 +31,7 @@ class Flux:
     kernels : List[np.ndarray]
         The averaging kernels for the flux calculation in each direction.
     """
+
     def __init__(
         self,
         grid: Grid,
@@ -39,7 +40,7 @@ class Flux:
         dt: float,
         solver: RiemannSolvers = RiemannSolvers.HLL,
         reconstruction: FluxReconstructions = FluxReconstructions.MUSCL,
-        limiter: SlopeLimiters = SlopeLimiters.MINMOD
+        limiter: SlopeLimiters = SlopeLimiters.MINMOD,
     ):
         """
         Parameters
@@ -74,7 +75,9 @@ class Flux:
 
         if self.ndim == 1:
             self.flux = {
-                "x": np.zeros((grid.ncx_total, variables.num_vars_cell), dtype=np.float16)
+                "x": np.zeros(
+                    (grid.ncx_total, variables.num_vars_cell), dtype=np.float16
+                )
             }
             self.iflux = np.zeros((grid.ncx_total, self.ndim), dtype=np.float16)
         elif self.ndim == 2:
@@ -88,7 +91,9 @@ class Flux:
                     dtype=np.float16,
                 ),
             }
-            self.iflux = np.zeros((grid.ncx_total, grid.ncy_total, self.ndim), dtype=np.float16)
+            self.iflux = np.zeros(
+                (grid.ncx_total, grid.ncy_total, self.ndim), dtype=np.float16
+            )
 
         elif self.ndim == 3:
             self.flux = {
@@ -120,10 +125,12 @@ class Flux:
                     dtype=np.float16,
                 ),
             }
-            self.iflux = np.zeros((grid.ncx_total, grid.ncy_total, grid.ncz_total, self.ndim), dtype=np.float16)
+            self.iflux = np.zeros(
+                (grid.ncx_total, grid.ncy_total, grid.ncz_total, self.ndim),
+                dtype=np.float16,
+            )
 
-
-    def compute_fluxes(self, left_state:np.ndarray, right_state) -> None:
+    def compute_fluxes(self, left_state: np.ndarray, right_state) -> None:
         """Compute fluxes in the x, y, and z directions."""
 
         # update the ifluxes with the new variable values
@@ -222,14 +229,17 @@ class Flux:
         """
 
         unphysical_fluxes = self._compute_unphysical_fluxes()  # [Pu, Pv, ...]
-        directions = [0, 1, 2] # direction of the flux calculation: x: 0, y: 1 and z: 2
+        directions = [0, 1, 2]  # direction of the flux calculation: x: 0, y: 1 and z: 2
 
         for flux, kernel, direction in zip(unphysical_fluxes, self.kernels, directions):
             self.iflux[..., direction] = sp.ndimage.convolve(flux, kernel, mode=mode)
 
+
 def main():
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.physics.eos import ExnerBasedEOS
+
+    dt = 0.1
 
     dim = [DimensionSpec(1, 0, 2, 2), DimensionSpec(2, 0, 2, 2)]
     grid = create_grid(dim)
@@ -244,21 +254,17 @@ def main():
     variables.cell_vars[..., VI.RHOY] = 2
     variables.cell_vars[..., VI.RHOV] = np.ones((5, 6)) * 2
     eos = ExnerBasedEOS()
-    flux = Flux(grid, variables, eos)
+    flux = Flux(grid, variables, eos, dt)
     print(flux.variables.cell_vars[..., VI.RHOV])
     # print(flux.iflux[..., 0])
     # print(flux.flux["y"].shape)
     # # print(variables.cell_vars[..., VI.RHOV])
     # # print(variables.cell_vars[..., VI.RHOU])
-    # Pu, Pv = flux.compute_unphysical_fluxes()
-    # print(Pu)
-    # print(arr)
+    Pu, Pv = flux._compute_unphysical_fluxes()
+    print(Pu)
+    print(arr)
     variables.cell_vars[..., VI.RHOV] = np.ones((5, 6)) * 3
-    print(flux.variables.cell_vars[..., VI.RHOV])
-
-
-
-
+    # print(flux.variables.cell_vars[..., VI.RHOV])
 
     # TODO: The current implementation evaluates the flux on the whole grid including ghost cells.
     #       This is correct. What remains is choosing indices from the flux the make it have one element

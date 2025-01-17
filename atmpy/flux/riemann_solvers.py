@@ -1,13 +1,24 @@
-import numpy as np
 from typing import Tuple
-from numba import njit, prange
 from atmpy.variables.variables import Variables
 from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
-from atmpy.physics.eos import *
-from atmpy.data.enums import *
+from atmpy.flux.utility import directional_indices
 
 
-def roe(left_state: Variables, right_state: Variables, direction: str,  *args, **kwargs):
+def modified_hll(
+    left_state: Variables,
+    right_state: Variables,
+    direction_string: str,
+    *args,
+    **kwargs,
+):
+    ndim = left_state.ndim
+    left_idx, right_idx, remove_cols_idx, _ = directional_indices(
+        ndim, direction_string
+    )
+    pass
+
+
+def roe(left_state: Variables, right_state: Variables, direction: str, *args, **kwargs):
     raise NotImplementedError(f"Roe solver for {direction}-direction not implemented.")
 
 
@@ -88,11 +99,15 @@ def _hll_numba(
     return flux
 
 
-def hllc(left_state: Variables, right_state: Variables, direction: str, *args, **kwargs):
+def hllc(
+    left_state: Variables, right_state: Variables, direction: str, *args, **kwargs
+):
     raise NotImplementedError(f"HLLC solver for {direction}-direction not implemented.")
 
 
-def rusanov(left_state: Variables, right_state: Variables, direction: str, *args, **kwargs):
+def rusanov(
+    left_state: Variables, right_state: Variables, direction: str, *args, **kwargs
+):
     raise NotImplementedError(
         f"Rusanov solver for {direction}-direction not implemented."
     )

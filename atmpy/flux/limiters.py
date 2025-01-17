@@ -5,15 +5,16 @@ import numpy as np
 import time
 
 
-@njit
-def minmod(a, b):
-    """
-    Classic minmod slope limiter for scalars.
-    """
-    if a * b <= 0.0:
-        return 0.0
-    else:
-        return np.sign(a) * min(abs(a), abs(b))
+def minmod(a: np.ndarray, b: np.ndarray):
+    """Minmod flux slope limiter using numpy vectorization"""
+    result = np.zeros_like(a)
+    positive_mask = (a * b) > 0
+    result[positive_mask] = a[positive_mask]
+
+    result[positive_mask] = np.sign(a[positive_mask]) * np.minimum(
+        np.abs(a[positive_mask]), np.abs(b[positive_mask])
+    )
+    return result
 
 
 def van_leer(a, b):
