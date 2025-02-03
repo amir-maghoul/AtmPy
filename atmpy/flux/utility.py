@@ -86,7 +86,7 @@ def directional_indices(
     """
     direction_map = {"x": 0, "y": 1, "z": 2}
     # use ndim+1 to include the slices for the axis which corresponds to the number of variables in our cell_vars
-    left_idx, right_idx, remove_cols_idx = (
+    left_idx, right_idx, directional_inner_idx = (
         [slice(None)] * (ndim + 1),
         [slice(None)] * (ndim + 1),
         [slice(None)] * (ndim + 1),
@@ -95,9 +95,20 @@ def directional_indices(
         direction = direction_map[direction_string]
         left_idx[direction] = slice(0, -1)
         right_idx[direction] = slice(1, None)
-        remove_cols_idx[direction] = slice(1, -1)
+        directional_inner_idx[direction] = slice(1, -1)
     else:
         raise ValueError("Invalid direction string")
     inner_idx = [slice(1, -1)] * (ndim + 1)
 
-    return tuple(left_idx), tuple(right_idx), tuple(remove_cols_idx), tuple(inner_idx)
+    return (
+        tuple(left_idx),
+        tuple(right_idx),
+        tuple(directional_inner_idx),
+        tuple(inner_idx),
+    )
+
+
+def direction_mapping(direction: str) -> int:
+    """Utility function to map the string direction to its indices in variables."""
+    direction_map = {"x": 0, "y": 1, "z": 2}
+    return direction_map[direction]

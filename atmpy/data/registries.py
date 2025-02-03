@@ -2,6 +2,7 @@
 
 from atmpy.flux.riemann_solvers import *
 from atmpy.flux.reconstruction import *
+from atmpy.flux.limiters import *
 from atmpy.data.enums import SlopeLimiters, RiemannSolvers, FluxReconstructions
 
 SLOPE_LIMITERS = {
@@ -19,6 +20,7 @@ RIEMANN_SOLVERS = {
 }
 
 FLUX_RECONSTRUCTION = {
+    FluxReconstructions.MODIFIED_MUSCL: modified_muscl,
     FluxReconstructions.PIECEWISE_CONSTANT: piecewise_constant,
     FluxReconstructions.MUSCL: muscl,
 }

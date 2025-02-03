@@ -175,6 +175,9 @@ class Variables:
     # Node-Based Methods
     # -------------------
 
+    def to_conservative(self):
+        pass
+
     def get_node_vars(self):
         """
         Retrieves the node-based variables.

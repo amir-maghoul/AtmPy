@@ -2,64 +2,67 @@
 
 import numpy as np
 from typing import Callable
-from atmpy.flux.utility import directional_indices
+from atmpy.flux.utility import directional_indices, direction_mapping
 from atmpy.physics.eos import EOS
 from atmpy.variables.variables import Variables
+from atmpy.flux.reconstruction_utility import (
+    calculate_amplitudes,
+    calculate_slopes,
+    calculate_variable_differences,
+)
+from atmpy.data.enums import PrimitiveVariableIndices as PVI, VariableIndices as VI
 
 
-def calculate_differential_variables(
+def modified_muscl(
     variables: Variables,
     eos: EOS,
-    direction_str: str,
-):
-    """Calculate the difference of primitive variables in the given direction and store it in an array with the same
-    shape as the variable array."""
-    cell_vars = variables.cell_vars
-    direction_map = {"x": 0, "y": 1, "z": 2}
-    direction = direction_map[direction_str]
-
-    primitives = variables.primitives(eos)
-
-    diffs = np.zeros_like(cell_vars)
-    diff_values = np.diff(primitives, axis=direction)
-
-    # Create a slicer as a mask
-    slicer = [slice(None)] * variables.ndim
-    slicer[direction] = slice(0, -1)
-    diffs[tuple(slicer)] = diff_values
-
-    return diffs
-
-
-def calculate_slopes(
-    diffs: np.ndarray,
-    direction_str: str,
     limiter: Callable[[np.ndarray, np.ndarray], np.ndarray],
-    ndim: int,
+    lmbda: float,
+    direction: str,
 ):
-    """Calculate the slopes of the variables from their given difference array using the left and right values
+    """Compute the MUSCL scheme in the form specified in BK19 Paper
 
     Parameters
-    ----------
-    diffs : np.ndarray of shape (nx, [ny], [nz], num_vars)
-        Array of differences of the primitive variables. It should be calculated using the function
-        :py:func:`atmpy.flux.reconstruction.calculate_differential_variables`
-    direction_str : str
-        Direction in which the slopes and the flow are calculated.
+    ---------
+    variables : Variables
+        Variables object
+    eos : EOS
+        EOS object
     limiter : Callable[[np.ndarray, np.ndarray], np.ndarray]
-        The flux slope limiter passed as a function.
-    ndim : int
-        The spatial dimension of the variables.
-
-    Returns
-    -------
-    np.ndarray of shape (nx, [ny], [nz], num_vars)
-        The slopes of the primitive variables at interfaces
+        The limiter function for slope limiting
+    direction : str
+        Direction of the flux calculation. Should be "x", "y" or "z".
     """
-    left_idx, right_idx, _, inner_idx = directional_indices(ndim, direction_str)
-    # Use twice indexing: once to eliminate the extra zero due to the size difference between vars and differences
-    # (differences should have one less element) and once to obtain the left values
-    left_variable_slopes = diffs[left_idx][left_idx]
-    right_variable_slopes = diffs[right_idx][right_idx]
+    cell_vars = variables.cell_vars
+    primitives = variables.to_primitive(eos)
+    ndim = variables.ndim
+    lefts_idx, rights_idx, directional_inner_idx, inner_idx = direction_mapping(
+        direction
+    )
+    speed = np.zeros_like(cell_vars[..., VI.RHOY])
+    speed[inner_idx] = (
+        0.5
+        * (
+            cell_vars[..., VI.RHOY][inner_idx][lefts_idx]
+            + cell_vars[..., VI.RHOY][inner_idx][rights_idx]
+        )
+        / cell_vars[..., VI.RHOY][inner_idx]
+    )
+    diffs = calculate_variable_differences(primitives, ndim, direction)
+    slopes = calculate_slopes(diffs, direction, limiter, ndim)
+    amplitudes = calculate_amplitudes(slopes, speed, lmbda, left=True)
+    lefts = primitives + amplitudes
+    amplitudes = calculate_amplitudes(slopes, speed, lmbda, left=False)
+    rights = primitives + amplitudes
 
+    # TODO: Write the "to_conservative" method in Variables class and use this here to calculate the conservative
+    #       variables too.
+    return lefts, rights
+
+
+def piecewise_constant():
+    pass
+
+
+def muscl():
     pass

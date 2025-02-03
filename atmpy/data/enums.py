@@ -46,5 +46,6 @@ class RiemannSolvers(Enum):
 class FluxReconstructions(Enum):
     """Map name to function for the reconstruction"""
 
+    MODIFIED_MUSCL = "modified_muscle"
     PIECEWISE_CONSTANT = "piecewise_constant"
     MUSCL = "muscl"

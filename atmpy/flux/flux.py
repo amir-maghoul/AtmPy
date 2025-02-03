@@ -5,7 +5,7 @@ from atmpy.flux.utility import create_averaging_kernels
 from atmpy.grid.kgrid import Grid
 from atmpy.variables.variables import Variables
 from atmpy.physics.eos import EOS
-from atmpy.data.enums import VariableIndices as VI
+from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
 from atmpy.data.enums import SlopeLimiters, RiemannSolvers, FluxReconstructions
 from atmpy.data._factory import (
     get_riemann_solver,
@@ -30,6 +30,12 @@ class Flux:
         flux in each direction would be for example Flux["x"] = Pu*Psi where Psi is the variable container.
     kernels : List[np.ndarray]
         The averaging kernels for the flux calculation in each direction.
+    riemann_solver : Callable
+        The given riemann solver function. Default is modified HLL.
+    reconstruction : Callable
+        The given reconstruction function. Default is MUSCL.
+    limiter : Callable
+        The given limiter function. Default is minmod.
     """
 
     def __init__(
@@ -40,7 +46,7 @@ class Flux:
         dt: float,
         solver: RiemannSolvers = RiemannSolvers.HLL,
         reconstruction: FluxReconstructions = FluxReconstructions.MUSCL,
-        limiter: SlopeLimiters = SlopeLimiters.MINMOD,
+        limiter: SlopeLimiters = SlopeLimiters.VAN_LEER,
     ):
         """
         Parameters
@@ -56,6 +62,15 @@ class Flux:
         solver : RiemannSolvers (Enum)
             An enum name from the implemented RiemannSolvers Enum,
             e.g. RiemannSolvers.HLL, RiemannSolvers.RUSANOV, etc.
+            The attribute created from this enum is a callable function.
+        reconstruction : FluxReconstructions (Enum)
+            An enum name from the implemented FluxReconstructions Enum,
+            e.g. FluxReconstructions.MUSCL. The attribute created from this
+            enum is a callable function.
+        limiter : SlopeLimiters (Enum)
+            An enum name from the implemented SlopeLimiters Enum,
+            e.g. SlopeLimiters.MINMOD. The attribute created from this
+            enum is a callable function.
 
         Notes
         -----
@@ -68,7 +83,7 @@ class Flux:
         self.eos = eos
         self.dt = dt
         self.riemann_solver = get_riemann_solver(solver)
-        self.reconstructions = get_reconstruction_method(reconstruction)
+        self.reconstruction = get_reconstruction_method(reconstruction)
         self.limiter = get_slope_limiter(limiter)
         self.ndim = self.grid.dimensions
         self.kernels = create_averaging_kernels(self.ndim)  # [kernel_x, kernel_y, ...]
@@ -255,20 +270,33 @@ def main():
     variables.cell_vars[..., VI.RHOV] = np.ones((5, 6)) * 2
     eos = ExnerBasedEOS()
     flux = Flux(grid, variables, eos, dt)
-    print(flux.variables.cell_vars[..., VI.RHOV])
-    # print(flux.iflux[..., 0])
-    # print(flux.flux["y"].shape)
-    # # print(variables.cell_vars[..., VI.RHOV])
-    # # print(variables.cell_vars[..., VI.RHOU])
-    Pu, Pv = flux._compute_unphysical_fluxes()
-    print(Pu)
-    print(arr)
-    variables.cell_vars[..., VI.RHOV] = np.ones((5, 6)) * 3
     # print(flux.variables.cell_vars[..., VI.RHOV])
+    # print(variables.cell_vars[..., VI.RHOV])
+    # print(variables.cell_vars[..., VI.RHOU])
+    Pu, Pv = flux._compute_unphysical_fluxes()
+    # print(Pu)
+    # print(arr)
+    # variables.cell_vars[..., VI.RHOV] = np.ones((5, 6)) * 3
+    # print(flux.variables.cell_vars[..., VI.RHOV])
+    variables.to_primitive(eos)
+    primitives = variables.primitives
 
-    # TODO: The current implementation evaluates the flux on the whole grid including ghost cells.
-    #       This is correct. What remains is choosing indices from the flux the make it have one element
-    #       more that the number of INNER cells of variables IN THE CORRESPONDING DIRECTION.
+    from atmpy.flux.reconstruction import (
+        calculate_variable_differences,
+        calculate_amplitudes,
+        calculate_slopes,
+    )
+
+    direction = "x"
+    diffs = calculate_variable_differences(primitives, 2, direction_str=direction)
+    print(diffs[..., PVI.U])
+    print("Now the left and right states")
+    slopes = calculate_slopes(diffs, direction, flux.limiter, 2)
+    print("Now the limited")
+    print(slopes[..., PVI.U])
+    amplitudes = calculate_amplitudes(slopes, 2, 1, True)
+    print("Now the amplitudes")
+    print(amplitudes[..., PVI.U])
 
 
 if __name__ == "__main__":
