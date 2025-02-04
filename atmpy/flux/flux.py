@@ -1,6 +1,7 @@
 import numpy as np
 from typing import List
 
+from atmpy.flux.reconstruction import modified_muscl
 from atmpy.flux.utility import create_averaging_kernels
 from atmpy.grid.kgrid import Grid
 from atmpy.variables.variables import Variables
@@ -241,6 +242,11 @@ class Flux:
         ----------
         mode : str
             mode of boundary handling for the sp.ndimage.convolve.
+
+        Notes
+        -----
+        For the sake of matching sizes to avoid confusion, the sizes are the same as the sizes of the variables.
+        But in reality the first and last entries in the direction of the flux calculation is not needed.
         """
 
         unphysical_fluxes = self._compute_unphysical_fluxes()  # [Pu, Pv, ...]
@@ -261,13 +267,16 @@ def main():
     rng = np.random.default_rng()
     arr = np.arange(30)
     rng.shuffle(arr)
-    arr = arr.reshape(5, 6)
+    array = arr.reshape(5, 6)
 
     variables = Variables(grid, 5, 1)
     variables.cell_vars[..., VI.RHO] = 1
-    variables.cell_vars[..., VI.RHOU] = arr
+    variables.cell_vars[..., VI.RHOU] = array
     variables.cell_vars[..., VI.RHOY] = 2
-    variables.cell_vars[..., VI.RHOV] = np.ones((5, 6)) * 2
+
+    rng.shuffle(arr)
+    array = arr.reshape(5, 6)
+    variables.cell_vars[..., VI.RHOV] = array
     eos = ExnerBasedEOS()
     flux = Flux(grid, variables, eos, dt)
     # print(flux.variables.cell_vars[..., VI.RHOV])
@@ -286,8 +295,9 @@ def main():
         calculate_amplitudes,
         calculate_slopes,
     )
+    from atmpy.flux.utility import directional_indices, direction_mapping
 
-    direction = "x"
+    direction = "y"
     diffs = calculate_variable_differences(primitives, 2, direction_str=direction)
     print(diffs[..., PVI.U])
     print("Now the left and right states")
@@ -297,6 +307,69 @@ def main():
     amplitudes = calculate_amplitudes(slopes, 2, 1, True)
     print("Now the amplitudes")
     print(amplitudes[..., PVI.U])
+    # lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
+    #     2, direction
+    # )
+
+    def directional_flux_idxx(direction, ndim):
+        left_idx, right_idx, directional_inner_idx, flux_inner_indices = (
+            [slice(None)] * (ndim + 1),
+            [slice(None)] * (ndim + 1),
+            [slice(None)] * (ndim + 1),
+            [slice(1, -1)] * (ndim + 1),
+        )
+        if direction in ["x", "y", "z"]:
+            direction = direction_mapping(direction)
+            left_idx[direction] = slice(0, -1)
+            right_idx[direction] = slice(1, None)
+            directional_inner_idx[direction] = slice(1, -1)
+            flux_inner_indices[direction] = slice(0, -1)
+        else:
+            raise ValueError("Invalid direction string")
+        inner_idx = [slice(1, -1)] * (ndim + 1)
+        return (
+            tuple(left_idx),
+            tuple(right_idx),
+            tuple(directional_inner_idx),
+            tuple(inner_idx),
+            tuple(flux_inner_indices),
+        )
+
+    lefts_idx, rights_idx, directional_inner_idx, inner_idx, flux_inner_slicesy = directional_flux_idxx(
+     direction, 2
+    )
+
+    _, _, _, _, flux_inner_slicesx = directional_flux_idxx(
+     "x", 2
+    )
+
+
+    cell_vars = variables.cell_vars
+    iflux = flux.iflux
+    flux._compute_averaging_fluxes()
+    print("kernel")
+    print(flux.kernels)
+    print(cell_vars[..., PVI.U].shape)
+    print(cell_vars[..., PVI.U])
+    print(iflux[..., 0])
+    # print(iflux[..., 0][inner_idx[:-1]].shape)
+    # print(iflux[..., 0][directional_inner_idx[:-1]].shape)
+    # # print(iflux[..., 0][directional_inner_idx[:-1]][lefts_idx[:-1]])
+    # # print(iflux[..., 0][directional_inner_idx[:-1]][rights_idx[:-1]])
+    # print("Now full")
+    print(iflux[..., 0][lefts_idx[:-1]])
+    # print(iflux[..., 0][rights_idx[:-1]])
+
+    print("now second component")
+    print(cell_vars[..., PVI.V])
+    print(iflux[..., 1])
+    print(iflux[..., 1][flux_inner_slicesy[:-1]].shape)
+    print(iflux[..., 0][flux_inner_slicesx[:-1]].shape)
+    x = np.zeros_like(cell_vars[..., PVI.U])
+    # x[flux_inner_slices[:-1]] = iflux[..., 1][directional_inner_idx[:-1]]
+
+    # left, right = modified_muscl(variables, iflux, eos, flux.limiter, 1, direction)
+
 
 
 if __name__ == "__main__":

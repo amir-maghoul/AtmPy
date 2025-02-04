@@ -85,7 +85,7 @@ def calculate_amplitudes(
     ndim : int
         The number of dimensions of the problem
     lmbda : float
-        The ration of delta_t to delta_x
+        The ratio of delta_t to delta_x
     left : bool
         Whether the left state should be calculated or the right state
 

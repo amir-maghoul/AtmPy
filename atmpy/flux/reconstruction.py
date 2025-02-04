@@ -1,7 +1,7 @@
 """ This module is responsible for creating the left and right state to pass to the riemann solver."""
 
 import numpy as np
-from typing import Callable
+from typing import Callable, List
 from atmpy.flux.utility import directional_indices, direction_mapping
 from atmpy.physics.eos import EOS
 from atmpy.variables.variables import Variables
@@ -15,6 +15,7 @@ from atmpy.data.enums import PrimitiveVariableIndices as PVI, VariableIndices as
 
 def modified_muscl(
     variables: Variables,
+    iflux: np.ndarray,
     eos: EOS,
     limiter: Callable[[np.ndarray, np.ndarray], np.ndarray],
     lmbda: float,
@@ -26,25 +27,38 @@ def modified_muscl(
     ---------
     variables : Variables
         Variables object
+    iflux : np.ndarray of shape (nx, [ny], [nz], ndim)
+        The list of unphysical flux values [Pu, [Pv], [Pw]]
     eos : EOS
         EOS object
     limiter : Callable[[np.ndarray, np.ndarray], np.ndarray]
         The limiter function for slope limiting
+    lmbda : float
+        The ration of delta_t to delta_x (given as constant here)
     direction : str
         Direction of the flux calculation. Should be "x", "y" or "z".
     """
     cell_vars = variables.cell_vars
     primitives = variables.to_primitive(eos)
     ndim = variables.ndim
-    lefts_idx, rights_idx, directional_inner_idx, inner_idx = direction_mapping(
-        direction
+    lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
+        2, direction
     )
-    speed = np.zeros_like(cell_vars[..., VI.RHOY])
+    # Here we need the slices for only one variable not the whole variable attribute
+    # Therefore we dont need the slices corresponding to the number of dimension (last entry of indices)
+    inner_idx = inner_idx[:-1]
+    lefts_idx = lefts_idx[:-1]
+    rights_idx = rights_idx[:-1]
+
+    direction_int: int = direction_mapping(direction)
+    Pu = iflux[..., direction_int]
+
+    speed = np.zeros_like(Pu)
     speed[inner_idx] = (
         0.5
         * (
-            cell_vars[..., VI.RHOY][inner_idx][lefts_idx]
-            + cell_vars[..., VI.RHOY][inner_idx][rights_idx]
+            Pu[lefts_idx]
+            + Pu[rights_idx]
         )
         / cell_vars[..., VI.RHOY][inner_idx]
     )

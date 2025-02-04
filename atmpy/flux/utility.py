@@ -84,7 +84,6 @@ def directional_indices(
         the inner indices in the direction of the flow
         the full inner indices of the whole array
     """
-    direction_map = {"x": 0, "y": 1, "z": 2}
     # use ndim+1 to include the slices for the axis which corresponds to the number of variables in our cell_vars
     left_idx, right_idx, directional_inner_idx = (
         [slice(None)] * (ndim + 1),
@@ -92,7 +91,7 @@ def directional_indices(
         [slice(None)] * (ndim + 1),
     )
     if direction_string in ["x", "y", "z"]:
-        direction = direction_map[direction_string]
+        direction = direction_mapping(direction_string)
         left_idx[direction] = slice(0, -1)
         right_idx[direction] = slice(1, None)
         directional_inner_idx[direction] = slice(1, -1)

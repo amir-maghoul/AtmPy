@@ -17,12 +17,12 @@ class PrimitiveVariableIndices(IntEnum):
     """Create constants for variable indices in the variable container (ndarray) for better readability"""
 
     # Indices of Conserved Quantities
-    P = 0  # Density
-    X = 1  # Potential Temperature inversed? or Exner Pressure?
-    Y = 2  # Potential Temperature
-    U = 3  # Horizontal Velocity x-component
-    V = 4  # Horizontal Velocity y-component
-    W = 5  # Vertical Velocity
+    P   = 0
+    X   = 1  # Potential Temperature inversed? or Exner Pressure?
+    Y   = 2  # Potential Temperature
+    U   = 3  # Horizontal Velocity x-component
+    V   = 4  # Horizontal Velocity y-component
+    W   = 5  # Vertical Velocity
 
 
 class SlopeLimiters(Enum):
