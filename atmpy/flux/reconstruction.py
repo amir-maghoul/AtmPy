@@ -27,7 +27,7 @@ def modified_muscl(
     ---------
     variables : Variables
         Variables object
-    iflux : np.ndarray of shape (nx, [ny], [nz], ndim)
+    iflux : np.ndarray of shape (nx, [ny], [nz])
         The list of unphysical flux values [Pu, [Pv], [Pw]]
     eos : EOS
         EOS object
@@ -39,7 +39,8 @@ def modified_muscl(
         Direction of the flux calculation. Should be "x", "y" or "z".
     """
     cell_vars = variables.cell_vars
-    primitives = variables.to_primitive(eos)
+    variables.to_primitive(eos)
+    primitives = variables.primitives
     ndim = variables.ndim
     lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
         2, direction
@@ -50,18 +51,12 @@ def modified_muscl(
     lefts_idx = lefts_idx[:-1]
     rights_idx = rights_idx[:-1]
 
-    direction_int: int = direction_mapping(direction)
-    Pu = iflux[..., direction_int]
-
-    speed = np.zeros_like(Pu)
+    Pu = iflux
+    speed = np.zeros_like(cell_vars[..., VI.RHOY])
     speed[inner_idx] = (
-        0.5
-        * (
-            Pu[lefts_idx]
-            + Pu[rights_idx]
-        )
-        / cell_vars[..., VI.RHOY][inner_idx]
-    )
+        0.5 * (Pu[lefts_idx] + Pu[rights_idx]) / cell_vars[..., VI.RHOY][inner_idx]
+    ) # This is basically ((Pu)[i-1/2] + (Pu)[i+1/2])/(P[i]/2)
+
     diffs = calculate_variable_differences(primitives, ndim, direction)
     slopes = calculate_slopes(diffs, direction, limiter, ndim)
     amplitudes = calculate_amplitudes(slopes, speed, lmbda, left=True)

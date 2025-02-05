@@ -80,10 +80,11 @@ def calculate_amplitudes(
 
     Parameters
     ----------
-    primitives : np.ndarray
-        The primitive variables of the problem as a single numpy array
-    ndim : int
-        The number of dimensions of the problem
+    slopes : np.ndarray of shape (nx, [ny], [nz], num_vars)
+        The array of slopes for all variables
+    speed : np.ndarray of shape (nx, [ny], [nz])
+        The flow speed at the interfaces in the given direction. This is calculated using the modified equation
+        22e of BK19.
     lmbda : float
         The ratio of delta_t to delta_x
     left : bool
@@ -92,5 +93,5 @@ def calculate_amplitudes(
     """
 
     sign = -1 if left else 1
-    amplitudes = sign * (0.5 * slopes * (1 + sign * lmbda * speed))
+    amplitudes = sign * (0.5 * slopes * (1 + sign * lmbda * speed[..., np.newaxis]))
     return amplitudes

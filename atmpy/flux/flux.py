@@ -26,7 +26,7 @@ class Flux:
     flux : dict[str, np.ndarray]
         The full flux container. This contains the main numerical flux of the problem. The keys are the direction of
          the flux. There is a full variable ndarray for each direction in this container.
-    iflux : np.ndarray
+    iflux : dict[str, np.ndarray]
         The intermediate flux container. This is basically an array of [Pu, Pv, Pw] of the unphysical flux. The main
         flux in each direction would be for example Flux["x"] = Pu*Psi where Psi is the variable container.
     kernels : List[np.ndarray]
@@ -89,13 +89,14 @@ class Flux:
         self.ndim = self.grid.dimensions
         self.kernels = create_averaging_kernels(self.ndim)  # [kernel_x, kernel_y, ...]
 
+        self.iflux = {"x": None, "y": None, "z": None}
+
         if self.ndim == 1:
             self.flux = {
                 "x": np.zeros(
                     (grid.ncx_total, variables.num_vars_cell), dtype=np.float16
                 )
             }
-            self.iflux = np.zeros((grid.ncx_total, self.ndim), dtype=np.float16)
         elif self.ndim == 2:
             self.flux = {
                 "x": np.zeros(
@@ -107,9 +108,6 @@ class Flux:
                     dtype=np.float16,
                 ),
             }
-            self.iflux = np.zeros(
-                (grid.ncx_total, grid.ncy_total, self.ndim), dtype=np.float16
-            )
 
         elif self.ndim == 3:
             self.flux = {
@@ -141,10 +139,6 @@ class Flux:
                     dtype=np.float16,
                 ),
             }
-            self.iflux = np.zeros(
-                (grid.ncx_total, grid.ncy_total, grid.ncz_total, self.ndim),
-                dtype=np.float16,
-            )
 
     def compute_fluxes(self, left_state: np.ndarray, right_state) -> None:
         """Compute fluxes in the x, y, and z directions."""
@@ -199,20 +193,24 @@ class Flux:
 
         return flux
 
-    def _compute_unphysical_fluxes(self) -> List[np.ndarray]:
+    def _compute_unphysical_fluxes(self) -> dict[str, np.ndarray]:
         """
         Compute unphysical fluxes in the x, y, and z directions. The unphysical fluxes are Pu, Pv and Pw in BK19 paper.
         Reminder: P = rho*Theta.
 
         Returns
         -------
-        List[np.ndarray]
-        List of unphysical fluxes in the x, y, and z directions e.g. [Pu, Pv, Pw].
+        dict[str, np.ndarray]
+            Dictionary of unphysical fluxes in the x, y, and z directions e.g. [Pu, Pv, Pw].
         """
 
         cell_vars = self.variables.cell_vars
         Pu = cell_vars[..., VI.RHOU] * cell_vars[..., VI.RHOY] / cell_vars[..., VI.RHO]
-        fluxes = [Pu]  # container for unphysical fluxes Pu, Pv and Pw
+        fluxes = {
+            "Pu": Pu,
+            "Pv": None,
+            "Pw": None,
+        }  # container for unphysical fluxes Pu, Pv and Pw
 
         if self.ndim >= 2:
             Pv = (
@@ -220,18 +218,18 @@ class Flux:
                 * cell_vars[..., VI.RHOY]
                 / cell_vars[..., VI.RHO]
             )
-            fluxes.append(Pv)
+            fluxes["Pv"] = Pv
         if self.ndim == 3:
             Pw = (
                 cell_vars[..., VI.RHOW]
                 * cell_vars[..., VI.RHOY]
                 / cell_vars[..., VI.RHO]
             )
-            fluxes = [Pu, Pv, Pw]
+            fluxes["Pw"] = Pw
 
         return fluxes
 
-    def _compute_averaging_fluxes(self, mode: str = "constant") -> None:
+    def _compute_averaging_fluxes(self, mode: str = "valid") -> None:
         """
         Compute the physical flux in x, y, and z directions. The physical flux in the BK19 algorithm is
         calculated starting with averaging of the Pu variable from cell to nodes and then averaging nodes to get
@@ -250,15 +248,23 @@ class Flux:
         """
 
         unphysical_fluxes = self._compute_unphysical_fluxes()  # [Pu, Pv, ...]
-        directions = [0, 1, 2]  # direction of the flux calculation: x: 0, y: 1 and z: 2
+        directions = [
+            "x",
+            "y",
+            "z",
+        ]  # direction of the flux calculation: x: 0, y: 1 and z: 2
 
-        for flux, kernel, direction in zip(unphysical_fluxes, self.kernels, directions):
-            self.iflux[..., direction] = sp.ndimage.convolve(flux, kernel, mode=mode)
+        for flux, kernel, direction in zip(
+            unphysical_fluxes.values(), self.kernels, directions
+        ):
+            self.iflux[direction] = sp.signal.fftconvolve(flux, kernel, mode=mode)
 
 
 def main():
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.physics.eos import ExnerBasedEOS
+
+    np.set_printoptions(linewidth=100)
 
     dt = 0.1
 
@@ -282,7 +288,7 @@ def main():
     # print(flux.variables.cell_vars[..., VI.RHOV])
     # print(variables.cell_vars[..., VI.RHOV])
     # print(variables.cell_vars[..., VI.RHOU])
-    Pu, Pv = flux._compute_unphysical_fluxes()
+    PV = flux._compute_unphysical_fluxes()
     # print(Pu)
     # print(arr)
     # variables.cell_vars[..., VI.RHOV] = np.ones((5, 6)) * 3
@@ -300,76 +306,30 @@ def main():
     direction = "y"
     diffs = calculate_variable_differences(primitives, 2, direction_str=direction)
     print(diffs[..., PVI.U])
-    print("Now the left and right states")
+    print("Now slopes")
     slopes = calculate_slopes(diffs, direction, flux.limiter, 2)
     print("Now the limited")
     print(slopes[..., PVI.U])
-    amplitudes = calculate_amplitudes(slopes, 2, 1, True)
+    amplitudes = calculate_amplitudes(slopes, np.arange(30).reshape(5, 6), 1, True)
     print("Now the amplitudes")
     print(amplitudes[..., PVI.U])
-    # lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
-    #     2, direction
-    # )
 
-    def directional_flux_idxx(direction, ndim):
-        left_idx, right_idx, directional_inner_idx, flux_inner_indices = (
-            [slice(None)] * (ndim + 1),
-            [slice(None)] * (ndim + 1),
-            [slice(None)] * (ndim + 1),
-            [slice(1, -1)] * (ndim + 1),
-        )
-        if direction in ["x", "y", "z"]:
-            direction = direction_mapping(direction)
-            left_idx[direction] = slice(0, -1)
-            right_idx[direction] = slice(1, None)
-            directional_inner_idx[direction] = slice(1, -1)
-            flux_inner_indices[direction] = slice(0, -1)
-        else:
-            raise ValueError("Invalid direction string")
-        inner_idx = [slice(1, -1)] * (ndim + 1)
-        return (
-            tuple(left_idx),
-            tuple(right_idx),
-            tuple(directional_inner_idx),
-            tuple(inner_idx),
-            tuple(flux_inner_indices),
-        )
-
-    lefts_idx, rights_idx, directional_inner_idx, inner_idx, flux_inner_slicesy = directional_flux_idxx(
-     direction, 2
+    lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
+        2, direction
     )
-
-    _, _, _, _, flux_inner_slicesx = directional_flux_idxx(
-     "x", 2
-    )
-
 
     cell_vars = variables.cell_vars
     iflux = flux.iflux
     flux._compute_averaging_fluxes()
-    print("kernel")
-    print(flux.kernels)
-    print(cell_vars[..., PVI.U].shape)
-    print(cell_vars[..., PVI.U])
-    print(iflux[..., 0])
-    # print(iflux[..., 0][inner_idx[:-1]].shape)
-    # print(iflux[..., 0][directional_inner_idx[:-1]].shape)
-    # # print(iflux[..., 0][directional_inner_idx[:-1]][lefts_idx[:-1]])
-    # # print(iflux[..., 0][directional_inner_idx[:-1]][rights_idx[:-1]])
-    # print("Now full")
-    print(iflux[..., 0][lefts_idx[:-1]])
-    # print(iflux[..., 0][rights_idx[:-1]])
 
-    print("now second component")
-    print(cell_vars[..., PVI.V])
-    print(iflux[..., 1])
-    print(iflux[..., 1][flux_inner_slicesy[:-1]].shape)
-    print(iflux[..., 0][flux_inner_slicesx[:-1]].shape)
-    x = np.zeros_like(cell_vars[..., PVI.U])
-    # x[flux_inner_slices[:-1]] = iflux[..., 1][directional_inner_idx[:-1]]
+    left, right = modified_muscl(
+        variables, iflux[direction], eos, flux.limiter, 1, direction
+    )
 
-    # left, right = modified_muscl(variables, iflux, eos, flux.limiter, 1, direction)
-
+    print("Now, left and right")
+    print(left[..., PVI.U])
+    print(right[..., PVI.U])
+    print((right - left)[..., PVI.U])
 
 
 if __name__ == "__main__":
