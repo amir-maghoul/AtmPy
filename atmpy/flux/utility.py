@@ -64,7 +64,7 @@ def create_averaging_kernels(dimension: int) -> List[np.ndarray]:
 
 
 def directional_indices(
-    ndim: int, direction_string: str
+    ndim: int, direction_string: str, full: bool = True
 ) -> Tuple[Tuple[slice, ...], Tuple[slice, ...], Tuple[slice, ...], Tuple[slice, ...]]:
     """Compute the correct indexing of the flux vs. variable for the hll solvers and reconstruction.
 
@@ -74,6 +74,10 @@ def directional_indices(
         The spatial dimension of the problem.
     direction_string : str
         The direction of the flow/in which the slopes are calculated.
+    full : bool, optional
+        Whether to return the indices for full array or just a single variable within the array
+        In this case, we need the slices for only one variable not the whole variable attribute
+        Therefore we don't need the slices corresponding to the number of dimension (last entry of indices)
 
     Returns
     -------
@@ -99,12 +103,21 @@ def directional_indices(
         raise ValueError("Invalid direction string")
     inner_idx = [slice(1, -1)] * (ndim + 1)
 
-    return (
-        tuple(left_idx),
-        tuple(right_idx),
-        tuple(directional_inner_idx),
-        tuple(inner_idx),
-    )
+
+    if full:
+        return (
+            tuple(left_idx),
+            tuple(right_idx),
+            tuple(directional_inner_idx),
+            tuple(inner_idx),
+        )
+    else:
+        return (
+            tuple(left_idx)[:-1],
+            tuple(right_idx)[:-1],
+            tuple(directional_inner_idx)[:-1],
+            tuple(inner_idx)[:-1],
+        )
 
 
 def direction_mapping(direction: str) -> int:

@@ -1,6 +1,8 @@
 import numpy as np
 from typing import List
 
+from ply.yacc import rightmost_terminal
+
 from atmpy.flux.reconstruction import modified_muscl
 from atmpy.flux.utility import create_averaging_kernels
 from atmpy.grid.kgrid import Grid
@@ -14,7 +16,7 @@ from atmpy.data._factory import (
     get_slope_limiter,
 )
 import scipy as sp
-
+from atmpy.flux.utility import directional_indices, direction_mapping
 
 class Flux:
     """Flux container. The attributes shared with the constructor parameters have docstrings there.
@@ -46,7 +48,7 @@ class Flux:
         eos: EOS,
         dt: float,
         solver: RiemannSolvers = RiemannSolvers.HLL,
-        reconstruction: FluxReconstructions = FluxReconstructions.MUSCL,
+        reconstruction: FluxReconstructions = FluxReconstructions.MODIFIED_MUSCL,
         limiter: SlopeLimiters = SlopeLimiters.VAN_LEER,
     ):
         """
@@ -90,6 +92,8 @@ class Flux:
         self.kernels = create_averaging_kernels(self.ndim)  # [kernel_x, kernel_y, ...]
 
         self.iflux = {"x": None, "y": None, "z": None}
+        # Initialize iflux
+        self._compute_averaging_fluxes()
 
         if self.ndim == 1:
             self.flux = {
@@ -258,6 +262,38 @@ class Flux:
             unphysical_fluxes.values(), self.kernels, directions
         ):
             self.iflux[direction] = sp.signal.fftconvolve(flux, kernel, mode=mode)
+
+    def _create_left_and_right_states(self, lmbda: float, direction: str) -> None:
+        """ Calculate the left and right states for the flux calculation.
+
+        Parameters
+        ----------
+        direction : str
+            The direction of the flux calculation.
+        lambda : float
+            The ratio of delta_t to delta_x.
+        """
+        lefts = Variables(self.grid, self.variables.num_vars_cell)
+        rights = Variables(self.grid, self.variables.num_vars_cell)
+
+        lefts.primitives, rights.primitives = self.reconstruction(
+            self.variables, self.iflux, self.eos, self.limiter, lmbda, direction
+        )
+
+        lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
+            2, direction, full=False
+        )
+
+        Pu = self.iflux[direction]
+
+        cell_vars = self.variables.cell_vars
+        lefts.cell_vars[..., VI.RHOY][lefts_idx] = rights.cell_vars[..., VI.RHOY][rights_idx] = 0.5 * (
+            (cell_vars[..., VI.RHOY][lefts_idx] + cell_vars[..., VI.RHOY][rights_idx])
+            - lmbda * (Pu[lefts_idx] + Pu[rights_idx])
+        )
+
+        # TODO: Calculate the conservative variables for both lefts and rights variable container.
+
 
 
 def main():

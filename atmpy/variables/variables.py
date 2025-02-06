@@ -176,7 +176,22 @@ class Variables:
     # -------------------
 
     def to_conservative(self):
-        pass
+        ndim = self.ndim
+        rho = self.primitives[..., PVI.P] / self.primitives[..., PVI.Y]
+        self.cell_vars[..., VI.RHO] = rho
+        self.cell_vars[..., VI.RHOX] = rho * self.primitives[..., PVI.X]
+        self.cell_vars[..., VI.RHOY] = self.primitives[
+            ..., PVI.P
+        ]  # Remember P = rho*Theta = rho*Y
+        self.cell_vars[..., VI.RHOU] = rho * self.primitives[..., PVI.U]
+
+        if ndim == 2:
+            self.cell_vars[..., VI.RHOV] = rho * self.primitives[..., PVI.V]
+        elif ndim == 3:
+            self.cell_vars[..., VI.RHOV] = rho * self.primitives[..., PVI.V]
+            self.cell_vars[..., VI.RHOW] = rho * self.primitives[..., PVI.W]
+        elif ndim > 3 or ndim < 1:
+            raise ValueError("Unsupported number of dimensions.")
 
     def get_node_vars(self):
         """

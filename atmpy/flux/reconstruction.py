@@ -43,19 +43,14 @@ def modified_muscl(
     primitives = variables.primitives
     ndim = variables.ndim
     lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
-        2, direction
+        2, direction, full=False
     )
-    # Here we need the slices for only one variable not the whole variable attribute
-    # Therefore we dont need the slices corresponding to the number of dimension (last entry of indices)
-    inner_idx = inner_idx[:-1]
-    lefts_idx = lefts_idx[:-1]
-    rights_idx = rights_idx[:-1]
 
     Pu = iflux
     speed = np.zeros_like(cell_vars[..., VI.RHOY])
     speed[inner_idx] = (
         0.5 * (Pu[lefts_idx] + Pu[rights_idx]) / cell_vars[..., VI.RHOY][inner_idx]
-    ) # This is basically ((Pu)[i-1/2] + (Pu)[i+1/2])/(P[i]/2)
+    )  # This is basically ((Pu)[i-1/2] + (Pu)[i+1/2])/(P[i]/2)
 
     diffs = calculate_variable_differences(primitives, ndim, direction)
     slopes = calculate_slopes(diffs, direction, limiter, ndim)
@@ -64,8 +59,17 @@ def modified_muscl(
     amplitudes = calculate_amplitudes(slopes, speed, lmbda, left=False)
     rights = primitives + amplitudes
 
+    # cell_vars[..., VI.RHOY] = 0.5 * (
+    #     (cell_vars[..., VI.RHOY][lefts_idx] + cell_vars[..., VI.RHOY][rights_idx])
+    #     - lmbda * (Pu[lefts_idx] + Pu[rights_idx])
+    # )
+
     # TODO: Write the "to_conservative" method in Variables class and use this here to calculate the conservative
     #       variables too.
+
+    # TODO: Write a method in flux to use the muscle scheme above and then create Variable object for
+    #       Lefts and Rights to be able to calculate two different rhoY here for them and have two different
+    #       conservative variables to pass to the hll solver.
     return lefts, rights
 
 

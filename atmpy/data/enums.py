@@ -17,7 +17,7 @@ class PrimitiveVariableIndices(IntEnum):
     """Create constants for variable indices in the variable container (ndarray) for better readability"""
 
     # Indices of Conserved Quantities
-    P = 0
+    P = 0  # Real Pressure
     X = 1  # Potential Temperature inversed? or Exner Pressure?
     Y = 2  # Potential Temperature
     U = 3  # Horizontal Velocity x-component
