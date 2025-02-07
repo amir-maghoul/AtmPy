@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List
+from typing import List, Tuple
 
 from ply.yacc import rightmost_terminal
 
@@ -17,6 +17,7 @@ from atmpy.data._factory import (
 )
 import scipy as sp
 from atmpy.flux.utility import directional_indices, direction_mapping
+
 
 class Flux:
     """Flux container. The attributes shared with the constructor parameters have docstrings there.
@@ -36,7 +37,7 @@ class Flux:
     riemann_solver : Callable
         The given riemann solver function. Default is modified HLL.
     reconstruction : Callable
-        The given reconstruction function. Default is MUSCL.
+        The given reconstruction function. Default is modiefid MUSCL.
     limiter : Callable
         The given limiter function. Default is minmod.
     """
@@ -47,7 +48,7 @@ class Flux:
         variables: Variables,
         eos: EOS,
         dt: float,
-        solver: RiemannSolvers = RiemannSolvers.HLL,
+        solver: RiemannSolvers = RiemannSolvers.MODIFIED_HLL,
         reconstruction: FluxReconstructions = FluxReconstructions.MODIFIED_MUSCL,
         limiter: SlopeLimiters = SlopeLimiters.VAN_LEER,
     ):
@@ -144,59 +145,6 @@ class Flux:
                 ),
             }
 
-    def compute_fluxes(self, left_state: np.ndarray, right_state) -> None:
-        """Compute fluxes in the x, y, and z directions."""
-
-        # update the ifluxes with the new variable values
-        self._compute_averaging_fluxes()
-
-        if self.ndim == 1:
-            self.flux["x"] = self._compute_directional_flux(
-                left_state, right_state, direction="x"
-            )
-        if self.ndim == 2:
-            self.flux["x"] = self._compute_directional_flux(
-                left_state, right_state, direction="x"
-            )
-            self.flux["y"] = self._compute_directional_flux(
-                left_state, right_state, direction="y"
-            )
-        if self.ndim == 3:
-            self.flux["x"] = self._compute_directional_flux(
-                left_state, right_state, direction="x"
-            )
-            self.flux["y"] = self._compute_directional_flux(
-                left_state, right_state, direction="y"
-            )
-            self.flux["z"] = self._compute_directional_flux(
-                left_state, right_state, direction="z"
-            )
-
-    def _compute_directional_flux(
-        self, left_state, right_state, direction: str
-    ) -> np.ndarray:
-        """
-        Compute the numerical flux in a specific direction.
-
-        Parameters:
-        cell_vars : np.ndarray
-            Conservative variables with shape (nx, [ny], [nz], n_vars).
-        direction : str
-            Spatial direction of flux calculation.
-        ndim : int:
-            Number of spatial dimensions.
-
-        Returns:
-        - np.ndarray: Numerical flux array in the specified direction.
-        """
-
-        # TODO: Either preallocate left_state and right_state, or do an inplace calculation in reconstruction
-        #     : Question to answer: Whether the reconstruction function should return two Variable objects or
-        #     : Simply two arrays.
-        flux = self.riemann_solver(self.flux, left_state, right_state, direction)
-
-        return flux
-
     def _compute_unphysical_fluxes(self) -> dict[str, np.ndarray]:
         """
         Compute unphysical fluxes in the x, y, and z directions. The unphysical fluxes are Pu, Pv and Pw in BK19 paper.
@@ -263,8 +211,11 @@ class Flux:
         ):
             self.iflux[direction] = sp.signal.fftconvolve(flux, kernel, mode=mode)
 
-    def _create_left_and_right_states(self, lmbda: float, direction: str) -> None:
-        """ Calculate the left and right states for the flux calculation.
+    def apply_reconstruction(
+        self, lmbda: float, direction: str
+    ) -> Tuple[Variables, Variables]:
+        """Calculate the left and right states for the flux calculation by applying a reconstruction scheme to the
+            variables and flux.
 
         Parameters
         ----------
@@ -273,27 +224,67 @@ class Flux:
         lambda : float
             The ratio of delta_t to delta_x.
         """
-        lefts = Variables(self.grid, self.variables.num_vars_cell)
-        rights = Variables(self.grid, self.variables.num_vars_cell)
+        # Initialize variable objects
+        lefts = Variables(
+            self.grid, self.variables.num_vars_cell, self.variables.num_vars_node
+        )
+        rights = Variables(
+            self.grid, self.variables.num_vars_cell, self.variables.num_vars_node
+        )
 
+        # Use reconstruction scheme (MUSCL) to create left and right primitive variables
         lefts.primitives, rights.primitives = self.reconstruction(
             self.variables, self.iflux, self.eos, self.limiter, lmbda, direction
         )
 
+        # left and right indices
         lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
             2, direction, full=False
         )
 
-        Pu = self.iflux[direction]
+        # Index mapping
+        velocity_indices = [PVI.U, PVI.V, PVI.W]
+        direction_int = direction_mapping(direction)
 
+        # Find velocity in the direction
         cell_vars = self.variables.cell_vars
-        lefts.cell_vars[..., VI.RHOY][lefts_idx] = rights.cell_vars[..., VI.RHOY][rights_idx] = 0.5 * (
+        velocity = cell_vars[..., velocity_indices[direction_int]]
+
+        # Compute the unphysical flux Pu
+        Pu = velocity * cell_vars[..., VI.RHOY]
+
+        # Calculate the P = rho*Theta by averaging and advecting
+        lefts.cell_vars[..., VI.RHOY][lefts_idx] = rights.cell_vars[..., VI.RHOY][
+            rights_idx
+        ] = 0.5 * (
             (cell_vars[..., VI.RHOY][lefts_idx] + cell_vars[..., VI.RHOY][rights_idx])
             - lmbda * (Pu[lefts_idx] + Pu[rights_idx])
         )
 
-        # TODO: Calculate the conservative variables for both lefts and rights variable container.
+        # Find the rho conservative variable from the new updated primitive variables
+        left_rho = lefts.cell_vars[..., VI.RHO] / lefts.primitives[..., PVI.Y]
+        right_rho = rights.cell_vars[..., VI.RHO] / rights.primitives[..., PVI.Y]
 
+        # Compute the conservative variables for left and right states
+        lefts.to_conservative(left_rho)
+        rights.to_conservative(right_rho)
+
+        return lefts, rights, Pu
+
+    def apply_riemann_solver(self, lmbda: float, direction: str) -> None:
+        """Apply the Riemann solver to the left and right states to obtain the flux. It updates the flux attribute in-place.
+
+        Parameters
+        ----------
+        lmbda : float
+            The ratio of delta_t to delta_x.
+        direction : str
+            The direction of the flux calculation.
+        """
+        lefts, rights, Pu = self.apply_reconstruction(lmbda, direction)
+        self.flux[direction] = self.riemann_solver(
+            lefts.primitives, rights.primitives, Pu, direction, self.ndim
+        )
 
 
 def main():
@@ -356,16 +347,10 @@ def main():
 
     cell_vars = variables.cell_vars
     iflux = flux.iflux
-    flux._compute_averaging_fluxes()
 
-    left, right = modified_muscl(
-        variables, iflux[direction], eos, flux.limiter, 1, direction
-    )
+    flux.apply_riemann_solver(1, direction)
 
-    print("Now, left and right")
-    print(left[..., PVI.U])
-    print(right[..., PVI.U])
-    print((right - left)[..., PVI.U])
+    # TODO: SHAPE MISMATCH IN HLL
 
 
 if __name__ == "__main__":

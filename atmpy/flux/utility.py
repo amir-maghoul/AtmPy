@@ -103,7 +103,6 @@ def directional_indices(
         raise ValueError("Invalid direction string")
     inner_idx = [slice(1, -1)] * (ndim + 1)
 
-
     if full:
         return (
             tuple(left_idx),

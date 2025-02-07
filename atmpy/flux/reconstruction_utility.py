@@ -55,7 +55,7 @@ def calculate_slopes(
 
     Notes
     -----
-    The limited slope has two less rows/columns in the direction of calculation than the original variables.
+    The limited slope has two fewer rows/columns in the direction of calculation than the original variables.
     """
     left_idx, right_idx, directional_inner_idx, _ = directional_indices(
         ndim, direction_str

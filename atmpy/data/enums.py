@@ -38,6 +38,7 @@ class RiemannSolvers(Enum):
     """Map name to function for the Riemann solver"""
 
     RUSANOV = "rusanov"
+    MODIFIED_HLL = "modified_hll"
     HLL = "hll"
     HLLC = "hllc"
     ROE = "roe"

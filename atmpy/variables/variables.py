@@ -28,7 +28,7 @@ class Variables:
         Number of spatial dimensions.
     """
 
-    def __init__(self, grid, num_vars_cell: int, num_vars_node: int):
+    def __init__(self, grid, num_vars_cell: int, num_vars_node: int = 1):
         """
         Initializes the VariableContainer with cell-centered and node-based variables.
 
@@ -38,7 +38,7 @@ class Variables:
             The computational grid.
         num_vars_cell : int
             Number of cell-centered variables.
-        num_vars_node : int
+        num_vars_node : int (default = 1)
             Number of node-based variables.
         """
         self.grid = grid
@@ -175,9 +175,8 @@ class Variables:
     # Node-Based Methods
     # -------------------
 
-    def to_conservative(self):
+    def to_conservative(self, rho: np.ndarray) -> None:
         ndim = self.ndim
-        rho = self.primitives[..., PVI.P] / self.primitives[..., PVI.Y]
         self.cell_vars[..., VI.RHO] = rho
         self.cell_vars[..., VI.RHOX] = rho * self.primitives[..., PVI.X]
         self.cell_vars[..., VI.RHOY] = self.primitives[

@@ -14,6 +14,7 @@ SLOPE_LIMITERS = {
 
 RIEMANN_SOLVERS = {
     RiemannSolvers.RUSANOV: rusanov,
+    RiemannSolvers.MODIFIED_HLL: modified_hll,
     RiemannSolvers.HLL: hll,
     RiemannSolvers.HLLC: hllc,
     RiemannSolvers.ROE: roe,
