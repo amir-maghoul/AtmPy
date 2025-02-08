@@ -18,13 +18,11 @@ def calculate_variable_differences(
         primitives, axis=direction
     )  # Apply np.diff in the direction which results in one less element
 
-    # Create a slicer as a mask
-    slicer = [slice(None)] * ndim
     # Set the difference slice (one fewer element than the original array) in the corresponding direction
-    slicer[direction] = slice(0, -1)
+    left_idx, _, _, _ = directional_indices(ndim, direction_str, full=False)
     # The diffs will array now have the same shape as the primitives with the last row/column of the diff direction
     # remaining zero
-    diffs[tuple(slicer)] = diff_values
+    diffs[left_idx] = diff_values
     return diffs
 
 

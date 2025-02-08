@@ -93,24 +93,22 @@ class Flux:
         self.kernels = create_averaging_kernels(self.ndim)  # [kernel_x, kernel_y, ...]
 
         self.iflux = {"x": None, "y": None, "z": None}
-        # Initialize iflux
-        self._compute_averaging_fluxes()
 
         if self.ndim == 1:
             self.flux = {
                 "x": np.zeros(
-                    (grid.ncx_total, variables.num_vars_cell), dtype=np.float16
+                    (grid.ncx_total + 1, variables.num_vars_cell), dtype=np.float32
                 )
             }
         elif self.ndim == 2:
             self.flux = {
                 "x": np.zeros(
-                    (grid.ncx_total, grid.ncy_total, variables.num_vars_cell),
-                    dtype=np.float16,
+                    (grid.ncx_total + 1, grid.ncy_total, variables.num_vars_cell),
+                    dtype=np.float32,
                 ),
                 "y": np.zeros(
-                    (grid.ncx_total, grid.ncy_total, variables.num_vars_cell),
-                    dtype=np.float16,
+                    (grid.ncx_total, grid.ncy_total + 1, variables.num_vars_cell),
+                    dtype=np.float32,
                 ),
             }
 
@@ -123,7 +121,7 @@ class Flux:
                         grid.ncz_total,
                         variables.num_vars_cell,
                     ),
-                    dtype=np.float16,
+                    dtype=np.float32,
                 ),
                 "y": np.zeros(
                     (
@@ -132,7 +130,7 @@ class Flux:
                         grid.ncz_total,
                         variables.num_vars_cell,
                     ),
-                    dtype=np.float16,
+                    dtype=np.float32,
                 ),
                 "z": np.zeros(
                     (
@@ -141,9 +139,12 @@ class Flux:
                         grid.ncz_total + 1,
                         variables.num_vars_cell,
                     ),
-                    dtype=np.float16,
+                    dtype=np.float32,
                 ),
             }
+
+        # Initialize iflux
+        self.compute_averaging_fluxes()
 
     def _compute_unphysical_fluxes(self) -> dict[str, np.ndarray]:
         """
@@ -181,7 +182,7 @@ class Flux:
 
         return fluxes
 
-    def _compute_averaging_fluxes(self, mode: str = "valid") -> None:
+    def compute_averaging_fluxes(self, mode: str = "valid") -> None:
         """
         Compute the physical flux in x, y, and z directions. The physical flux in the BK19 algorithm is
         calculated starting with averaging of the Pu variable from cell to nodes and then averaging nodes to get
@@ -210,6 +211,8 @@ class Flux:
             unphysical_fluxes.values(), self.kernels, directions
         ):
             self.iflux[direction] = sp.signal.fftconvolve(flux, kernel, mode=mode)
+            _, _, _, inner_index = directional_indices(self.ndim, direction, full=False)
+            self.flux[direction][..., VI.RHOY][inner_index] = self.iflux[direction]
 
     def apply_reconstruction(
         self, lmbda: float, direction: str
@@ -234,7 +237,7 @@ class Flux:
 
         # Use reconstruction scheme (MUSCL) to create left and right primitive variables
         lefts.primitives, rights.primitives = self.reconstruction(
-            self.variables, self.iflux, self.eos, self.limiter, lmbda, direction
+            self.variables, self.flux, self.eos, self.limiter, lmbda, direction
         )
 
         # left and right indices
@@ -269,7 +272,7 @@ class Flux:
         lefts.to_conservative(left_rho)
         rights.to_conservative(right_rho)
 
-        return lefts, rights, Pu
+        return lefts, rights
 
     def apply_riemann_solver(self, lmbda: float, direction: str) -> None:
         """Apply the Riemann solver to the left and right states to obtain the flux. It updates the flux attribute in-place.
@@ -281,9 +284,9 @@ class Flux:
         direction : str
             The direction of the flux calculation.
         """
-        lefts, rights, Pu = self.apply_reconstruction(lmbda, direction)
-        self.flux[direction] = self.riemann_solver(
-            lefts.primitives, rights.primitives, Pu, direction, self.ndim
+        lefts, rights = self.apply_reconstruction(lmbda, direction)
+        self.riemann_solver(
+            lefts.primitives, rights.primitives, self.flux, direction, self.ndim
         )
 
 
@@ -312,14 +315,6 @@ def main():
     variables.cell_vars[..., VI.RHOV] = array
     eos = ExnerBasedEOS()
     flux = Flux(grid, variables, eos, dt)
-    # print(flux.variables.cell_vars[..., VI.RHOV])
-    # print(variables.cell_vars[..., VI.RHOV])
-    # print(variables.cell_vars[..., VI.RHOU])
-    PV = flux._compute_unphysical_fluxes()
-    # print(Pu)
-    # print(arr)
-    # variables.cell_vars[..., VI.RHOV] = np.ones((5, 6)) * 3
-    # print(flux.variables.cell_vars[..., VI.RHOV])
     variables.to_primitive(eos)
     primitives = variables.primitives
 
@@ -327,19 +322,14 @@ def main():
         calculate_variable_differences,
         calculate_amplitudes,
         calculate_slopes,
+        modified_muscl,
     )
     from atmpy.flux.utility import directional_indices, direction_mapping
 
-    direction = "y"
+    direction = "x"
     diffs = calculate_variable_differences(primitives, 2, direction_str=direction)
-    print(diffs[..., PVI.U])
-    print("Now slopes")
     slopes = calculate_slopes(diffs, direction, flux.limiter, 2)
-    print("Now the limited")
-    print(slopes[..., PVI.U])
     amplitudes = calculate_amplitudes(slopes, np.arange(30).reshape(5, 6), 1, True)
-    print("Now the amplitudes")
-    print(amplitudes[..., PVI.U])
 
     lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
         2, direction
@@ -348,7 +338,15 @@ def main():
     cell_vars = variables.cell_vars
     iflux = flux.iflux
 
+    left, right = modified_muscl(
+        variables, flux.flux, eos, flux.limiter, 0.5, direction
+    )
+
+    print(flux.flux[direction][..., VI.RHOU])
+    print(flux.variables.cell_vars[..., VI.RHOU])
     flux.apply_riemann_solver(1, direction)
+    print(flux.flux[direction][..., VI.RHOU])
+    print(flux.variables.cell_vars[..., VI.RHOU])
 
     # TODO: SHAPE MISMATCH IN HLL
 

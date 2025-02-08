@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, List
 import numpy as np
 from numba import njit
 from atmpy.variables.variables import Variables
@@ -26,12 +26,12 @@ def modified_hll(
     To have a uniform signature for all the riemann solvers, only the left and right states are passed as
     positional arguments. In modified HLL, the order of other arguments are as follows:
 
-    iflux = arg[0]
+    flux = arg[0]
     direction = arg[1]
     ndim = arg[2]
     """
 
-    iflux = args[0]
+    flux = args[0]
     direction = args[1]
     ndim = args[2]
 
@@ -39,7 +39,8 @@ def modified_hll(
         ndim, direction, full=False
     )
 
-    upwind = 0.5 * (1.0 + np.sign(iflux))
+    Pu = flux[direction][..., VI.RHOY]
+    upwind = 0.5 * (1.0 + np.sign(Pu))
     upl = upwind[right_idx]
     upr = 1.0 - upwind[left_idx]
 
@@ -47,28 +48,20 @@ def modified_hll(
     # -------------------------------------
     # -------------------------------------
 
-    # Initialize factors
-    # left_factor = np.zeros_like(iflux)
-    # right_factor = np.zeros_like(iflux)
-
     # Compute the ADVECTING flux: Pu/Theta = rho*Theta*u/Theta = rho*u
-    left_factor = iflux[left_idx] * upl / left_state[..., PVI.Y][left_idx]
-    right_factor = iflux[right_idx] * upr / right_state[..., PVI.Y][right_idx]
+    left_factor = (
+        Pu[directional_inner_idx] * upl[left_idx] / left_state[..., PVI.Y][left_idx]
+    )
+    right_factor = (
+        Pu[directional_inner_idx] * upr[right_idx] / right_state[..., PVI.Y][right_idx]
+    )
 
     # Compute the ADVECTED values
-    flux_variables = np.zeros_like(left_state)
-    print("shape of left factor = ", left_factor.shape)
-    print("shape of flux_variables = ", flux_variables.shape)
-    print("shape of left state = ", left_state.shape)
-    flux_variables[..., VI.RHO] = left_factor + right_factor
-    flux_variables[..., 1:] = (
+    flux[direction][..., VI.RHO][directional_inner_idx] = left_factor + right_factor
+    flux[direction][..., 1:][directional_inner_idx] = (
         left_factor[..., np.newaxis] * left_state[..., 1:][left_idx]
         + right_factor[..., np.newaxis] * right_state[..., 1:][right_idx]
     )
-
-    # TODO: SHAPE MISMATCH ABOVE
-
-    return flux_variables
 
 
 def roe(left_state: Variables, right_state: Variables, direction: str, *args, **kwargs):

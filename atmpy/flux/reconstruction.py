@@ -15,7 +15,7 @@ from atmpy.data.enums import PrimitiveVariableIndices as PVI, VariableIndices as
 
 def modified_muscl(
     variables: Variables,
-    iflux: np.ndarray,
+    flux: dict[str, np.ndarray],
     eos: EOS,
     limiter: Callable[[np.ndarray, np.ndarray], np.ndarray],
     lmbda: float,
@@ -27,8 +27,8 @@ def modified_muscl(
     ---------
     variables : Variables
         Variables object
-    iflux : np.ndarray of shape (nx, [ny], [nz])
-        The list of unphysical flux values [Pu, [Pv], [Pw]]
+    flux : dict[str, np.ndarray]
+        The Pu = rhoYu as calculated in the flux container
     eos : EOS
         EOS object
     limiter : Callable[[np.ndarray, np.ndarray], np.ndarray]
@@ -51,12 +51,14 @@ def modified_muscl(
     )
 
     # unphysical flux
-    Pu = iflux[direction]
+    Pu = flux[direction][..., VI.RHOY]
 
     # Compute flow speed
     speed = np.zeros_like(cell_vars[..., VI.RHOY])
     speed[inner_idx] = (
-        0.5 * (Pu[lefts_idx] + Pu[rights_idx]) / cell_vars[..., VI.RHOY][inner_idx]
+        0.5
+        * (Pu[inner_idx][lefts_idx] + Pu[inner_idx][rights_idx])
+        / cell_vars[..., VI.RHOY][inner_idx]
     )  # This is basically ((Pu)[i-1/2] + (Pu)[i+1/2])/(P[i]/2)
 
     # Compute variable differences (for slope) and slope at interfaces
