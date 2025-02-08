@@ -1,7 +1,5 @@
 from typing import Tuple, List
 import numpy as np
-from numba import njit
-from atmpy.variables.variables import Variables
 from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
 from atmpy.flux.utility import directional_indices
 
