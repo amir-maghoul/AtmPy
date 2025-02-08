@@ -1,8 +1,7 @@
 """ This module contains slope limiter functions for the flux reconstruction."""
 
-from numba import njit, prange
 import numpy as np
-import time
+from numba import njit, prange
 
 
 def minmod(a: np.ndarray, b: np.ndarray):
@@ -31,6 +30,7 @@ def van_leer(a: np.ndarray, b: np.ndarray):
 
 def mc_limiter(a, b):
     """monotonized central-difference limiter."""
+    pass
 
 
 def superbee(a, b):

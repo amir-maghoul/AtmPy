@@ -26,11 +26,11 @@ def modified_muscl(
     Parameters
     ---------
     variables : Variables
-        Variables object
+        Object of the variables container.
     flux : dict[str, np.ndarray]
         The Pu = rhoYu as calculated in the flux container
     eos : EOS
-        EOS object
+        Object of the eos container.
     limiter : Callable[[np.ndarray, np.ndarray], np.ndarray]
         The limiter function for slope limiting
     lmbda : float

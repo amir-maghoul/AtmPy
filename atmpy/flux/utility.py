@@ -34,12 +34,12 @@ def create_averaging_kernels(dimension: int) -> List[np.ndarray]:
         For 3D: [kx, ky, kz]
     """
     if dimension == 1:
-        kx = np.array([0.5, 1.0, 0.5], dtype=float)
+        kx = np.array([0.5, 1.0, 0.5], dtype=np.float32)
         kx /= kx.sum()
         return [kx]
 
     elif dimension == 2:
-        base_kernel = np.array([[0.5, 1.0, 0.5], [0.5, 1.0, 0.5]], dtype=float)
+        base_kernel = np.array([[0.5, 1.0, 0.5], [0.5, 1.0, 0.5]], dtype=np.float32)
         base_kernel /= base_kernel.sum()
 
         kx = base_kernel
@@ -47,7 +47,7 @@ def create_averaging_kernels(dimension: int) -> List[np.ndarray]:
         return [kx, ky]
 
     elif dimension == 3:
-        base_2d = np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]], dtype=float)
+        base_2d = np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]], dtype=np.float32)
         base_2d /= base_2d.sum()
 
         # kernel_x (shape: 2 x 3 x 3)
@@ -76,7 +76,7 @@ def directional_indices(
         The direction of the flow/in which the slopes are calculated.
     full : bool, optional
         Whether to return the indices for full array or just a single variable within the array
-        In this case, we need the slices for only one variable not the whole variable attribute
+        In the latter case, we need the slices for only one variable not the whole variable attribute
         Therefore we don't need the slices corresponding to the number of dimension (last entry of indices)
 
     Returns

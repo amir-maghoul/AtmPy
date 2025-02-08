@@ -1,9 +1,5 @@
 import numpy as np
 from typing import List, Tuple
-
-from ply.yacc import rightmost_terminal
-
-from atmpy.flux.reconstruction import modified_muscl
 from atmpy.flux.utility import create_averaging_kernels
 from atmpy.grid.kgrid import Grid
 from atmpy.variables.variables import Variables
@@ -39,7 +35,7 @@ class Flux:
     reconstruction : Callable
         The given reconstruction function. Default is modiefid MUSCL.
     limiter : Callable
-        The given limiter function. Default is minmod.
+        The given limiter function. Default is van Leer.
     """
 
     def __init__(
@@ -207,6 +203,7 @@ class Flux:
             "z",
         ]  # direction of the flux calculation: x: 0, y: 1 and z: 2
 
+        # Compute the averaging fluxes and place them in the flux container
         for flux, kernel, direction in zip(
             unphysical_fluxes.values(), self.kernels, directions
         ):

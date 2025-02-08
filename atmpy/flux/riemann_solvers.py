@@ -31,15 +31,17 @@ def modified_hll(
     ndim = arg[2]
     """
 
-    flux = args[0]
-    direction = args[1]
-    ndim = args[2]
+    flux, direction, ndim = args
 
+    # Get left, right and directional inner slices for a single variable
     left_idx, right_idx, directional_inner_idx, _ = directional_indices(
         ndim, direction, full=False
     )
 
+    # Compute the Pu= rhoTheta*u
     Pu = flux[direction][..., VI.RHOY]
+
+    # Compute the upwind factor based on the sign of Pu
     upwind = 0.5 * (1.0 + np.sign(Pu))
     upl = upwind[right_idx]
     upr = 1.0 - upwind[left_idx]
@@ -64,23 +66,17 @@ def modified_hll(
     )
 
 
-def roe(left_state: Variables, right_state: Variables, direction: str, *args, **kwargs):
-    raise NotImplementedError(f"Roe solver for {direction}-direction not implemented.")
+def roe(left_state: np.ndarray, right_state: np.ndarray, *args, **kwargs):
+    raise NotImplementedError(f"Roe solver for direction not implemented.")
 
 
-def hll(left_state: Variables, right_state: Variables, direction: str, *args, **kwargs):
+def hll(left_state: np.ndarray, right_state: np.ndarray, *args, **kwargs):
     pass
 
 
-def hllc(
-    left_state: Variables, right_state: Variables, direction: str, *args, **kwargs
-):
-    raise NotImplementedError(f"HLLC solver for {direction}-direction not implemented.")
+def hllc(left_state: np.ndarray, right_state: np.ndarray, *args, **kwargs):
+    raise NotImplementedError(f"HLLC solver for direction not implemented.")
 
 
-def rusanov(
-    left_state: Variables, right_state: Variables, direction: str, *args, **kwargs
-):
-    raise NotImplementedError(
-        f"Rusanov solver for {direction}-direction not implemented."
-    )
+def rusanov(left_state: np.ndarray, right_state: np.ndarray, *args, **kwargs):
+    raise NotImplementedError(f"Rusanov solver for direction not implemented.")
