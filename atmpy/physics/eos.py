@@ -93,10 +93,6 @@ class ExnerBasedEOS(EOS):
           - If pi_arr is provided, compute p from pi.
           - If P_arr is provided, compute p from P.
           (In reality, you might pass both or keep separate methods.)
-
-        Parameters
-        ----------
-
         """
         P = args[0]
         pressure = args[1] # Boolean whether the pressure is given or the exner pressure

@@ -162,10 +162,10 @@ class Variables:
         elif isinstance(eos, BarotropicEOS):
             args = self.cell_vars[..., VI.RHO]
         elif isinstance(eos, ExnerBasedEOS):
-            args = self.cell_vars[..., VI.RHOY]
+            args = (self.cell_vars[..., VI.RHOY], True)
 
         rho = self.cell_vars[..., VI.RHO]
-        self.primitives[..., PVI.P] = eos.pressure(args)
+        self.primitives[..., PVI.P] = eos.pressure(*args)
         self.primitives[..., PVI.U] = self.cell_vars[..., VI.RHOU] / rho
         self.primitives[..., PVI.X] = self.cell_vars[..., VI.RHOX] / rho
         self.primitives[..., PVI.Y] = self.cell_vars[..., VI.RHOY] / rho
