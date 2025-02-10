@@ -3,6 +3,7 @@ import numpy as np
 from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
 from atmpy.grid.utility import DimensionSpec, create_grid
 from atmpy.physics import eos
+from atmpy.physics.eos import IdealGasEOS, BarotropicEOS, ExnerBasedEOS
 
 
 class Variables:
@@ -156,8 +157,15 @@ class Variables:
         """
         ndim = self.ndim
 
+        if isinstance(eos, IdealGasEOS):
+            raise NotImplementedError("IdealGasEOS not yet supported for primitives: No way to calculate the energy")
+        elif isinstance(eos, BarotropicEOS):
+            args = self.cell_vars[..., VI.RHO]
+        elif isinstance(eos, ExnerBasedEOS):
+            args = self.cell_vars[..., VI.RHOY]
+
         rho = self.cell_vars[..., VI.RHO]
-        self.primitives[..., PVI.P] = eos.pressure(self.cell_vars[..., VI.RHOY])
+        self.primitives[..., PVI.P] = eos.pressure(args)
         self.primitives[..., PVI.U] = self.cell_vars[..., VI.RHOU] / rho
         self.primitives[..., PVI.X] = self.cell_vars[..., VI.RHOX] / rho
         self.primitives[..., PVI.Y] = self.cell_vars[..., VI.RHOY] / rho

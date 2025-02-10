@@ -31,11 +31,14 @@ class IdealGasEOS(EOS):
     def __init__(self, gamma: float = 1.4):
         self.gamma = gamma
 
-    def pressure(self, rho: np.ndarray, e: np.ndarray):
-        # p = (gamma - 1) * rho * e
+    def pressure(self,*args, **kwargs):
+        rho = args[0]
+        e = args[1]
         return (self.gamma - 1.0) * rho * e
 
-    def sound_speed(self, rho: np.ndarray, p: np.ndarray):
+    def sound_speed(self, *args, **kwargs):
+        rho = args[0]
+        p = args[1]
         # a = sqrt(gamma * p / rho)
         return np.sqrt(self.gamma * p / rho)
 
@@ -47,10 +50,13 @@ class BarotropicEOS(EOS):
         self.K = K
         self.gamma = gamma
 
-    def pressure(self, rho: np.ndarray, e: np.ndarray = None):
+    def pressure(self, *args, **kwargs):
+        rho = args[0]
         return self.K * rho**self.gamma
 
-    def sound_speed(self, rho: np.ndarray, p: np.ndarray):
+    def sound_speed(self, *args, **kwargs):
+        rho = args[0]
+        p = args[1]
         return np.sqrt(self.gamma * p / rho)
 
 
@@ -80,7 +86,7 @@ class ExnerBasedEOS(EOS):
         self.p_ref = p_ref
         self.gamma = self.cp / self.cv
 
-    def pressure(self, P: np.ndarray = None, pi: np.ndarray = None):
+    def pressure(self, *args, **kwargs):
         """
         Calculate pressure given unphysical pressure P or Exner pressure pi.
         Examples of usage:
@@ -92,16 +98,14 @@ class ExnerBasedEOS(EOS):
         ----------
 
         """
-        if P is not None:
+        P = args[0]
+        pressure = args[1] # Boolean whether the pressure is given or the exner pressure
+        if pressure:
             return P_to_pressure_numba(P, self.p_ref, self.cp, self.cv)
-        elif pi is not None:
-            return exner_to_pressure_numba(pi, self.p_ref, self.cp, self.R)
         else:
-            raise ValueError(
-                "Must provide either 'P_arr' or 'pi_arr' to compute pressure."
-            )
+            return exner_to_pressure_numba(P, self.p_ref, self.cp, self.R)
 
-    def sound_speed(self, rho_arr: np.ndarray, p_arr: np.ndarray):
+    def sound_speed(self, *args, **kwargs):
         """
         Calculate sound speed given density and pressure.
         Speed of sound can be approximated via gamma = cp/cv, or a more
@@ -109,9 +113,9 @@ class ExnerBasedEOS(EOS):
 
         Parameters
         ----------
-        rho_arr : np.ndarray
+        rho : np.ndarray
             density
-        p_arr : np.ndarray
+        p : np.ndarray
             The real pressure
 
         Returns
@@ -119,5 +123,7 @@ class ExnerBasedEOS(EOS):
         np.ndarray
             the speed of sound as an array
         """
+        rho = args[0]
+        p = args[1]
         gamma = self.cp / self.cv
-        return exner_sound_speed_numba(rho_arr, p_arr, gamma)
+        return exner_sound_speed_numba(rho, p, gamma)
