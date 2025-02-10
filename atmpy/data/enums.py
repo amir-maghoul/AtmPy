@@ -6,7 +6,7 @@ class VariableIndices(IntEnum):
 
     # Indices of Conserved Quantities
     RHO = 0  # Density
-    RHOX = 1  # Potential Temperature inversed? or Exner Pressure?
+    RHOX = 1  # Extra variables for future
     RHOY = 2  # Potential Temperature
     RHOU = 3  # Horizontal Velocity x-component
     RHOV = 4  # Horizontal Velocity y-component
@@ -18,7 +18,7 @@ class PrimitiveVariableIndices(IntEnum):
 
     # Indices of Conserved Quantities
     P = 0  # Real Pressure
-    X = 1  # Potential Temperature inversed? or Exner Pressure?
+    X = 1  # Any Extra variables
     Y = 2  # Potential Temperature
     U = 3  # Horizontal Velocity x-component
     V = 4  # Horizontal Velocity y-component
