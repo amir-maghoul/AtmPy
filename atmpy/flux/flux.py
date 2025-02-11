@@ -239,7 +239,7 @@ class Flux:
 
         # left and right indices
         lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
-            2, direction, full=False
+            self.ndim, direction, full=False
         )
 
         # Index mapping
