@@ -50,3 +50,9 @@ class FluxReconstructions(Enum):
     MODIFIED_MUSCL = "modified_muscle"
     PIECEWISE_CONSTANT = "piecewise_constant"
     MUSCL = "muscl"
+
+class BoundaryConditions(Enum):
+    """Map name to function for the boundary condition"""
+
+    REFLECTIVE = "reflective"
+    PERIODIC = "periodic"
