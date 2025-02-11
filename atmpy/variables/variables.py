@@ -1,7 +1,9 @@
 from abc import abstractmethod
 import numpy as np
-from atmpy.data.constants import VariableIndices
+from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
 from atmpy.grid.utility import DimensionSpec, create_grid
+from atmpy.physics import eos
+from atmpy.physics.eos import IdealGasEOS, BarotropicEOS, ExnerBasedEOS
 
 
 class Variables:
@@ -27,7 +29,7 @@ class Variables:
         Number of spatial dimensions.
     """
 
-    def __init__(self, grid, num_vars_cell: int, num_vars_node: int):
+    def __init__(self, grid, num_vars_cell: int, num_vars_node: int = 1):
         """
         Initializes the VariableContainer with cell-centered and node-based variables.
 
@@ -37,7 +39,7 @@ class Variables:
             The computational grid.
         num_vars_cell : int
             Number of cell-centered variables.
-        num_vars_node : int
+        num_vars_node : int (default = 1)
             Number of node-based variables.
         """
         self.grid = grid
@@ -49,7 +51,7 @@ class Variables:
             raise ValueError("Number of dimensions not supported.")
 
         # Initialize cell-centered variables
-        if self.num_vars_cell is not None and self.num_vars_cell > 0:
+        if self.num_vars_cell is not None and self.num_vars_cell >= 4:
             if self.ndim == 1:
                 self.cell_vars = np.zeros((self.grid.ncx_total, self.num_vars_cell))
             elif self.ndim == 2:
@@ -66,7 +68,9 @@ class Variables:
                     )
                 )
         else:
-            raise ValueError("Number of cell-based variables should not be None, zero or negative.")
+            raise ValueError(
+                "Number of cell-based variables should not be None or less than 4."
+            )
 
         self.primitives = np.zeros(self.cell_vars.shape)
 
@@ -83,7 +87,9 @@ class Variables:
                 nnz = self.grid.nnz_total
                 self.node_vars = np.zeros((nnx, nny, nnz, self.num_vars_node))
         else:
-            raise ValueError("Number of node-based variables should not be None, zero or negative.")
+            raise ValueError(
+                "Number of node-based variables should not be None, zero or negative."
+            )
 
     def print_debug_info(self):
         """
@@ -130,7 +136,7 @@ class Variables:
             )
         self.cell_vars = new_values
 
-    def to_primitive(self, gamma):
+    def to_primitive(self, eos):
         """
         Converts cell-centered conservative variables to primitive variables.
 
@@ -141,8 +147,8 @@ class Variables:
 
         Parameters
         ----------
-        gamma : float
-            The constant adiabatic ration (ration of specific heats)
+        eos : :py:class:`atmpy.physics.eos.EOS`
+            The equation of state.
 
         Returns
         -------
@@ -150,29 +156,49 @@ class Variables:
             Array of primitive variables with one additional dimension.
         """
         ndim = self.ndim
-        RHO, RHOX, RHOY, RHOU, RHOV, RHOW = VariableIndices.values()
 
-        rho = self.cell_vars[..., RHO]
-        self.primitives[..., 0] = self.cell_vars[..., RHOY] ** gamma        # Pressure p
-        self.primitives[..., RHOU] = self.cell_vars[..., RHOU] / rho        #
-        self.primitives[..., RHOX] = self.cell_vars[..., RHOX] / rho
-        self.primitives[..., RHOY] = self.cell_vars[..., RHOY] / rho
+        if isinstance(eos, IdealGasEOS):
+            raise NotImplementedError("IdealGasEOS not yet supported for primitives: No way to calculate the energy")
+        elif isinstance(eos, BarotropicEOS):
+            args = self.cell_vars[..., VI.RHO]
+        elif isinstance(eos, ExnerBasedEOS):
+            args = (self.cell_vars[..., VI.RHOY], True)
+
+        rho = self.cell_vars[..., VI.RHO]
+        self.primitives[..., PVI.P] = eos.pressure(*args)
+        self.primitives[..., PVI.U] = self.cell_vars[..., VI.RHOU] / rho
+        self.primitives[..., PVI.X] = self.cell_vars[..., VI.RHOX] / rho
+        self.primitives[..., PVI.Y] = self.cell_vars[..., VI.RHOY] / rho
 
         if ndim == 2:
-            self.primitives[..., RHOV] = self.cell_vars[..., RHOV] / rho
+            self.primitives[..., PVI.V] = self.cell_vars[..., VI.RHOV] / rho
         elif ndim == 3:
-            self.primitives[..., RHOV] = self.cell_vars[..., RHOV] / rho
-            self.primitives[..., RHOW] = self.cell_vars[..., RHOW] / rho
-
+            self.primitives[..., PVI.V] = self.cell_vars[..., VI.RHOV] / rho
+            self.primitives[..., PVI.W] = self.cell_vars[..., VI.RHOW] / rho
 
         elif ndim > 3 or ndim < 1:
             raise ValueError("Unsupported number of dimensions.")
 
-
-
     # -------------------
     # Node-Based Methods
     # -------------------
+
+    def to_conservative(self, rho: np.ndarray) -> None:
+        ndim = self.ndim
+        self.cell_vars[..., VI.RHO] = rho
+        self.cell_vars[..., VI.RHOX] = rho * self.primitives[..., PVI.X]
+        self.cell_vars[..., VI.RHOY] = self.primitives[
+            ..., PVI.P
+        ]  # Remember P = rho*Theta = rho*Y
+        self.cell_vars[..., VI.RHOU] = rho * self.primitives[..., PVI.U]
+
+        if ndim == 2:
+            self.cell_vars[..., VI.RHOV] = rho * self.primitives[..., PVI.V]
+        elif ndim == 3:
+            self.cell_vars[..., VI.RHOV] = rho * self.primitives[..., PVI.V]
+            self.cell_vars[..., VI.RHOW] = rho * self.primitives[..., PVI.W]
+        elif ndim > 3 or ndim < 1:
+            raise ValueError("Unsupported number of dimensions.")
 
     def get_node_vars(self):
         """
@@ -199,4 +225,3 @@ class Variables:
                 f"Shape mismatch: expected {self.node_vars.shape}, got {new_values.shape}"
             )
         self.node_vars = new_values
-

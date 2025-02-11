@@ -1,2 +1,5 @@
 .idea
 tests/coverage
+__pycache__/
+api_key_test.py
+

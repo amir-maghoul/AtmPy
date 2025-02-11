@@ -1,248 +1,352 @@
 import numpy as np
-from typing import Callable, Union
+from typing import List, Tuple
+from atmpy.flux.utility import create_averaging_kernels
 from atmpy.grid.kgrid import Grid
-from atmpy.flux.riemann_solvers import *
+from atmpy.variables.variables import Variables
+from atmpy.physics.eos import EOS
+from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
+from atmpy.data.enums import SlopeLimiters, RiemannSolvers, FluxReconstructions
+from atmpy.data._factory import (
+    get_riemann_solver,
+    get_reconstruction_method,
+    get_slope_limiter,
+)
+import scipy as sp
+from atmpy.flux.utility import directional_indices, direction_mapping
 
 
 class Flux:
+    """Flux container. The attributes shared with the constructor parameters have docstrings there.
+
+    Attributes
+    ----------
+    ndim : int
+        The dimension of the problem
+    flux : dict[str, np.ndarray]
+        The full flux container. This contains the main numerical flux of the problem. The keys are the direction of
+         the flux. There is a full variable ndarray for each direction in this container.
+    iflux : dict[str, np.ndarray]
+        The intermediate flux container. This is basically an array of [Pu, Pv, Pw] of the unphysical flux. The main
+        flux in each direction would be for example Flux["x"] = Pu*Psi where Psi is the variable container.
+    kernels : List[np.ndarray]
+        The averaging kernels for the flux calculation in each direction.
+    riemann_solver : Callable
+        The given riemann solver function. Default is modified HLL.
+    reconstruction : Callable
+        The given reconstruction function. Default is modiefid MUSCL.
+    limiter : Callable
+        The given limiter function. Default is van Leer.
+    """
+
     def __init__(
         self,
         grid: Grid,
-        flux_type: str,
-        use_limiter: bool = False,
-        limiter_type: str = None,
-        **kwargs,
+        variables: Variables,
+        eos: EOS,
+        dt: float,
+        solver: RiemannSolvers = RiemannSolvers.MODIFIED_HLL,
+        reconstruction: FluxReconstructions = FluxReconstructions.MODIFIED_MUSCL,
+        limiter: SlopeLimiters = SlopeLimiters.VAN_LEER,
     ):
         """
-        Initialize the Flux class with parameters and references.
-
         Parameters
         ----------
         grid : :py:class:`atmpy.grid.kgrid.Grid`
-            A reference to the Grid object that holds geometry and indexing info.
-            The grid object should provide:
-              - grid.ndim: number of spatial dimensions (1, 2, or 3)
-              - grid.num_cells_x, grid.num_cells_y, (grid.num_cells_z if 3D): number of cells
-        flux_type : str
-            Indicates which flux scheme to use (e.g. "Roe", "HLLC", "Rusanov")
-        use_limiter : bool, optional
-            Whether to apply a slope/flux limiter
-        limiter_type : str, optional
-            Type of limiter (e.g. "vanleer", "minmod")
-        kwargs : dict
-            Additional parameters for flux computation (e.g. epsilon for Roe fix)
+            The computational grid.
+        variables : :py:class:`atmpy.variables.variables.Variables`
+            The variable container
+        eos : :py:class:`atmpy.physics.eos.EOS`
+            The equation of state
+        dt : float
+            The time step of the problem.
+        solver : RiemannSolvers (Enum)
+            An enum name from the implemented RiemannSolvers Enum,
+            e.g. RiemannSolvers.HLL, RiemannSolvers.RUSANOV, etc.
+            The attribute created from this enum is a callable function.
+        reconstruction : FluxReconstructions (Enum)
+            An enum name from the implemented FluxReconstructions Enum,
+            e.g. FluxReconstructions.MUSCL. The attribute created from this
+            enum is a callable function.
+        limiter : SlopeLimiters (Enum)
+            An enum name from the implemented SlopeLimiters Enum,
+            e.g. SlopeLimiters.MINMOD. The attribute created from this
+            enum is a callable function.
+
+        Notes
+        -----
+        Note that the timestep of the problem should be an attribute of the flux class since the CFL condition
+        restricts the physical fineness and the reconstruction schemes like MUSCL depend on the time step and the
+        slope of the state.
         """
-        self.flux_type = flux_type
         self.grid = grid
-        self.use_limiter = use_limiter
-        self.limiter_type = limiter_type
-
-        # Additional solver-specific parameters can be passed in kwargs
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
+        self.variables = variables
+        self.eos = eos
+        self.dt = dt
+        self.riemann_solver = get_riemann_solver(solver)
+        self.reconstruction = get_reconstruction_method(reconstruction)
+        self.limiter = get_slope_limiter(limiter)
         self.ndim = self.grid.dimensions
-        # Initialize flux storage arrays after we know how many vars and cells we have.
-        # This will be done in initialize_flux_storage
+        self.kernels = create_averaging_kernels(self.ndim)  # [kernel_x, kernel_y, ...]
 
-        # We'll store interface fluxes in a dictionary keyed by dimension:
-        # 'x' -> fluxes in x-direction
-        # 'y' -> fluxes in y-direction (if ndim >= 2)
-        # 'z' -> fluxes in z-direction (if ndim == 3)
-        self.interface_fluxes = {}
+        self.iflux = {"x": None, "y": None, "z": None}
 
-    def set_flux_type(self, flux_type: str):
-        """Set the flux type to a new scheme
-
-        Parameters
-        ----------
-        flux_type : str
-            New flux scheme identifier."""
-        self.flux_type = flux_type
-
-    def initialize_flux_storage(self, num_vars):
-        """
-        Allocate memory for flux storage arrays.
-        Shape of flux arrays depends on the dimension:
-          - 1D: (num_cells_x + 1, num_vars)
-          - 2D: (num_cells_x + 1, num_cells_y, num_vars) for x-direction
-                 (num_cells_x, num_cells_y + 1, num_vars) for y-direction
-          - 3D: Similarly extended to z-direction
-        """
         if self.ndim == 1:
-            self.interface_fluxes["x"] = np.zeros((self.grid.nx + 1, num_vars))
+            self.flux = {
+                "x": np.zeros(
+                    (grid.ncx_total + 1, variables.num_vars_cell), dtype=np.float32
+                )
+            }
         elif self.ndim == 2:
-            self.interface_fluxes["x"] = np.zeros(
-                (self.grid.nx + 1, self.grid.ny, num_vars)
-            )
-            self.interface_fluxes["y"] = np.zeros(
-                (self.grid.nx, self.grid.ny + 1, num_vars)
-            )
+            self.flux = {
+                "x": np.zeros(
+                    (grid.ncx_total + 1, grid.ncy_total, variables.num_vars_cell),
+                    dtype=np.float32,
+                ),
+                "y": np.zeros(
+                    (grid.ncx_total, grid.ncy_total + 1, variables.num_vars_cell),
+                    dtype=np.float32,
+                ),
+            }
+
         elif self.ndim == 3:
-            self.interface_fluxes["x"] = np.zeros(
-                (self.grid.nx + 1, self.grid.ny, self.grid.nz, num_vars)
-            )
-            self.interface_fluxes["y"] = np.zeros(
-                (self.grid.nx, self.grid.ny + 1, self.grid.nz, num_vars)
-            )
-            self.interface_fluxes["z"] = np.zeros(
-                (self.grid.nx, self.grid.ny, self.grid.nz + 1, num_vars)
-            )
-        else:
-            raise ValueError("Number of dimensions not supported.")
+            self.flux = {
+                "x": np.zeros(
+                    (
+                        grid.ncx_total + 1,
+                        grid.ncy_total,
+                        grid.ncz_total,
+                        variables.num_vars_cell,
+                    ),
+                    dtype=np.float32,
+                ),
+                "y": np.zeros(
+                    (
+                        grid.ncx_total,
+                        grid.ncy_total + 1,
+                        grid.ncz_total,
+                        variables.num_vars_cell,
+                    ),
+                    dtype=np.float32,
+                ),
+                "z": np.zeros(
+                    (
+                        grid.ncx_total,
+                        grid.ncy_total,
+                        grid.ncz_total + 1,
+                        variables.num_vars_cell,
+                    ),
+                    dtype=np.float32,
+                ),
+            }
 
-    def compute_interface_fluxes(self, variables):
+        # Initialize iflux
+        self.compute_averaging_fluxes()
+
+    def _compute_unphysical_fluxes(self) -> dict[str, np.ndarray]:
         """
-        Given the current state variables, compute the fluxes at each interface in all directions.
+        Compute unphysical fluxes in the x, y, and z directions. The unphysical fluxes are Pu, Pv and Pw in BK19 paper.
+        Reminder: P = rho*Theta.
 
-        Parameters
-        ----------
-        variables : Variable
-            The current state of the variables.
+        Returns
+        -------
+        dict[str, np.ndarray]
+            Dictionary of unphysical fluxes in the x, y, and z directions e.g. [Pu, Pv, Pw].
         """
-        cons_states = variables.get_conservative_vars()
 
-        # Depending on the dimension, perform reconstruction and Riemann solves along each direction.
-        # For example, in 1D:
-        #   - Reconstruct left/right states in x-direction, call Riemann solver.
-        # In 2D:
-        #   - For x-direction interfaces: reconstruct states in x-direction slices, solve Riemann problem.
-        #   - For y-direction interfaces: similarly for y-direction.
-        # In 3D:
-        #   - Do the same for x, y, and z directions.
-
-        # The actual indexing and the way you slice cons_states depends heavily on your data layout.
-        # Below we show a conceptual approach:
-
-        if self.ndim >= 1:
-            # Compute fluxes in x-direction
-            left_states_x, right_states_x = self._reconstruct_states(
-                cons_states, direction="x"
-            )
-            self._solve_all_interfaces(left_states_x, right_states_x, direction="x")
+        cell_vars = self.variables.cell_vars
+        Pu = cell_vars[..., VI.RHOU] * cell_vars[..., VI.RHOY] / cell_vars[..., VI.RHO]
+        fluxes = {
+            "Pu": Pu,
+            "Pv": None,
+            "Pw": None,
+        }  # container for unphysical fluxes Pu, Pv and Pw
 
         if self.ndim >= 2:
-            # Compute fluxes in y-direction
-            left_states_y, right_states_y = self._reconstruct_states(
-                cons_states, direction="y"
+            Pv = (
+                cell_vars[..., VI.RHOV]
+                * cell_vars[..., VI.RHOY]
+                / cell_vars[..., VI.RHO]
             )
-            self._solve_all_interfaces(left_states_y, right_states_y, direction="y")
-
+            fluxes["Pv"] = Pv
         if self.ndim == 3:
-            # Compute fluxes in z-direction
-            left_states_z, right_states_z = self._reconstruct_states(
-                cons_states, direction="z"
+            Pw = (
+                cell_vars[..., VI.RHOW]
+                * cell_vars[..., VI.RHOY]
+                / cell_vars[..., VI.RHO]
             )
-            self._solve_all_interfaces(left_states_z, right_states_z, direction="z")
+            fluxes["Pw"] = Pw
 
-    def _reconstruct_states(self, cons_states, direction="x"):
+        return fluxes
+
+    def compute_averaging_fluxes(self, mode: str = "valid") -> None:
         """
-        Reconstruct states at cell interfaces in the given direction.
+        Compute the physical flux in x, y, and z directions. The physical flux in the BK19 algorithm is
+        calculated starting with averaging of the Pu variable from cell to nodes and then averaging nodes to get
+        the value on the corresponding interface. But in the end, it is a weighted average of the immediate cells.
+        This algorithm updates the iflux attribute in-place.
 
         Parameters
         ----------
-        cons_states : np.ndarray
-            Array of conservative variables per cell. Shape typically depends on dimension:
-              1D: (num_cells_x, num_vars)
-              2D: (num_cells_x, num_cells_y, num_vars)
-              3D: (num_cells_x, num_cells_y, num_cells_z, num_vars)
-        direction : str
-            'x', 'y', or 'z' for which direction to reconstruct.
+        mode : str
+            mode of boundary handling for the sp.ndimage.convolve.
 
-        Returns
-        -------
-        left_states, right_states : np.ndarray
-            Arrays containing reconstructed left and right states at each interface.
-            Their shapes depend on dimension and direction. For example, in 2D:
-              - For direction='x': left_states and right_states might have shape
-                (num_cells_x+1, num_cells_y, num_vars).
-              - For direction='y': (num_cells_x, num_cells_y+1, num_vars).
+        Notes
+        -----
+        For the sake of matching sizes to avoid confusion, the sizes are the same as the sizes of the variables.
+        But in reality the first and last entries in the direction of the flux calculation is not needed.
         """
-        # Placeholder - actual implementation needed.
-        raise NotImplementedError(
-            f"State reconstruction for {direction}-direction not implemented."
+
+        unphysical_fluxes = self._compute_unphysical_fluxes()  # [Pu, Pv, ...]
+        directions = [
+            "x",
+            "y",
+            "z",
+        ]  # direction of the flux calculation: x: 0, y: 1 and z: 2
+
+        # Compute the averaging fluxes and place them in the flux container
+        for flux, kernel, direction in zip(
+            unphysical_fluxes.values(), self.kernels, directions
+        ):
+            self.iflux[direction] = sp.signal.fftconvolve(flux, kernel, mode=mode)
+            _, _, _, inner_index = directional_indices(self.ndim, direction, full=False)
+            self.flux[direction][..., VI.RHOY][inner_index] = self.iflux[direction]
+
+    def apply_reconstruction(
+        self, lmbda: float, direction: str
+    ) -> Tuple[Variables, Variables]:
+        """Calculate the left and right states for the flux calculation by applying a reconstruction scheme to the
+            variables and flux.
+
+        Parameters
+        ----------
+        direction : str
+            The direction of the flux calculation.
+        lambda : float
+            The ratio of delta_t to delta_x.
+        """
+        # Initialize variable objects
+        lefts = Variables(
+            self.grid, self.variables.num_vars_cell, self.variables.num_vars_node
+        )
+        rights = Variables(
+            self.grid, self.variables.num_vars_cell, self.variables.num_vars_node
         )
 
-    def _solve_all_interfaces(self, left_states, right_states, direction="x"):
-        """
-        Apply the chosen Riemann solver scheme to every interface in the specified direction.
-
-        Updates self.interface_fluxes[direction] in place.
-
-        Parameters
-        ----------
-        left_states : np.ndarray
-            Left-side reconstructed states at each interface.
-        right_states : np.ndarray
-            Right-side reconstructed states at each interface.
-        direction : str
-            'x', 'y', or 'z'
-        """
-        # Example pseudo-code (1D-like indexing shown, adapt for multiple dimensions):
-        # for i in all interfaces in direction:
-        #    flux = self.riemann_solver(left_states[i], right_states[i], direction)
-        #    self.interface_fluxes[direction][i] = flux
-        raise NotImplementedError(
-            f"Riemann solver loop for {direction}-direction not implemented."
+        # Use reconstruction scheme (MUSCL) to create left and right primitive variables
+        lefts.primitives, rights.primitives = self.reconstruction(
+            self.variables, self.flux, self.eos, self.limiter, lmbda, direction
         )
 
-    def riemann_solver(self, left_state, right_state, direction="x"):
-        """
-        Solve the Riemann problem for the given left and right states in the specified direction.
+        # left and right indices
+        lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
+            2, direction, full=False
+        )
+
+        # Index mapping
+        velocity_indices = [PVI.U, PVI.V, PVI.W]
+        direction_int = direction_mapping(direction)
+
+        # Find velocity in the direction
+        cell_vars = self.variables.cell_vars
+        velocity = cell_vars[..., velocity_indices[direction_int]]
+
+        # Compute the unphysical flux Pu
+        Pu = velocity * cell_vars[..., VI.RHOY]
+
+        # Calculate the P = rho*Theta by averaging and advecting
+        lefts.cell_vars[..., VI.RHOY][lefts_idx] = rights.cell_vars[..., VI.RHOY][
+            rights_idx
+        ] = 0.5 * (
+            (cell_vars[..., VI.RHOY][lefts_idx] + cell_vars[..., VI.RHOY][rights_idx])
+            - lmbda * (Pu[lefts_idx] + Pu[rights_idx])
+        )
+
+        # Find the rho conservative variable from the new updated primitive variables
+        left_rho = lefts.cell_vars[..., VI.RHO] / lefts.primitives[..., PVI.Y]
+        right_rho = rights.cell_vars[..., VI.RHO] / rights.primitives[..., PVI.Y]
+
+        # Compute the conservative variables for left and right states
+        lefts.to_conservative(left_rho)
+        rights.to_conservative(right_rho)
+
+        return lefts, rights
+
+    def apply_riemann_solver(self, lmbda: float, direction: str) -> None:
+        """Apply the Riemann solver to the left and right states to obtain the flux. It updates the flux attribute in-place.
 
         Parameters
         ----------
-        left_state, right_state : np.ndarray
-            State vectors (usually conservative or primitive) on each side of an interface.
+        lmbda : float
+            The ratio of delta_t to delta_x.
         direction : str
-            'x', 'y', or 'z' for the corresponding direction
+            The direction of the flux calculation.
+        """
+        lefts, rights = self.apply_reconstruction(lmbda, direction)
+        self.riemann_solver(
+            lefts.primitives, rights.primitives, self.flux, direction, self.ndim
+        )
 
-        Returns
-        -------
-        flux : np.ndarray
-            The flux across this interface in the given direction.
-        """
-        if self.flux_type == "Roe":
-            flux = roe_solver(left_state, right_state, direction)
-        elif self.flux_type == "HLLC":
-            flux = hllc_solver(left_state, right_state, direction)
-        elif self.flux_type == "Rusanov":
-            flux = rusanov_solver(left_state, right_state, direction)
-        else:
-            raise ValueError(f"Unsupported flux_type: {self.flux_type}")
-        return flux
 
-    def apply_flux_limiters(self, *args, **kwargs):
-        """
-        Apply limiters to slopes or fluxes if necessary.
-        """
-        raise NotImplementedError("Flux limiter application not implemented.")
+def main():
+    from atmpy.grid.utility import DimensionSpec, create_grid
+    from atmpy.physics.eos import ExnerBasedEOS
 
-    def get_interface_fluxes(self, direction=None):
-        """
-        Return the computed fluxes for external use, e.g. in the time management step.
+    np.set_printoptions(linewidth=100)
 
-        Parameters
-        ----------
-        direction : str, optional
-            If specified, return fluxes only for that direction ('x', 'y', or 'z').
-            If None, return a dict of all directions.
-        """
-        if direction is not None:
-            return self.interface_fluxes[direction]
-        return self.interface_fluxes
+    dt = 0.1
 
-    def print_debug_info(self):
-        """
-        Print out debug information for inspection.
-        """
-        print("Flux Type:", self.flux_type)
-        # print("Gamma:", self.gamma)
-        print("Use Limiter:", self.use_limiter)
-        print("Limiter Type:", self.limiter_type)
-        print("Number of dimensions:", self.ndim)
-        for d in self.interface_fluxes:
-            print(
-                f"Interface fluxes [{d}]-direction shape:",
-                self.interface_fluxes[d].shape,
-            )
+    dim = [DimensionSpec(1, 0, 2, 2), DimensionSpec(2, 0, 2, 2)]
+    grid = create_grid(dim)
+    rng = np.random.default_rng()
+    arr = np.arange(30)
+    rng.shuffle(arr)
+    array = arr.reshape(5, 6)
+
+    variables = Variables(grid, 5, 1)
+    variables.cell_vars[..., VI.RHO] = 1
+    variables.cell_vars[..., VI.RHOU] = array
+    variables.cell_vars[..., VI.RHOY] = 2
+
+    rng.shuffle(arr)
+    array = arr.reshape(5, 6)
+    variables.cell_vars[..., VI.RHOV] = array
+    eos = ExnerBasedEOS()
+    flux = Flux(grid, variables, eos, dt)
+    variables.to_primitive(eos)
+    primitives = variables.primitives
+
+    from atmpy.flux.reconstruction import (
+        calculate_variable_differences,
+        calculate_amplitudes,
+        calculate_slopes,
+        modified_muscl,
+    )
+    from atmpy.flux.utility import directional_indices, direction_mapping
+
+    direction = "x"
+    diffs = calculate_variable_differences(primitives, 2, direction_str=direction)
+    slopes = calculate_slopes(diffs, direction, flux.limiter, 2)
+    amplitudes = calculate_amplitudes(slopes, np.arange(30).reshape(5, 6), 1, True)
+
+    lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
+        2, direction
+    )
+
+    cell_vars = variables.cell_vars
+    iflux = flux.iflux
+
+    left, right = modified_muscl(
+        variables, flux.flux, eos, flux.limiter, 0.5, direction
+    )
+
+    print(flux.flux[direction][..., VI.RHOU])
+    print(flux.variables.cell_vars[..., VI.RHOU])
+    flux.apply_riemann_solver(1, direction)
+    print(flux.flux[direction][..., VI.RHOU])
+    print(flux.variables.cell_vars[..., VI.RHOU])
+
+    # TODO: SHAPE MISMATCH IN HLL
+
+
+if __name__ == "__main__":
+    main()

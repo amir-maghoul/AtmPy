@@ -3,6 +3,7 @@ should have grid and variable container as the input and update variables in-pla
 
 import numpy as np
 
+
 def sod_shock_tube_initial_conditions(grid, cell_vars, node_vars):
     """
     Initialize variable container in-place.
@@ -21,4 +22,3 @@ def sod_shock_tube_initial_conditions(grid, cell_vars, node_vars):
         None
     """
     cell_vars.vars[..., 1] += 1
-
