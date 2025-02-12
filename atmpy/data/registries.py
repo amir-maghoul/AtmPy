@@ -4,6 +4,7 @@ from atmpy.flux.riemann_solvers import *
 from atmpy.flux.reconstruction import *
 from atmpy.flux.limiters import *
 from atmpy.data.enums import SlopeLimiters, RiemannSolvers, FluxReconstructions, BoundaryConditions
+from atmpy.boundary_conditions.boundary_conditions import *
 
 SLOPE_LIMITERS = {
     SlopeLimiters.MINMOD: minmod,
@@ -27,6 +28,9 @@ FLUX_RECONSTRUCTION = {
 }
 
 BOUNDARY_CONDITIONS = {
-    BoundaryConditions.PERIODIC: periodic,
-    BoundaryConditions.REFLECTIVE: reflective,
+    BoundaryConditions.SLIP_WALL: SlipWall,
+    BoundaryConditions.INFLOW: InflowBoundary,
+    BoundaryConditions.OUTFLOW: OutflowBoundary,
+    BoundaryConditions.NON_REFLECTIVE_OUTLET: NonReflectiveOutlet,
+    BoundaryConditions.PERIODIC: PeriodicBoundary,
 }

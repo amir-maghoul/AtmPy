@@ -52,7 +52,11 @@ class FluxReconstructions(Enum):
     MUSCL = "muscl"
 
 class BoundaryConditions(Enum):
-    """Map name to function for the boundary condition"""
+    """Map name to class for boundary conditions."""
 
-    REFLECTIVE = "reflective"
+    SLIP_WALL = "slip_wall"
+    INFLOW = "inflow"
+    OUTFLOW = "outflow"
+    NON_REFLECTIVE_OUTLET = "non_reflective_outlet"
     PERIODIC = "periodic"
+
