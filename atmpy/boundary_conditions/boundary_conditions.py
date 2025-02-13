@@ -4,8 +4,10 @@ import numpy as np
 from abc import ABC, abstractmethod
 from typing import List
 
-class BoundaryCondition(ABC):
+
+class BaseBoundaryCondition(ABC):
     """Abstract base class for all boundary conditions."""
+
     def __init__(self, **kwargs):
         self.params = kwargs
 
@@ -13,34 +15,38 @@ class BoundaryCondition(ABC):
     def apply(self, cells, faces, solver_state):
         pass
 
-class SlipWall(BoundaryCondition):
+
+class SlipWall(BaseBoundaryCondition):
     def apply(self, cells, faces, solver_state):
         # Zero normal velocity, reflect tangential components
         pass
 
-class NonReflectiveOutlet(BoundaryCondition):
+
+class NonReflectiveOutlet(BaseBoundaryCondition):
     def apply(self, cells, faces, solver_state):
         # Characteristic-based extrapolation
         pass
-class WallBoundary(BoundaryCondition):
+
+
+class WallBoundary(BaseBoundaryCondition):
     def apply(self, cell_vars, grid, direction=None):
         # Implement wall BC logic (e.g., reflect normal velocity)
         pass
 
-class InflowBoundary(BoundaryCondition):
+
+class InflowBoundary(BaseBoundaryCondition):
     def apply(self, cell_vars, grid, direction=None):
         # Implement inflow BC logic (e.g., fixed pressure, temperature, velocity)
         pass
 
-class OutflowBoundary(BoundaryCondition):
+
+class OutflowBoundary(BaseBoundaryCondition):
     def apply(self, cell_vars, grid, direction=None):
         # Implement outflow BC logic (e.g., zero gradient)
         pass
 
-class PeriodicBoundary(BoundaryCondition):
+
+class PeriodicBoundary(BaseBoundaryCondition):
     def apply(self, cell_vars, grid, direction=None):
-        # Implement periodic BC logic (copy data from opposite boundary)
+        # Implement periodic BC logic (copy infrastructure from opposite boundary)
         pass
-
-
-

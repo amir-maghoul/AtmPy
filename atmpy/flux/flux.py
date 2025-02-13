@@ -4,9 +4,16 @@ from atmpy.flux.utility import create_averaging_kernels
 from atmpy.grid.kgrid import Grid
 from atmpy.variables.variables import Variables
 from atmpy.physics.eos import EOS
-from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
-from atmpy.data.enums import SlopeLimiters, RiemannSolvers, FluxReconstructions
-from atmpy.data._factory import (
+from atmpy.infrastructure.enums import (
+    VariableIndices as VI,
+    PrimitiveVariableIndices as PVI,
+)
+from atmpy.infrastructure.enums import (
+    SlopeLimiters,
+    RiemannSolvers,
+    FluxReconstructions,
+)
+from atmpy.infrastructure.factory import (
     get_riemann_solver,
     get_reconstruction_method,
     get_slope_limiter,
@@ -221,7 +228,7 @@ class Flux:
         ----------
         direction : str
             The direction of the flux calculation.
-        lambda : float
+        lmbda : float
             The ratio of delta_t to delta_x.
         """
         # Initialize variable objects

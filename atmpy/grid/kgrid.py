@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 
 class Grid:
     """
-    Basic grid data structure for the FVM solver.
+    Basic grid infrastructure structure for the FVM solver.
 
     Attributes
     ----------

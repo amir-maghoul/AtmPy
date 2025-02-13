@@ -1,57 +1,43 @@
-from atmpy.test_cases.base_test_case import BaseTestCase
-
-#########################################
-# THIS IS JUST A TEMPLATE EXAMPLE FOR NOW
-#########################################
-
-# test_cases/traveling_vortex.py
-from .base_test_case import BaseTestCase
-from boundary_conditions.enums import BoundaryConditions
-from dataclasses import dataclass
-from typing import List, Tuple
+from dataclasses import dataclass, field
+from typing import List, Tuple, Dict, Any
+from atmpy.test_cases.base_test_case import BaseTestCase, BoundaryFace
+from atmpy.configuration.simulation_configuration import SimulationConfig
+from atmpy.infrastructure.enums import BoundaryConditions as BdryType, BoundarySide
 
 
 @dataclass
-class BoundaryFace:
-    face_id: int
-    normal_vector: Tuple[float, float, float]
+class TravelingVortexConfig(SimulationConfig):
+    # Override or extend specific configurations if needed
+    pass
 
 
 class TravelingVortexTestCase(BaseTestCase):
     def __init__(self):
-        super().__init__(name="TravelingVortexTestCase")
+        super().__init__(name="TravelingVortexTestCase", config=TravelingVortexConfig())
         self.setup()
 
     def setup(self):
-        self.parameters = {
-            'reynolds_number': 1000,
-            'vortex_strength': 5.0,
-            # Add other relevant parameters
-        }
-        self.initial_conditions = {
-            'velocity_field': ...,  # Define initial velocity field
-            'pressure_field': ...,  # Define initial pressure field
-            # Add other initial conditions
-        }
-        self.boundary_conditions = {
-            'left': {
-                'type': BoundaryConditions.INFLOW,
-                'params': {'velocity': 5.0},
-                'faces': [BoundaryFace(face_id=1, normal_vector=(-1, 0, 0))]
-            },
-            'right': {
-                'type': BoundaryConditions.OUTFLOW,
-                'params': {},
-                'faces': [BoundaryFace(face_id=2, normal_vector=(1, 0, 0))]
-            },
-            'top': {
-                'type': BoundaryConditions.SLIP_WALL,
-                'params': {},
-                'faces': [BoundaryFace(face_id=3, normal_vector=(0, 1, 0))]
-            },
-            'bottom': {
-                'type': BoundaryConditions.SLIP_WALL,
-                'params': {},
-                'faces': [BoundaryFace(face_id=4, normal_vector=(0, -1, 0))]
-            },
-        }
+        self.set_boundary_condition(
+            BoundarySide.LEFT,
+            BdryType.INFLOW,
+            params={'velocity': 5.0},
+            faces=[BoundaryFace(face_id=1, normal_vector=(-1, 0, 0))]
+        )
+        self.set_boundary_condition(
+            BoundarySide.RIGHT,
+            BdryType.OUTFLOW,
+            params={},
+            faces=[BoundaryFace(face_id=2, normal_vector=(1, 0, 0))]
+        )
+        self.set_boundary_condition(
+            BoundarySide.TOP,
+            BdryType.SLIP_WALL,
+            params={},
+            faces=[BoundaryFace(face_id=3, normal_vector=(0, 1, 0))]
+        )
+        self.set_boundary_condition(
+            BoundarySide.BOTTOM,
+            BdryType.SLIP_WALL,
+            params={},
+            faces=[BoundaryFace(face_id=4, normal_vector=(0, -1, 0))]
+        )

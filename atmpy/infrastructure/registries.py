@@ -3,7 +3,12 @@
 from atmpy.flux.riemann_solvers import *
 from atmpy.flux.reconstruction import *
 from atmpy.flux.limiters import *
-from atmpy.data.enums import SlopeLimiters, RiemannSolvers, FluxReconstructions, BoundaryConditions
+from atmpy.infrastructure.enums import (
+    SlopeLimiters,
+    RiemannSolvers,
+    FluxReconstructions,
+    BoundaryConditions,
+)
 from atmpy.boundary_conditions.boundary_conditions import *
 
 SLOPE_LIMITERS = {

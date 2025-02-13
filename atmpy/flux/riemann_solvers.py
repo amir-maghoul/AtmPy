@@ -1,6 +1,9 @@
 from typing import Tuple, List
 import numpy as np
-from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
+from atmpy.infrastructure.enums import (
+    VariableIndices as VI,
+    PrimitiveVariableIndices as PVI,
+)
 from atmpy.flux.utility import directional_indices
 
 

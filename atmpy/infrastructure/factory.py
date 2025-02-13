@@ -2,9 +2,18 @@
 
 # factories.py
 
-from atmpy.data.enums import SlopeLimiters, RiemannSolvers, FluxReconstructions, BoundaryConditions
-from atmpy.data.registries import SLOPE_LIMITERS, RIEMANN_SOLVERS, FLUX_RECONSTRUCTION, BOUNDARY_CONDITIONS
-
+from atmpy.infrastructure.enums import (
+    SlopeLimiters,
+    RiemannSolvers,
+    FluxReconstructions,
+    BoundaryConditions,
+)
+from atmpy.infrastructure.registries import (
+    SLOPE_LIMITERS,
+    RIEMANN_SOLVERS,
+    FLUX_RECONSTRUCTION,
+    BOUNDARY_CONDITIONS,
+)
 
 
 def get_slope_limiter(name: SlopeLimiters) -> callable:
@@ -39,7 +48,7 @@ def get_riemann_solver(name: RiemannSolvers) -> callable:
     --------
         Callable: The corresponding Riemann solver function.
 
-      """
+    """
 
     try:
         return RIEMANN_SOLVERS[name]
@@ -64,6 +73,7 @@ def get_reconstruction_method(name: FluxReconstructions) -> callable:
         return FLUX_RECONSTRUCTION[name]
     except KeyError:
         raise ValueError(f"Unknown reconstruction method: {name}")
+
 
 def get_boundary_conditions(name: BoundaryConditions, **params) -> object:
     """

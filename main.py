@@ -13,7 +13,9 @@ def main():
     bc_manager.setup_conditions(test_case.boundary_conditions)
 
     # Initialize Solver with parameters and BoundaryConditionManager
-    solver = Solver(boundary_condition_manager=bc_manager, parameters=test_case.parameters)
+    solver = Solver(
+        boundary_condition_manager=bc_manager, parameters=test_case.parameters
+    )
 
     # Set initial conditions in Solver
     solver.set_initial_conditions(test_case.initial_conditions)

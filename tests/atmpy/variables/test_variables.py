@@ -44,11 +44,13 @@ class MockGrid:
             self.nnz_total = ncz + 1
 
 
-# Temporarily modify sys.modules to replace atmpy.data.constants with
+# Temporarily modify sys.modules to replace atmpy.infrastructure.constants with
 # MagicMock defined above to isolate the test
 import sys
 
-sys.modules["atmpy.data.constants"] = MagicMock(VariableIndices=MockVariableIndices)
+sys.modules["atmpy.infrastructure.constants"] = MagicMock(
+    VariableIndices=MockVariableIndices
+)
 
 
 @pytest.mark.parametrize(
@@ -127,7 +129,7 @@ def test_variables_update_and_get_cell_vars(dims, num_cell_vars, num_node_vars):
         grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars
     )
 
-    # Create new cell data
+    # Create new cell infrastructure
     new_cell_data = np.ones(expected_shape) * 42.0  # Arbitrary test value
     vars_container.update_cell_vars(new_cell_data)
     retrieved_cell_data = vars_container.get_cell_vars()
@@ -158,7 +160,7 @@ def test_variables_update_and_get_node_vars(dims, num_cell_vars, num_node_vars):
         grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars
     )
 
-    # Create new node data
+    # Create new node infrastructure
     new_node_data = np.ones(expected_shape) * 24.0  # Arbitrary test value
     vars_container.update_node_vars(new_node_data)
     retrieved_node_data = vars_container.get_node_vars()
@@ -189,7 +191,7 @@ def test_variables_to_primitive(dims, num_cell_vars, num_node_vars, gamma):
         grid=g, num_vars_cell=num_cell_vars, num_vars_node=num_node_vars
     )
 
-    # Populate cell_vars with test data
+    # Populate cell_vars with test infrastructure
     # Set rho, rhoX, rhoY, rho*u, rho*v, rho*w as per the variable ordering
     # rho = 2.0, rhoX = 3.0, rhoY = 2.0, rho*u = 4.0, rho*v = 6.0, rho*w = 8.0
 
@@ -377,7 +379,7 @@ def test_variables_partial_update():
     # Ensure primitives remain unchanged (still zeros)
     assert np.all(vars_container.primitives == 0.0)
 
-    # Now update cell_vars with meaningful data
+    # Now update cell_vars with meaningful infrastructure
     # Set rho, rhoX, rhoY, rho*u, rho*v, rho*w
     vars_container.cell_vars[..., MockVariableIndices.RHO] = 2.0
     vars_container.cell_vars[..., MockVariableIndices.RHOX] = 3.0

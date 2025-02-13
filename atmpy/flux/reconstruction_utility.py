@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Callable
 from atmpy.flux.utility import directional_indices, direction_mapping
-from atmpy.data.enums import PrimitiveVariableIndices as PVI
+from atmpy.infrastructure.enums import PrimitiveVariableIndices as PVI
 
 
 def calculate_variable_differences(
@@ -40,12 +40,12 @@ def calculate_variable_differences(
 
     # Apply np.diff in the direction which results in one less element
     # Notice the PVI.Y element is calculated differently and np.diff is not applied on it
-    diffs[..., :PVI.Y][left_idx] = np.diff(
-        primitives[..., :PVI.Y], axis=direction
+    diffs[..., : PVI.Y][left_idx] = np.diff(primitives[..., : PVI.Y], axis=direction)
+    diffs[..., PVI.Y][left_idx] = (
+        1.0 / primitives[..., PVI.Y][right_idx] - 1.0 / primitives[..., PVI.Y][left_idx]
     )
-    diffs[..., PVI.Y][left_idx] = 1.0/primitives[..., PVI.Y][right_idx] - 1.0/primitives[..., PVI.Y][left_idx]
-    diffs[..., PVI.Y+1:][left_idx] = np.diff(
-        primitives[..., PVI.Y+1:], axis=direction
+    diffs[..., PVI.Y + 1 :][left_idx] = np.diff(
+        primitives[..., PVI.Y + 1 :], axis=direction
     )
     return diffs
 

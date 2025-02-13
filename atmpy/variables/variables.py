@@ -1,6 +1,9 @@
 from abc import abstractmethod
 import numpy as np
-from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
+from atmpy.infrastructure.enums import (
+    VariableIndices as VI,
+    PrimitiveVariableIndices as PVI,
+)
 from atmpy.grid.utility import DimensionSpec, create_grid
 from atmpy.physics import eos
 from atmpy.physics.eos import IdealGasEOS, BarotropicEOS, ExnerBasedEOS
@@ -158,7 +161,9 @@ class Variables:
         ndim = self.ndim
 
         if isinstance(eos, IdealGasEOS):
-            raise NotImplementedError("IdealGasEOS not yet supported for primitives: No way to calculate the energy")
+            raise NotImplementedError(
+                "IdealGasEOS not yet supported for primitives: No way to calculate the energy"
+            )
         elif isinstance(eos, BarotropicEOS):
             args = self.cell_vars[..., VI.RHO]
         elif isinstance(eos, ExnerBasedEOS):

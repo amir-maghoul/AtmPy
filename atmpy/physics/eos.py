@@ -31,7 +31,7 @@ class IdealGasEOS(EOS):
     def __init__(self, gamma: float = 1.4):
         self.gamma = gamma
 
-    def pressure(self,*args, **kwargs):
+    def pressure(self, *args, **kwargs):
         rho = args[0]
         e = args[1]
         return (self.gamma - 1.0) * rho * e
@@ -95,7 +95,9 @@ class ExnerBasedEOS(EOS):
           (In reality, you might pass both or keep separate methods.)
         """
         P = args[0]
-        pressure = args[1] # Boolean whether the pressure is given or the exner pressure
+        pressure = args[
+            1
+        ]  # Boolean whether the pressure is given or the exner pressure
         if pressure:
             return P_to_pressure_numba(P, self.p_ref, self.cp, self.cv)
         else:

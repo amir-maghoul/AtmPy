@@ -6,7 +6,7 @@ from typing import List
 
 @dataclass
 class DimensionSpec:
-    """The data class for creating the dimensions of the problem"""
+    """The infrastructure class for creating the dimensions of the problem"""
 
     n: int
     start: float
