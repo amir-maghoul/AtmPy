@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 import numpy as np
-from typing import List
+from typing import List, Tuple, Dict, Any
 from atmpy.infrastructure.enums import BoundarySide, BoundaryConditions as BdryType
 from atmpy.configuration.simulation_data import (
     GlobalConstants,

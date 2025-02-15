@@ -5,23 +5,18 @@ from atmpy.solver.solver import Solver
 
 
 def main():
-    # Initialize test case
+    # Initialize the specific test case
     test_case = TravelingVortexTestCase()
 
-    # Initialize BoundaryConditionManager
-    bc_manager = BoundaryConditionManager()
-    bc_manager.setup_conditions(test_case.boundary_conditions)
+    # Access the updated simulation configuration
+    simulation_config = test_case.config
 
-    # Initialize Solver with parameters and BoundaryConditionManager
-    solver = Solver(
-        boundary_condition_manager=bc_manager, parameters=test_case.parameters
-    )
+    # Initialize the solver with the configuration
+    solver = Solver(simulation_config)
 
-    # Set initial conditions in Solver
-    solver.set_initial_conditions(test_case.initial_conditions)
+    # Run the simulation
+    solver.run()
 
-    # Run the solver
-    solver.solve()
 
 
 if __name__ == "__main__":

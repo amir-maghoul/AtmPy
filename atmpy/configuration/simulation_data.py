@@ -1,8 +1,21 @@
 from dataclasses import dataclass, field
-from typing import List, Dict
+from typing import List, Dict, Tuple, Any
 import numpy as np
 from atmpy.infrastructure.enums import BoundaryConditions as BdryType, BoundarySide
 from atmpy.infrastructure.enums import SlopeLimiters as LimiterType
+
+
+@dataclass
+class BoundaryFace:
+    face_id: int
+    normal_vector: Tuple[float, float, float]
+
+
+@dataclass
+class BoundaryConditionStructure:
+    type: BdryType
+    params: Dict[str, Any] = field(default_factory=dict)
+    faces: List[BoundaryFace] = field(default_factory=list)
 
 
 @dataclass
@@ -21,10 +34,10 @@ class SpatialGrid:
 class BoundaryConditions:
     conditions: Dict[BoundarySide, BdryType] = field(
         default_factory=lambda: {
-            BoundarySide.LEFT: BdryType.INFLOW,
-            BoundarySide.RIGHT: BdryType.OUTFLOW,
-            BoundarySide.TOP: BdryType.SLIP_WALL,
-            BoundarySide.BOTTOM: BdryType.SLIP_WALL,
+            BoundarySide.LEFT: BoundaryConditionStructure(type=BdryType.INFLOW),
+            BoundarySide.RIGHT: BoundaryConditionStructure(type=BdryType.INFLOW),
+            BoundarySide.TOP: BoundaryConditionStructure(type=BdryType.INFLOW),
+            BoundarySide.BOTTOM: BoundaryConditionStructure(type=BdryType.INFLOW),
             # Add FRONT and BACK if needed
         }
     )
