@@ -70,7 +70,10 @@ class Grid:
         the meshgrid created from the nodes according to the dimension
     grid_type : str, default="cartesian"
         the grid type
-
+    ng : List[Tuple[int, int]]
+        The list of the number of ghost cells in at each side of each direction as a tuple
+    inner_slice : List[slice]
+        The list of the index slices of inner cells in each direction
     """
 
     def __init__(
@@ -145,6 +148,8 @@ class Grid:
         self.nnx_total: int = self.ncx_total + 1
         self.cshape: Tuple[int, ...] = (self.ncx_total,)
         self.nshape: Tuple[int, ...] = (self.nnx_total,)
+        self.ng = [None, None, None]
+        self.inner_slice = [None, None, None]
 
         # Generate x-coordinate arrays
         self.x_cells: np.ndarray = np.linspace(
@@ -161,6 +166,8 @@ class Grid:
 
         # Inner cell indices in x-direction
         self.inner_slice_x = slice(ngx, -ngx)
+        self.ng[0] = (self.ngx, self.ngx)
+        self.inner_slice[0] = self.inner_slice_x
 
         # Check for 2D grid
         if (
@@ -202,6 +209,9 @@ class Grid:
 
             # Inner cell indices in y-direction
             self.inner_slice_y = slice(self.ngy, -self.ngy)
+            self.ng[1] = (self.ngy, self.ngy)
+            self.inner_slice[1] = self.inner_slice_y
+
         elif not (ny is None and y_start is None and y_end is None and ngy is None):
             raise ValueError(
                 "Cannot have mixed of None and not None values for parameters of the dimensions."
@@ -248,6 +258,8 @@ class Grid:
 
             # Inner cell indices in z-direction
             self.inner_slice_z = slice(self.ngz, -self.ngz)
+            self.ng[2] = (self.ngz, self.ngz)
+            self.inner_slice[2] = self.inner_slice_z
 
         elif not (nz is None and z_start is None and z_end is None and ngz is None):
             raise ValueError(
