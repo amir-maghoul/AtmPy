@@ -1,5 +1,3 @@
-# test_grid.py
-
 import numpy as np
 import pytest
 from atmpy.grid.kgrid import Grid  # Assuming the Grid class is in a file named grid.py
