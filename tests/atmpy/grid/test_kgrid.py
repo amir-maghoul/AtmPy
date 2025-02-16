@@ -48,7 +48,7 @@ class TestKgrid:
 
     def test_grid_initialization_1d(self):
         grid = Grid(nx=10, x_start=0.0, x_end=1.0, ngx=2)
-        assert grid.dimensions == 1
+        assert grid.ndim == 1
         assert grid.nx == 10
         assert grid.ngx == 2
         assert grid.ncx_total == 14  # nx + 2 * ngx
@@ -59,7 +59,7 @@ class TestKgrid:
         grid = Grid(
             nx=10, x_start=0.0, x_end=1.0, ny=20, y_start=0.0, y_end=2.0, ngx=2, ngy=3
         )
-        assert grid.dimensions == 2
+        assert grid.ndim == 2
         assert grid.nx == 10
         assert grid.ny == 20
         assert grid.ngx == 2
@@ -86,7 +86,7 @@ class TestKgrid:
             ngy=3,
             ngz=4,
         )
-        assert grid.dimensions == 3
+        assert grid.ndim == 3
         assert grid.nx == 10
         assert grid.ny == 20
         assert grid.nz == 30
@@ -194,7 +194,7 @@ class TestKgrid:
 
     def test_get_inner_cells_invalid_dimension(self):
         grid = Grid(nx=10, x_start=0.0, x_end=1.0)
-        grid.dimensions = 4  # Invalid dimension
+        grid.ndim = 4  # Invalid dimension
         with pytest.raises(ValueError):
             grid.get_inner_cells()
 

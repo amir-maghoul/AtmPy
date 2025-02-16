@@ -36,7 +36,7 @@ class TestUtility:
     def test_create_grid_1d(self):
         dimensions = [DimensionSpec(5, 0, 1, 2)]
         grid = create_grid(dimensions)
-        assert grid.dimensions == 1
+        assert grid.ndim == 1
         assert grid.nx == 5
         assert grid.ngx == 2
         assert grid.x_start == 0
@@ -49,7 +49,7 @@ class TestUtility:
             DimensionSpec(7, 2, 3, 2),
         ]
         grid = create_grid(dimensions)
-        assert grid.dimensions == 3
+        assert grid.ndim == 3
         assert grid.nx == 5 and grid.ngx == 2
         assert grid.ny == 6 and grid.ngy == 2
         assert grid.nz == 7 and grid.ngz == 2

@@ -92,7 +92,7 @@ class Flux:
         self.riemann_solver = get_riemann_solver(solver)
         self.reconstruction = get_reconstruction_method(reconstruction)
         self.limiter = get_slope_limiter(limiter)
-        self.ndim = self.grid.dimensions
+        self.ndim = self.grid.ndim
         self.kernels = create_averaging_kernels(self.ndim)  # [kernel_x, kernel_y, ...]
 
         self.iflux = {"x": None, "y": None, "z": None}

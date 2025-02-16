@@ -81,7 +81,7 @@ class NodeGrid:
             self.nghosts
         ):
             raise AssertionError(
-                "The number of dimensions in coordinates and nodes does not match"
+                "The number of ndim in coordinates and nodes does not match"
             )
 
         self.nix, self.niy, self.niz = self.ninodes

@@ -58,7 +58,7 @@ sys.modules["atmpy.infrastructure.constants"] = MagicMock(
 )
 def test_variables_init(dims, num_cell_vars, num_node_vars):
     """
-    Test the initialization of the Variables class for different dimensions.
+    Test the initialization of the Variables class for different ndim.
     """
     if dims == 1:
         g = MockGrid(dimensions=1, ncx=10)
@@ -101,7 +101,7 @@ def test_variables_init(dims, num_cell_vars, num_node_vars):
 
 def test_variables_init_invalid_dims():
     """
-    Test that Variables class raises a ValueError for unsupported dimensions.
+    Test that Variables class raises a ValueError for unsupported ndim.
     """
     g = MockGrid(dimensions=4, ncx=10)  # Not supported
     with pytest.raises(ValueError):

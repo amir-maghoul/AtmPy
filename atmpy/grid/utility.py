@@ -6,7 +6,7 @@ from typing import List
 
 @dataclass
 class DimensionSpec:
-    """The infrastructure class for creating the dimensions of the problem"""
+    """The infrastructure class for creating the ndim of the problem"""
 
     n: int
     start: float
@@ -15,12 +15,12 @@ class DimensionSpec:
 
 
 def to_grid_args(dimensions: List[DimensionSpec]):
-    """Convert list of dimensions to grid arguments
+    """Convert list of ndim to grid arguments
 
     Parameters
     ----------
     dimensions : List[DimensionSpec]
-        List of dimensions in forms of objects of the Dimension class
+        List of ndim in forms of objects of the Dimension class
 
     Returns
     -------
@@ -48,13 +48,13 @@ def to_grid_args(dimensions: List[DimensionSpec]):
 
 
 def create_grid(dimensions: List[DimensionSpec]):
-    """Unpacks the dimensions parameter (which is a list of DimensionSpec objects)
+    """Unpacks the ndim parameter (which is a list of DimensionSpec objects)
     into a dictionary and pass it to create a Grid object using them
 
     Parameters
     ----------
     dimensions : List[DimensionSpec]
-        List of dimensions in forms of objects of the Dimension class
+        List of ndim in forms of objects of the Dimension class
 
     Returns
     -------
@@ -78,7 +78,7 @@ def cell_to_node_average(
         An array of cell-centered values of shape (ncx, ncy, ncz).
 
     var_nodes : np.ndarray, default=None
-        An array of node-centered values of shape (nnx,nny,nnz), depending on the dimensions
+        An array of node-centered values of shape (nnx,nny,nnz), depending on the ndim
         If it is None, an array of zeros is created.
 
     Returns
@@ -94,11 +94,11 @@ def cell_to_node_average(
                 "Not an expected shape for the given variable evaluated on nodes"
             )
 
-    if grid.dimensions == 1:
+    if grid.ndim == 1:
         return _cell_to_node_average_1d(grid, var_cells, var_nodes)
-    elif grid.dimensions == 2:
+    elif grid.ndim == 2:
         return _cell_to_node_average_2d(grid, var_cells, var_nodes)
-    elif grid.dimensions == 3:
+    elif grid.ndim == 3:
         return _cell_to_node_average_3d(grid, var_cells, var_nodes)
     else:
         raise ValueError("Invalid grid dimension")
@@ -134,11 +134,11 @@ def node_to_cell_average(
                 "Not an expected shape for the given variable evaluated on cells"
             )
 
-    if grid.dimensions == 1:
+    if grid.ndim == 1:
         return _node_to_cell_average_1d(grid, var_nodes, var_cells)
-    elif grid.dimensions == 2:
+    elif grid.ndim == 2:
         return _node_to_cell_average_2d(grid, var_nodes, var_cells)
-    elif grid.dimensions == 3:
+    elif grid.ndim == 3:
         return _node_to_cell_average_3d(grid, var_nodes, var_cells)
     else:
         raise ValueError("Invalid grid dimension")
