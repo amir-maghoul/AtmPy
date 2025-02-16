@@ -3,6 +3,7 @@ from typing import List, Dict, Tuple, Any
 import numpy as np
 from atmpy.infrastructure.enums import BoundaryConditions as BdryType, BoundarySide
 from atmpy.infrastructure.enums import SlopeLimiters as LimiterType
+from atmpy.grid.utility import DimensionSpec, create_grid
 
 
 @dataclass
@@ -20,17 +21,44 @@ class BoundaryConditionStructure:
 
 @dataclass
 class SpatialGrid:
-    inx: int = 65
-    iny: int = 65
-    inz: int = 1
+    ndim = 2
+    # Number of points
+    nx: int = 65
+    ny: int = 65
+    nz: int = 0
+
+    # Number of ghost cells
+    ngx = 2
+    ngy = 2
+    ngz = 0
+
+    # Ranges: x direction
     xmin: float = -1.0
     xmax: float = 1.0
+
+    # Ranges: y direction
     ymin: float = 0.0
     ymax: float = 1.0
-    zmin: float = -1.0
-    zmax: float = 1.0
+
+    # Ranges: z direction
+    zmin: float = 0.0
+    zmax: float = 0.0
+
+    def __post_init__(self):
+        dims = self.initialize()
+        self.grid = create_grid(dims)
 
 
+    def initialize(self):
+        """ Create dimensional specifications in form of DimensionSpec objects to create a grid object."""
+        dim_x = DimensionSpec(self.nx, self.xmin, self.xmax, self.ngx)
+        dim_y = DimensionSpec(self.ny, self.ymin, self.ymax, self.ngy)
+        dim_z = DimensionSpec(self.nz, self.zmin, self.zmax, self.ngz)
+        dims = [dim_x, dim_y, dim_z]
+        return dims[:self.ndim]
+
+
+@dataclass
 class BoundaryConditions:
     conditions: Dict[BoundarySide, BdryType] = field(
         default_factory=lambda: {
