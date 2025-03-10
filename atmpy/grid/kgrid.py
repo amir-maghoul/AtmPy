@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict
 
 
 class Grid:
@@ -74,6 +74,8 @@ class Grid:
         The list of the number of ghost cells in at each side of each direction as a tuple
     inner_slice : List[slice]
         The list of the index slices of inner cells in each direction
+    dxyz : List[int, int, int]
+        The discretization fineness of all directions as a list. If a direction does not exist, the value is None.
     """
 
     def __init__(
@@ -136,15 +138,21 @@ class Grid:
         if ngx < 1:
             raise ValueError("Number of ghost cells should at least be 1.")
 
+        # Unifying lists of important properties for all dimensions
+        self.dxyz : List[int,...] = [None]*3 # Discretization fineness
+        self.nc_total : List[int, ...] = [None]*3
+
         # Grid parameters in x-direction
         self.nx: int = nx
         self.x_start: float = x_start
         self.x_end: float = x_end
         self.dx: float = (x_end - x_start) / nx
         self.ngx: int = ngx  # Number of ghost cells in x-direction
+        self.dxyz[0] = self.dx
 
         # Total number of cells and nodes including ghost cells in x-direction
         self.ncx_total: int = nx + 2 * ngx
+        self.nc_total[0] = self.ncx_total
         self.nnx_total: int = self.ncx_total + 1
         self.cshape: Tuple[int, ...] = (self.ncx_total,)
         self.nshape: Tuple[int, ...] = (self.nnx_total,)
@@ -185,12 +193,14 @@ class Grid:
             self.y_start: float = y_start
             self.y_end: float = y_end
             self.dy: float = (y_end - y_start) / ny
+            self.dxyz[1] = self.dy
             self.ngy: int = (
                 ngy if ngy is not None else ngx
             )  # Use ngx if ngy not specified
 
             # Total number of cells and nodes including ghost cells in y-direction
             self.ncy_total: int = ny + 2 * self.ngy
+            self.nc_total[1] = self.ncy_total
             self.nny_total: int = self.ncy_total + 1
             self.cshape = (self.ncx_total, self.ncy_total)
             self.nshape = (self.nnx_total, self.nny_total)
@@ -233,12 +243,14 @@ class Grid:
             self.z_start: float = z_start
             self.z_end: float = z_end
             self.dz: float = (z_end - z_start) / nz
+            self.dxyz[2] = self.dz
             self.ngz: int = (
                 ngz if ngz is not None else ngx
             )  # Use ngx if ngz not specified
 
             # Total number of cells and nodes including ghost cells in z-direction
             self.ncz_total: int = nz + 2 * self.ngz
+            self.nc_total[2] = self.ncz_total
             self.nnz_total: int = self.ncz_total + 1
 
             self.cshape = (self.ncx_total, self.ncy_total, self.ncz_total)

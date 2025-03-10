@@ -203,7 +203,7 @@ class Flux:
         But in reality the first and last entries in the direction of the flux calculation is not needed.
         """
 
-        unphysical_fluxes = self._compute_unphysical_fluxes()  # [Pu, Pv, ...]
+        unphysical_fluxes = self._compute_unphysical_fluxes()  # [Pu, Pv, [Pw]]
         directions = [
             "x",
             "y",
