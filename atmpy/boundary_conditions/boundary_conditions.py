@@ -96,14 +96,88 @@ class GravityBoundary(BaseBoundaryCondition):
     """
     def __init__(self, **kwargs: dict[str, Any]) -> None:
         super().__init__(**kwargs)
-        self.gravity = kwargs.pop("gravity")
+        self.gravity: List[int, ...] = kwargs.pop("gravity")
         if len(np.nonzero(self.gravity)[0]) > 1:
             raise ValueError("Only one axis can have gravity strength.")
+        if np.isclose(self.gravity[self.direction], 0):
+            raise ValueError("There is no gravity strength in the specified direction. Wrong boundary conditions.")
         self.gravity_axis = np.nonzero(self.gravity)[0][0]
 
 
     def apply(self, cell_vars: np.ndarray, *args, **kwargs):
         pass
+
+    def _create_boundary_indices(self, side="bottom"):
+        """ Create three type of indices:
+            nsource: the combination of first two inner cells (for bottom side) and last two inner cells (for top side)
+            nlast: the combination of the two set of neighboring inner cell and ghost cells, i.e. for the bottom side,
+                    it is the last ghost cell of the side and first inner cells.
+            nimage: the combination of the set of two ghost cells at both sides
+
+            For the lower boundary (ghost cells at beginning along the axis):
+              For i=0,...,ghost-1:
+                 nimage = ghost - 1 - i
+                 nlast  = ghost - i
+                 nsource = ghost + i
+
+            For the upper boundary (ghost cells at end along the axis; let N be size along axis):
+              For i=0,...,ghost-1:
+                 nimage = N - ghost + i
+                 nsource = N - ghost - 1 - i
+                 nlast  = N - ghost - 1 + i
+
+            Parameters
+            ----------
+            side : str
+                The signifier of which side we are working one. The valid values are "bottom" and "top".
+                They don't mean anything in themselves. "bottom" is a signifier for the beginning of the
+                in the given axis. "top" is a signifier for the end of the in the given axis.
+
+            Returns
+            -------
+            Tuple of
+
+    """
+        ng_tuple : Tuple[int, int] = self.grid.ng[self.direction]
+        N : int = self.grid.nc_total[self.direction]
+
+        # Bring the BC axis to the front.
+        # u_shift = np.moveaxis(u, axis, 0)
+        # N = u_shift.shape[0]
+
+        if side == "bottom":
+            ng = ng_tuple[0]
+            ng_arange = np.arange(ng)
+            nimage = ng - 1 - ng_arange       # ghost cells indices (will be updated)
+            nlast = ng - ng_arange            # adjacent inner/ghost cell index
+            nsource = ng + ng_arange          # inner cells moving inward
+        elif side == "top":
+            ng = ng_tuple[1]
+            ng_arange = np.arange(ng)
+            nimage = N - ng + ng_arange         # ghost cell indices at upper boundary
+            nlast = N - ng + ng_arange - 1      # cell adjacent to inner cell on upper side
+            nsource = N - ng - ng_arange - 1    # inner cells near the upper boundary
+        else:
+            raise ValueError("side must be 'bottom' or 'top'.")
+
+        # --- Lower boundary indices ---
+        # i runs from 0 to ghost-1.
+
+
+        # --- Upper boundary indices ---
+
+
+        # # Evaluate the operation first into temporary arrays to avoid dependency issues.
+        # tmp_lower = f(u_shift[lower_nsource, ...], u_shift[lower_nlast, ...])
+        # tmp_upper = f(u_shift[top_nsource, ...], u_shift[top_nlast, ...])
+        #
+        # # Assign the computed values to the ghost cells.
+        # u_shift[lower_nimage, ...] = tmp_lower
+        # u_shift[top_nimage, ...]   = tmp_upper
+
+        # Return the array with the original axis ordering.
+        # return np.moveaxis(u_shift, 0, axis)
+        return nsource, nlast, nimage
 
 class SlipWall(BaseBoundaryCondition):
     def apply(self, cell_vars, *args, **kwargs):
@@ -137,10 +211,11 @@ class OutflowBoundary(BaseBoundaryCondition):
 if __name__ == "__main__":
     from atmpy.grid.utility import create_grid, DimensionSpec
     y = np.arange(7*8*2).reshape(7, 8, 2)
-    dims = [DimensionSpec(3, 0, 1, 2), DimensionSpec(4, 0, 1, 2)]
+    dims = [DimensionSpec(3, 0, 1, 2), DimensionSpec(3, 0, 1, 2)]
     grid = create_grid(dims)
-    gravity = np.array([0.0, 0.0, 1.0])
+    gravity = np.array([0.0, 1.0, 0.0])
     params = {"direction":"y", "grid":grid, "gravity":gravity}
     x = GravityBoundary(**params)
     idx = x.gravity_axis
-    print(grid.dxyz)
+    nsource, nlast, nimage = x._create_boundary_indices(side="top")
+    print(nsource, nlast, nimage)

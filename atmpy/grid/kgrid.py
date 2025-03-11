@@ -135,8 +135,8 @@ class Grid:
             )
         if nx < 0:
             raise ValueError("Cannot have negative values for number of cells.")
-        if ngx < 1:
-            raise ValueError("Number of ghost cells should at least be 1.")
+        if ngx < 2:
+            raise ValueError("Number of ghost cells should at least be 2.")
 
         # Unifying lists of important properties for all dimensions
         self.dxyz : List[int,...] = [None]*3 # Discretization fineness
@@ -186,8 +186,8 @@ class Grid:
         ):
             if ny < 0:
                 raise ValueError("Cannot have negative values for number of cells.")
-            if ngy < 1:
-                raise ValueError("Number of ghost cells should at least be 1.")
+            if ngy < 2:
+                raise ValueError("Number of ghost cells should at least be 2.")
             self.ndim = 2
             self.ny: int = ny
             self.y_start: float = y_start
@@ -236,8 +236,8 @@ class Grid:
         ):
             if nz < 0:
                 raise ValueError("Cannot have negative values for number of cells.")
-            if ngz < 1:
-                raise ValueError("Number of ghost cells should at least be 1.")
+            if ngz < 2:
+                raise ValueError("Number of ghost cells should at least be 2.")
             self.ndim = 3
             self.nz: int = nz
             self.z_start: float = z_start
