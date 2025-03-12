@@ -1,4 +1,4 @@
-""" This module is responsible for creating the left and right state to pass to the riemann solver."""
+"""This module is responsible for creating the left and right state to pass to the riemann solver."""
 
 import numpy as np
 from typing import Callable, List

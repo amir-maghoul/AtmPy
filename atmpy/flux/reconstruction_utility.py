@@ -52,7 +52,8 @@ def calculate_variable_differences(
     left_idx, right_idx, _, _ = directional_indices(ndim, direction_str, full=True)
 
     # Apply np.diff in the direction which results in one less element
-    diffs[...][left_idx] = np.diff(primitives, axis=direction)
+    # diffs[...][left_idx] = np.diff(primitives, axis=direction)
+    diffs[left_idx] = np.diff(primitives, axis=direction)
 
     return diffs
 

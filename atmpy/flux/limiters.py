@@ -1,4 +1,4 @@
-""" This module contains slope limiter functions for the flux reconstruction."""
+"""This module contains slope limiter functions for the flux reconstruction."""
 
 import numpy as np
 from numba import njit, prange
