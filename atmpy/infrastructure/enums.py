@@ -60,6 +60,7 @@ class BoundaryConditions(Enum):
     OUTFLOW = "outflow"
     NON_REFLECTIVE_OUTLET = "non_reflective_outlet"
     PERIODIC = "periodic"
+    ReflectiveGravity = "gravity_reflective_boundary"
 
 
 class BoundarySide(Enum):

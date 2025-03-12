@@ -1,4 +1,4 @@
-""" This is a registry container to map names to their corresponding functions. """
+"""This is a registry container to map names to their corresponding functions."""
 
 from atmpy.flux.riemann_solvers import *
 from atmpy.flux.reconstruction import *
@@ -38,4 +38,5 @@ BOUNDARY_CONDITIONS = {
     BoundaryConditions.OUTFLOW: OutflowBoundary,
     BoundaryConditions.NON_REFLECTIVE_OUTLET: NonReflectiveOutlet,
     BoundaryConditions.PERIODIC: PeriodicBoundary,
+    BoundaryConditions.ReflectiveGravity: ReflectiveGravityBoundary,
 }

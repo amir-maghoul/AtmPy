@@ -1,4 +1,4 @@
-""" This module containes initial conditions for the problem. The structure is such that the functions
+"""This module containes initial conditions for the problem. The structure is such that the functions
 should have grid and variable container as the input and update variables in-place."""
 
 import numpy as np

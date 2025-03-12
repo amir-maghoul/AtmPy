@@ -1,3 +1,5 @@
+"""This module handles and updates the simulation configuration of the problem"""
+
 from dataclasses import dataclass, field
 import numpy as np
 from typing import List, Tuple, Dict, Any
@@ -44,6 +46,7 @@ class SimulationConfig:
             if hasattr(self, key):
                 for nested_key, nested_value in value.items():
                     setattr(getattr(self, key), nested_key, nested_value)
+
 
 if __name__ == "__main__":
     x = SimulationConfig()

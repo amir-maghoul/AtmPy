@@ -1,5 +1,6 @@
-""" Module for the definition of the equation of state. Any different and general forms of eos
-must be implemented here as a class and then passed to the riemann solvers in the flux. """
+"""Module for the definition of the equation of state. Any different and general forms of eos
+must be implemented here as a class and then passed to the riemann solvers in the flux.
+"""
 
 from abc import ABC, abstractmethod
 import numpy as np

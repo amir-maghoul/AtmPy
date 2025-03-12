@@ -12,10 +12,10 @@ class TravelingVortex(BaseTestCase):
         self.setup()
 
         physics = {
-            "u_wind_speed" : 1.0,
-            "v_wind_speed" : 0.0,
-            "w_wind_speed" : 0.0,
-            "stratification": lambda y : 1.0
+            "u_wind_speed": 1.0,
+            "v_wind_speed": 0.0,
+            "w_wind_speed": 0.0,
+            "stratification": lambda y: 1.0,
         }
 
         self.set_physics(physics)

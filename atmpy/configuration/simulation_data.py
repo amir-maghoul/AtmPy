@@ -1,3 +1,6 @@
+"""The module containing the simulation data. The simulation data are the numerical, physical and temporal data needed
+for a concrete simulation."""
+
 from dataclasses import dataclass, field
 from typing import List, Dict, Tuple, Any
 import numpy as np
@@ -48,14 +51,13 @@ class SpatialGrid:
         dims = self.initialize()
         self.grid = create_grid(dims)
 
-
     def initialize(self):
-        """ Create dimensional specifications in form of DimensionSpec objects to create a grid object."""
+        """Create dimensional specifications in form of DimensionSpec objects to create a grid object."""
         dim_x = DimensionSpec(self.nx, self.xmin, self.xmax, self.ngx)
         dim_y = DimensionSpec(self.ny, self.ymin, self.ymax, self.ngy)
         dim_z = DimensionSpec(self.nz, self.zmin, self.zmax, self.ngz)
         dims = [dim_x, dim_y, dim_z]
-        return dims[:self.ndim]
+        return dims[: self.ndim]
 
 
 @dataclass

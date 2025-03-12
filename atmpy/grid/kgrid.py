@@ -139,8 +139,8 @@ class Grid:
             raise ValueError("Number of ghost cells should at least be 2.")
 
         # Unifying lists of important properties for all dimensions
-        self.dxyz : List[int,...] = [None]*3 # Discretization fineness
-        self.nc_total : List[int, ...] = [None]*3
+        self.dxyz: List[int, ...] = [None] * 3  # Discretization fineness
+        self.nc_total: List[int, ...] = [None] * 3
 
         # Grid parameters in x-direction
         self.nx: int = nx
@@ -303,6 +303,17 @@ class Grid:
             return np.meshgrid(self.x_nodes, self.y_nodes, indexing="ij")
         elif self.ndim == 3:
             return np.meshgrid(self.x_nodes, self.y_nodes, self.z_nodes, indexing="ij")
+
+    def get_coordinates(self, axis):
+        """Get method for coordinate values in each direction"""
+        if axis == 0:
+            return self.x_cells
+        elif axis == 1:
+            return self.y_cells
+        elif axis == 2:
+            return self.z_cells
+        else:
+            raise ValueError("Invalid value for 'axis'.")
 
     def get_inner_cells(self) -> Tuple[slice, ...]:
         """

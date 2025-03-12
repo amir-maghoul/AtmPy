@@ -1,4 +1,4 @@
-""" Module for abstract base class for test cases."""
+"""Module for abstract base class for test cases."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -46,7 +46,7 @@ class BaseTestCase(ABC):
         self.config.update_from_kwargs(global_constants=global_constant_updates)
 
     def set_temporal(self, temporal_updates: Dict[str, Any]):
-        """ Update the temporal configuration as a bulk. Single changes should be done manually in the child class.
+        """Update the temporal configuration as a bulk. Single changes should be done manually in the child class.
 
         Parameters
         ---------
@@ -56,7 +56,7 @@ class BaseTestCase(ABC):
         self.config.update_from_kwargs(temporal=temporal_updates)
 
     def set_boundary_conditions(self, bc_updates: Dict[BoundarySide, BdryType]):
-        """ Update the boundary conditions in the configuration.
+        """Update the boundary conditions in the configuration.
 
         Parameters
         ----------
@@ -65,9 +65,8 @@ class BaseTestCase(ABC):
         """
         self.config.update_boundary_condition(boundary_conditions=bc_updates)
 
-
     def set_physics(self, physics_updates: dict):
-        """ Update the physics configuration as a bulk. Single changes should be done manually in the child class.
+        """Update the physics configuration as a bulk. Single changes should be done manually in the child class.
 
         Parameters
         ----------
@@ -77,27 +76,27 @@ class BaseTestCase(ABC):
         self.config.update_from_kwargs(physics=physics_updates)
 
     def set_model_regimes(self, model_regime_updates: dict):
-        """ Update the model regime configuration as a bulk. Single changes should be done manually in the child class."""
+        """Update the model regime configuration as a bulk. Single changes should be done manually in the child class."""
 
         self.config.update_from_kwargs(model_regimes=model_regime_updates)
 
     def numerics(self, numerics_updates: dict):
-        """ Update the numerics configuration as a bulk. Single changes should be done manually in the child class."""
+        """Update the numerics configuration as a bulk. Single changes should be done manually in the child class."""
 
         self.config.update_from_kwargs(numerics=numerics_updates)
 
     def set_parameters(self, parameters_updates: dict):
-        """ Update the parameters configuration as a bulk. Single changes should be done manually in the child class."""
+        """Update the parameters configuration as a bulk. Single changes should be done manually in the child class."""
 
         self.config.update_from_kwargs(parameters=parameters_updates)
 
     def set_diagnostics(self, diagnostics_updates: dict):
-        """ Update the diagnostics configuration as a bulk. Single changes should be done manually in the child class."""
+        """Update the diagnostics configuration as a bulk. Single changes should be done manually in the child class."""
 
         self.config.update_from_kwargs(diagnostics=diagnostics_updates)
 
     def set_output(self, output_updates: dict):
-        """ Update the output configuration as a bulk. Single changes should be done manually in the child class."""
+        """Update the output configuration as a bulk. Single changes should be done manually in the child class."""
 
         self.config.update_from_kwargs(output=output_updates)
 

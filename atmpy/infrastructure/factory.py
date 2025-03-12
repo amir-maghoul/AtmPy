@@ -1,4 +1,4 @@
-""" Internal module to test whether a given name exists in the function registry. """
+"""Internal module to test whether a given name exists in the function registry."""
 
 # factories.py
 

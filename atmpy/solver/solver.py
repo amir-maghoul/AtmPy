@@ -32,7 +32,7 @@ class Solver:
             riemann_solver=test_case.config.numerics.riemann_solver,
             limiter=test_case.config.numerics.limiter,
             variables=self.variables,
-            grid=self.grid
+            grid=self.grid,
         )
         self.time = 0.0
         self.step = 0
@@ -43,9 +43,7 @@ class Solver:
         """
         self.grid.initialize(self.config.spatial_grid)
         self.variables.initialize(self.grid)
-        self.boundary_manager.setup_conditions(
-            self.test_case.boundary_conditions
-        )
+        self.boundary_manager.setup_conditions(self.test_case.boundary_conditions)
         print("Initialization complete.")
 
     def run(self):
@@ -74,7 +72,7 @@ class Solver:
         """
         solver_state = {
             "time": self.time,
-            "step": self.step
+            "step": self.step,
             # Add more state information as needed
         }
         self.boundary_manager.apply_boundary_conditions(
