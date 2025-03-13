@@ -2,9 +2,9 @@
 
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import List, Any, Tuple, Callable, cast
+from typing import List, Any, Tuple, Callable, TypeGuard, TypedDict, Unpack, cast, Union
 
-from atmpy.grid.utility import DimensionSpec, create_grid
+from atmpy.grid.kgrid import Grid
 from atmpy.infrastructure.enums import VariableIndices as VI
 from atmpy.infrastructure.enums import BoundarySide
 from atmpy.flux.utility import direction_mapping
@@ -37,13 +37,17 @@ class BaseBoundaryCondition(ABC):
     the "inner_slice" key of the params is the tuple of all inner slices in all directions.
     """
 
-    def __init__(self, **kwargs: dict[str, Any]) -> None:
+    class KwargsTypes(TypedDict):
+        """ Constructor class for dictionary typing of kwargs"""
+        direction: str
+        grid: Grid
 
-        self.params: dict = kwargs
-        self.direction: int = direction_mapping(self.params["direction"])
-        self.grid = self.params["grid"]
+    def __init__(self, **kwargs: Unpack[KwargsTypes]) -> None:
+
+        self.direction: int = direction_mapping(kwargs["direction"])
+        self.grid: Grid = kwargs["grid"]
         self.ndim: int = self.grid.ndim
-        self.ng: List[Tuple[int, int]] = self.grid.ng[self.direction]
+        self.ng: List[Tuple[Any, Any]] = self.grid.ng[self.direction]
         self.pad_width: List[Tuple[int, int]] = (
             self._create_pad_width_for_single_direction()
         )
@@ -65,9 +69,9 @@ class BaseBoundaryCondition(ABC):
         return tuple(directional_inner_slice)
 
     def _create_pad_width_for_single_direction(self) -> List[Tuple[int, int]]:
-        """Create the pad width for a single direction. The self.params["ng"] attribute contains a
+        """Create the pad width for a single direction. The "ng" attribute contains a
         list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
-        Assuming we are working in 3D, self.params["ng"]= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
+        Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
         avoid padding the boundary in all direction with the same number of ghost cells, we need to create a
         pad width tuple containing zero tuples in the undesired directions, i.e.  for x direction padding
         [(ngx, ngx), (0, 0), (0, 0)]."""
@@ -87,7 +91,7 @@ class PeriodicBoundary(BaseBoundaryCondition):
             The array container for all the variables.
         """
         cell_vars[..., VI.RHO] = np.pad(
-            cell_vars[..., VI.RHO][self.directional_inner_slice],
+            cell_vars[self.directional_inner_slice + (VI.RHO,)],
             self.pad_width,
             mode="wrap",
         )
@@ -116,61 +120,86 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         Determines if we are in the compressible regime.
     """
 
-    def __init__(self, **kwargs: dict[str, Any]) -> None:
+    class KwargsType(TypedDict):
+        """ Constructor class for typing of kwargs dictionary"""
+        thermodynamics: Thermodynamics
+        gravity: Union[List[float], np.ndarray]
+        stratification: Callable[[Any], Any]
+        side: str
+        is_lamb: bool
+        is_compressible: bool
+
+    def __init__(self, **kwargs: Unpack[KwargsType]) -> None:
         super().__init__(**kwargs)
         self.th: Thermodynamics = kwargs["thermodynamics"]
-        self.gravity: List[int, ...] = kwargs.pop("gravity")
+        self.gravity: Union[List[float], np.ndarray] = kwargs["gravity"]
         if len(np.nonzero(self.gravity)[0]) > 1:
             raise ValueError("Only one axis can have gravity strength.")
         if np.isclose(self.gravity[self.direction], 0):
             raise ValueError(
                 "There is no gravity strength in the specified direction. Wrong boundary conditions."
             )
-        self.gravity_axis: int = np.nonzero(self.gravity)[0][0]
-        self.stratification: Callable[[Any], Any] = kwargs.pop("stratification")
-        self.side: str = kwargs.pop("side")
+        self.gravity_axis: int = cast(int, np.nonzero(self.gravity)[0][0])
+        if self.gravity_axis == 0:
+            raise ValueError("The first axis is reserved for horizontal velocity. It cannot have gravity.")
+        self.stratification: Callable[[Any], Any] = kwargs["stratification"]
+        self.side: str = kwargs["side"]
         if self.side not in ["top", "bottom"]:
             raise ValueError("Side must be either 'top' or 'bottom'.")
-        self.is_lamb: bool = kwargs.pop("is_lamb")
-        self.is_compressible: bool = kwargs.pop("is_compressible")
+        self.is_lamb: bool = kwargs["is_lamb"]
+        self.is_compressible: bool = kwargs["is_compressible"]
 
     def apply(self, cell_vars: np.ndarray, *args, **kwargs):
         """Apply the reflective boundary condition for the given side of the gravity axis. If self.side is top, this means
         that the boundary condition for the top side of the vertical axis is the 'Lid' boundary. The sponge BC should be
         implemented separately in another class."""
-        nsource, nlast, nimage = self._create_boundary_indices(side=self.side)
 
-        # bring the variables in gravity axis to the first axis to avoid index confusion
-        shift_vars = np.moveaxis(cell_vars, self.gravity_axis, 0)
-        Y_last = cell_vars[..., VI.RHOY][nlast] / cell_vars[..., VI.RHO][nlast]
+
+        # calculate the boundary indices
+        nsource, nlast, nimage = self._create_boundary_indices()
+
+        # evaluate the Theta on nlast indices
+        Y_last = cell_vars[nlast + (VI.RHOY,)] / cell_vars[nlast + (VI.RHO,)]
+
+        # get the coordinate values of the grid in the direction of gravity
         axis_coordinate_cells = self.grid.get_coordinates(self.gravity_axis)
-        strat = 1.0 / self.stratification(axis_coordinate_cells[nimage])
+
+        # calculate the stratification function on the ghost cells
+        strat = 1.0 / self.stratification(
+            axis_coordinate_cells[nimage[self.gravity_axis]]
+        )
+
+        # sign to calculate the derivative of Pi. -1 if on the topside boundary and 1 if on the downside
         sign = -1 if self.side == "top" else 1
         dr = self.grid.dxyz[
             self.gravity_axis
         ]  # discretization fineness in the gravity direction
+
+        # Calculate the derivative of Pi (Exner pressure) in existence/nonexistence of lamb boundary
         if not self.is_lamb:
-            # The derivative of Pi (Exner pressure)
-            dpi = sign * (self.th.Gamma) * 0.5 * dr * (1.0 / Y_last + strat)
+            dpi = sign * self.th.Gamma * 0.5 * dr * (1.0 / Y_last + strat)
         else:
             raise NotImplementedError(
                 "The lamb boundary condition is not implemented yet."
             )
+
+        # Calculate the P = rho Theta on the nlast indices in compressible or pseudo-incompressible regimes
         if self.is_compressible:
             rhoY = (
-                (cell_vars[..., VI.RHOY][nlast] ** self.th.gm1) + dpi
+                (cell_vars[nlast + (VI.RHOY,)] ** self.th.gm1) + dpi
             ) ** self.th.gm1inv
         else:
             raise NotImplementedError(
                 "The compressible boundary condition is not implemented yet."
             )
 
+        # Get the index of the velocities in cell_vars for the gravity and nongravity directions
         momentum_index = self._get_gravity_momentum_index()
-        # calculate the Pv for the ghost cells. v here is a placeholder for the velocity in the direction of gravity
+        # calculate the Pv for the ghost cells. "v" here is a placeholder for the velocity in the direction of gravity
         Pv = (
-            -cell_vars[..., momentum_index][nsource]
-            * cell_vars[..., VI.RHOY][nsource]
-            / cell_vars[..., VI.RHO][nsource]
+            -cell_vars[nsource + (momentum_index[0],)]
+            * cell_vars[nsource + (VI.RHOY,)]
+            / cell_vars[nsource + (VI.RHO,)]
         )
 
         if not self.is_lamb:
@@ -179,19 +208,44 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         else:
             raise ValueError("The lamb boundary condition is not implemented yet.")
 
-        u = cell_vars[..., VI.RHOU][nsource] / cell_vars[..., VI.RHO][nsource]
+        # This is the actual horizontal velocity, since the gravity axis can never be the first axis.
+        u = cell_vars[nsource + (VI.RHOU,)] / cell_vars[nsource + (VI.RHO,)]
 
-        # TODO: 1. this is completely wrong. The nsource and nlast and nimage indexing should be applied after moved axis
-        #       2. Use inplace indexing instead of making copies
-        return Y_last
+        # w is a placeholder for the velocity in the direction of non-gravity.
+        w = cell_vars[nsource + (momentum_index[1],)] / cell_vars[nsource + (VI.RHO,)]
 
-    def _get_gravity_momentum_index(self):
-        """Helper method to get the momentum variable index in the direction of gravity as one output and the index of
-        the rest of the momentums as the second output."""
-        velocity_indices = [VI.RHOU, VI.RHOV, VI.RHOW]
-        return velocity_indices[self.gravity_axis]
+        # Actual X
+        X = cell_vars[nsource + (VI.RHOX,)] / cell_vars[nsource + (VI.RHO,)]
 
-    def _create_boundary_indices(self):
+        rho = rhoY * strat
+
+        # Evaluate variables (all) at the ghost cells
+        cell_vars[nimage + (VI.RHO,)] = rho
+        cell_vars[nimage + (VI.RHOU)] = rho * u * Th_slc
+        if not self.is_lamb:
+            cell_vars[nimage + (momentum_index[0],)] = rho * v
+        else:
+            raise NotImplementedError("The lamb boundary condition is not implemented yet.")
+        cell_vars[nimage + (momentum_index[1],)] = rho * w * Th_slc
+        cell_vars[nimage + (VI.RHOY,)] = rhoY
+        cell_vars[nimage + (VI.RHOX,)] = rho * X
+
+        return w
+
+    def _get_gravity_momentum_index(self) -> Tuple[int, int]:
+        """Helper method to get the momentum variable index in the direction of gravity as the first output and the
+        momentum in the nongravity direction as the second output. Notice since RHOU can never be the momentum in the
+        gravity axis (or more clearly, first axis can never be the gravity axis), it is not included in the array"""
+
+        if self.gravity_axis == 1:
+            gravity_index = VI.RHOV
+            non_gravity_index = VI.RHOW
+        elif self.gravity_axis == 2:
+            gravity_index = VI.RHOW
+            non_gravity_index = VI.RHOV
+        return gravity_index, non_gravity_index
+
+    def _create_boundary_indices(self) -> tuple[tuple[slice, ...], tuple[slice, ...], tuple[slice, ...]]:
         """Create three type of indices:
         nsource: the combination of first two inner cells (for bottom side) and last two inner cells (for top side)
         nlast: the combination of the two set of neighboring inner cell and ghost cells, i.e. for the bottom side,
@@ -216,39 +270,34 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             Return the three set of indices.
 
         """
-        ng_tuple: Tuple[int, int] = self.grid.ng[self.direction]
+        ng_tuple: Tuple[int, ...] = self.grid.ng[self.direction]
         N: int = self.grid.nc_total[self.direction]
-
-        # Bring the BC axis to the front.
-        # u_shift = np.moveaxis(u, axis, 0)
-        # N = u_shift.shape[0]
 
         if self.side == "bottom":
             ng = ng_tuple[0]
             ng_arange = np.arange(ng)
-            nimage = ng - 1 - ng_arange  # ghost cells indices (will be updated)
-            nlast = ng - ng_arange  # adjacent inner/ghost cell index
-            nsource = ng + ng_arange  # inner cells moving inward
+            image = ng - 1 - ng_arange  # ghost cells indices (will be updated)
+            last = ng - ng_arange  # adjacent inner/ghost cell index
+            source = ng + ng_arange  # inner cells moving inward
         elif self.side == "top":
             ng = ng_tuple[1]
             ng_arange = np.arange(ng)
-            nimage = N - ng + ng_arange  # ghost cell indices at upper boundary
-            nlast = N - ng + ng_arange - 1  # cell adjacent to inner cell on upper side
-            nsource = N - ng - ng_arange - 1  # inner cells near the upper boundary
+            image = N - ng + ng_arange  # ghost cell indices at upper boundary
+            last = N - ng + ng_arange - 1  # cell adjacent to inner cell on upper side
+            source = N - ng - ng_arange - 1  # inner cells near the upper boundary
         else:
             raise ValueError("side must be 'bottom' or 'top'.")
 
-        # # Evaluate the operation first into temporary arrays to avoid dependency issues.
-        # tmp_lower = f(u_shift[lower_nsource, ...], u_shift[lower_nlast, ...])
-        # tmp_upper = f(u_shift[top_nsource, ...], u_shift[top_nlast, ...])
-        #
-        # # Assign the computed values to the ghost cells.
-        # u_shift[lower_nimage, ...] = tmp_lower
-        # u_shift[top_nimage, ...]   = tmp_upper
+        # Make the indices valid for multi-dimensional array
+        nimage: list = [slice(None)] * self.ndim
+        nlast = [slice(None)] * self.ndim
+        nsource = [slice(None)] * self.ndim
 
-        # Return the array with the original axis ordering.
-        # return np.moveaxis(u_shift, 0, axis)
-        return nsource, nlast, nimage
+        nimage[self.gravity_axis] = image
+        nlast[self.gravity_axis] = last
+        nsource[self.gravity_axis] = source
+
+        return tuple(nsource), tuple(nlast), tuple(nimage)
 
 
 class SlipWall(BaseBoundaryCondition):
@@ -283,10 +332,37 @@ class OutflowBoundary(BaseBoundaryCondition):
 
 if __name__ == "__main__":
     from atmpy.grid.utility import create_grid, DimensionSpec
+    from atmpy.grid.utility import DimensionSpec, create_grid
+    from atmpy.physics.eos import ExnerBasedEOS
+    from atmpy.variables.variables import Variables
 
-    y = np.arange(7 * 8 * 5).reshape(7, 8, 5)
-    dims = [DimensionSpec(3, 0, 1, 2), DimensionSpec(3, 0, 1, 2)]
-    grid = create_grid(dims)
+    np.set_printoptions(linewidth=100)
+
+    dt = 0.1
+
+    nx = 1
+    ngx = 2
+    nnx = nx + 2 * ngx
+    ny = 2
+    ngy = 2
+    nny = ny + 2 * ngy
+
+    dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
+    grid = create_grid(dim)
+    rng = np.random.default_rng()
+    arr = np.arange(nnx * nny)
+    rng.shuffle(arr)
+    array = arr.reshape(nnx, nny)
+
+    variables = Variables(grid, 6, 1)
+    variables.cell_vars[..., VI.RHO] = 1
+    variables.cell_vars[..., VI.RHOU] = array
+    variables.cell_vars[..., VI.RHOY] = 2
+    variables.cell_vars[..., VI.RHOW] = 3
+
+    rng.shuffle(arr)
+    array = arr.reshape(nnx, nny)
+    variables.cell_vars[..., VI.RHOV] = array
     gravity = np.array([0.0, 1.0, 0.0])
     th = Thermodynamics()
     params = {
@@ -302,13 +378,12 @@ if __name__ == "__main__":
     x = ReflectiveGravityBoundary(**params)
     idx = x.gravity_axis
     nsource, nlast, nimage = x._create_boundary_indices()
-    print(nsource, nlast, nimage)
-    print("--------------------------")
-    print(y[..., 0])
-    print(y[nimage, ..., 0])
-    y_shift = np.moveaxis(y, 1, 0)
-    print(y_shift[nimage, ..., 0])
-    print("---------------------------")
-    y_shift[nimage, ..., 0] = 0
-    print(y_shift[nimage, ..., 0])
-    print(y[..., 0])
+
+    s = x.apply(variables.cell_vars)
+
+    print(s)
+
+
+
+
+
