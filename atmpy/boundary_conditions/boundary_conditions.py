@@ -38,7 +38,8 @@ class BaseBoundaryCondition(ABC):
     """
 
     class KwargsTypes(TypedDict):
-        """ Constructor class for dictionary typing of kwargs"""
+        """Constructor class for dictionary typing of kwargs"""
+
         direction: str
         grid: Grid
 
@@ -121,7 +122,8 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
     """
 
     class KwargsType(TypedDict):
-        """ Constructor class for typing of kwargs dictionary"""
+        """Constructor class for typing of kwargs dictionary"""
+
         thermodynamics: Thermodynamics
         gravity: Union[List[float], np.ndarray]
         stratification: Callable[[Any], Any]
@@ -141,7 +143,9 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             )
         self.gravity_axis: int = cast(int, np.nonzero(self.gravity)[0][0])
         if self.gravity_axis == 0:
-            raise ValueError("The first axis is reserved for horizontal velocity. It cannot have gravity.")
+            raise ValueError(
+                "The first axis is reserved for horizontal velocity. It cannot have gravity."
+            )
         self.stratification: Callable[[Any], Any] = kwargs["stratification"]
         self.side: str = kwargs["side"]
         if self.side not in ["top", "bottom"]:
@@ -153,7 +157,6 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         """Apply the reflective boundary condition for the given side of the gravity axis. If self.side is top, this means
         that the boundary condition for the top side of the vertical axis is the 'Lid' boundary. The sponge BC should be
         implemented separately in another class."""
-
 
         # calculate the boundary indices
         nsource, nlast, nimage = self._create_boundary_indices()
@@ -221,21 +224,22 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
 
         # Evaluate variables (all) at the ghost cells
         cell_vars[nimage + (VI.RHO,)] = rho
-        cell_vars[nimage + (VI.RHOU)] = rho * u * Th_slc
+        cell_vars[nimage + (VI.RHOU,)] = rho * u * Th_slc
         if not self.is_lamb:
             cell_vars[nimage + (momentum_index[0],)] = rho * v
         else:
-            raise NotImplementedError("The lamb boundary condition is not implemented yet.")
+            raise NotImplementedError(
+                "The lamb boundary condition is not implemented yet."
+            )
         cell_vars[nimage + (momentum_index[1],)] = rho * w * Th_slc
         cell_vars[nimage + (VI.RHOY,)] = rhoY
         cell_vars[nimage + (VI.RHOX,)] = rho * X
 
-        return w
-
     def _get_gravity_momentum_index(self) -> Tuple[int, int]:
         """Helper method to get the momentum variable index in the direction of gravity as the first output and the
         momentum in the nongravity direction as the second output. Notice since RHOU can never be the momentum in the
-        gravity axis (or more clearly, first axis can never be the gravity axis), it is not included in the array"""
+        gravity axis (or more clearly, first axis can never be the gravity axis), it is not included in the array
+        """
 
         if self.gravity_axis == 1:
             gravity_index = VI.RHOV
@@ -245,7 +249,9 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             non_gravity_index = VI.RHOV
         return gravity_index, non_gravity_index
 
-    def _create_boundary_indices(self) -> tuple[tuple[slice, ...], tuple[slice, ...], tuple[slice, ...]]:
+    def _create_boundary_indices(
+        self,
+    ) -> tuple[tuple[slice, ...], tuple[slice, ...], tuple[slice, ...]]:
         """Create three type of indices:
         nsource: the combination of first two inner cells (for bottom side) and last two inner cells (for top side)
         nlast: the combination of the two set of neighboring inner cell and ghost cells, i.e. for the bottom side,
@@ -330,10 +336,9 @@ class OutflowBoundary(BaseBoundaryCondition):
         pass
 
 
-if __name__ == "__main__":
+def example_usage():
     from atmpy.grid.utility import create_grid, DimensionSpec
     from atmpy.grid.utility import DimensionSpec, create_grid
-    from atmpy.physics.eos import ExnerBasedEOS
     from atmpy.variables.variables import Variables
 
     np.set_printoptions(linewidth=100)
@@ -370,20 +375,16 @@ if __name__ == "__main__":
         "grid": grid,
         "gravity": gravity,
         "stratification": lambda x: x**2,
-        "side": "bottom",
+        "side": "top",
         "thermodynamics": th,
         "is_lamb": False,
         "is_compressible": True,
     }
     x = ReflectiveGravityBoundary(**params)
-    idx = x.gravity_axis
-    nsource, nlast, nimage = x._create_boundary_indices()
-
-    s = x.apply(variables.cell_vars)
-
-    print(s)
+    print(variables.cell_vars[..., VI.RHO])
+    x.apply(variables.cell_vars)
+    print(variables.cell_vars[..., VI.RHO])
 
 
-
-
-
+if __name__ == "__main__":
+    example_usage()
