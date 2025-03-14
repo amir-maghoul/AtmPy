@@ -51,8 +51,24 @@ class FluxReconstructions(Enum):
     PIECEWISE_CONSTANT = "piecewise_constant"
     MUSCL = "muscl"
 
-class BoundaryConditions(Enum):
-    """Map name to function for the boundary condition"""
 
-    REFLECTIVE = "reflective"
+class BoundaryConditions(Enum):
+    """Map name to class for boundary conditions."""
+
+    SLIP_WALL = "slip_wall"
+    INFLOW = "inflow"
+    OUTFLOW = "outflow"
+    NON_REFLECTIVE_OUTLET = "non_reflective_outlet"
     PERIODIC = "periodic"
+    ReflectiveGravity = "gravity_reflective_boundary"
+
+
+class BoundarySide(Enum):
+    """Map name to boundary direction."""
+
+    LEFT = "left"
+    RIGHT = "right"
+    TOP = "top"
+    BOTTOM = "bottom"
+    FRONT = "front"
+    BACK = "back"

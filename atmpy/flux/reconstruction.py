@@ -1,4 +1,4 @@
-""" This module is responsible for creating the left and right state to pass to the riemann solver."""
+"""This module is responsible for creating the left and right state to pass to the riemann solver."""
 
 import numpy as np
 from typing import Callable, List
@@ -10,7 +10,10 @@ from atmpy.flux.reconstruction_utility import (
     calculate_slopes,
     calculate_variable_differences,
 )
-from atmpy.data.enums import PrimitiveVariableIndices as PVI, VariableIndices as VI
+from atmpy.infrastructure.enums import (
+    PrimitiveVariableIndices as PVI,
+    VariableIndices as VI,
+)
 
 
 def modified_muscl(

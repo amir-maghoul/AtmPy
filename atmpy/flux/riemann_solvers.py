@@ -1,6 +1,9 @@
 from typing import Tuple, List
 import numpy as np
-from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
+from atmpy.infrastructure.enums import (
+    VariableIndices as VI,
+    PrimitiveVariableIndices as PVI,
+)
 from atmpy.flux.utility import directional_indices
 
 
@@ -50,17 +53,17 @@ def modified_hll(
 
     # Compute the ADVECTING flux: Pu/Theta = rho*Theta*u/Theta = rho*u
     left_factor = (
-        Pu[directional_inner_idx] * upl[left_idx] / left_state[..., PVI.Y][left_idx]
+        Pu[directional_inner_idx] * upl[left_idx] / left_state[left_idx + (PVI.Y,)]
     )
     right_factor = (
-        Pu[directional_inner_idx] * upr[right_idx] / right_state[..., PVI.Y][right_idx]
+        Pu[directional_inner_idx] * upr[right_idx] / right_state[right_idx + (PVI.Y,)]
     )
 
     # Compute the ADVECTED values
-    flux[direction][..., VI.RHO][directional_inner_idx] = left_factor + right_factor
-    flux[direction][..., 1:][directional_inner_idx] = (
-        left_factor[..., np.newaxis] * left_state[..., 1:][left_idx]
-        + right_factor[..., np.newaxis] * right_state[..., 1:][right_idx]
+    flux[direction][directional_inner_idx + (VI.RHO,)] = left_factor + right_factor
+    flux[direction][directional_inner_idx + (slice(1, None),)] = (
+        left_factor[..., np.newaxis] * left_state[left_idx + (slice(1, None),)]
+        + right_factor[..., np.newaxis] * right_state[right_idx + (slice(1, None),)]
     )
 
 

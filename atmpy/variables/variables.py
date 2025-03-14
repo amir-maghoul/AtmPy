@@ -1,6 +1,9 @@
 from abc import abstractmethod
 import numpy as np
-from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
+from atmpy.infrastructure.enums import (
+    VariableIndices as VI,
+    PrimitiveVariableIndices as PVI,
+)
 from atmpy.grid.utility import DimensionSpec, create_grid
 from atmpy.physics import eos
 from atmpy.physics.eos import IdealGasEOS, BarotropicEOS, ExnerBasedEOS
@@ -26,7 +29,7 @@ class Variables:
     num_vars_node : int
         Number of node-based variables.
     ndim : int
-        Number of spatial dimensions.
+        Number of spatial ndim.
     """
 
     def __init__(self, grid, num_vars_cell: int, num_vars_node: int = 1):
@@ -45,10 +48,10 @@ class Variables:
         self.grid = grid
         self.num_vars_cell = num_vars_cell
         self.num_vars_node = num_vars_node
-        self.ndim = grid.dimensions
+        self.ndim = grid.ndim
 
         if self.ndim not in [1, 2, 3]:
-            raise ValueError("Number of dimensions not supported.")
+            raise ValueError("Number of ndim not supported.")
 
         # Initialize cell-centered variables
         if self.num_vars_cell is not None and self.num_vars_cell >= 4:
@@ -158,7 +161,9 @@ class Variables:
         ndim = self.ndim
 
         if isinstance(eos, IdealGasEOS):
-            raise NotImplementedError("IdealGasEOS not yet supported for primitives: No way to calculate the energy")
+            raise NotImplementedError(
+                "IdealGasEOS not yet supported for primitives: No way to calculate the energy"
+            )
         elif isinstance(eos, BarotropicEOS):
             args = self.cell_vars[..., VI.RHO]
         elif isinstance(eos, ExnerBasedEOS):
@@ -177,7 +182,7 @@ class Variables:
             self.primitives[..., PVI.W] = self.cell_vars[..., VI.RHOW] / rho
 
         elif ndim > 3 or ndim < 1:
-            raise ValueError("Unsupported number of dimensions.")
+            raise ValueError("Unsupported number of ndim.")
 
     # -------------------
     # Node-Based Methods
@@ -198,7 +203,7 @@ class Variables:
             self.cell_vars[..., VI.RHOV] = rho * self.primitives[..., PVI.V]
             self.cell_vars[..., VI.RHOW] = rho * self.primitives[..., PVI.W]
         elif ndim > 3 or ndim < 1:
-            raise ValueError("Unsupported number of dimensions.")
+            raise ValueError("Unsupported number of ndim.")
 
     def get_node_vars(self):
         """

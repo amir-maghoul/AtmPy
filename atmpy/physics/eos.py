@@ -1,5 +1,6 @@
-""" Module for the definition of the equation of state. Any different and general forms of eos
-must be implemented here as a class and then passed to the riemann solvers in the flux. """
+"""Module for the definition of the equation of state. Any different and general forms of eos
+must be implemented here as a class and then passed to the riemann solvers in the flux.
+"""
 
 from abc import ABC, abstractmethod
 import numpy as np
@@ -31,7 +32,7 @@ class IdealGasEOS(EOS):
     def __init__(self, gamma: float = 1.4):
         self.gamma = gamma
 
-    def pressure(self,*args, **kwargs):
+    def pressure(self, *args, **kwargs):
         rho = args[0]
         e = args[1]
         return (self.gamma - 1.0) * rho * e
@@ -95,7 +96,9 @@ class ExnerBasedEOS(EOS):
           (In reality, you might pass both or keep separate methods.)
         """
         P = args[0]
-        pressure = args[1] # Boolean whether the pressure is given or the exner pressure
+        pressure = args[
+            1
+        ]  # Boolean whether the pressure is given or the exner pressure
         if pressure:
             return P_to_pressure_numba(P, self.p_ref, self.cp, self.cv)
         else:

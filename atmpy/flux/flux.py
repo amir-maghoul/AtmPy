@@ -4,9 +4,16 @@ from atmpy.flux.utility import create_averaging_kernels
 from atmpy.grid.kgrid import Grid
 from atmpy.variables.variables import Variables
 from atmpy.physics.eos import EOS
-from atmpy.data.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
-from atmpy.data.enums import SlopeLimiters, RiemannSolvers, FluxReconstructions
-from atmpy.data._factory import (
+from atmpy.infrastructure.enums import (
+    VariableIndices as VI,
+    PrimitiveVariableIndices as PVI,
+)
+from atmpy.infrastructure.enums import (
+    SlopeLimiters,
+    RiemannSolvers,
+    FluxReconstructions,
+)
+from atmpy.infrastructure.factory import (
     get_riemann_solver,
     get_reconstruction_method,
     get_slope_limiter,
@@ -85,7 +92,7 @@ class Flux:
         self.riemann_solver = get_riemann_solver(solver)
         self.reconstruction = get_reconstruction_method(reconstruction)
         self.limiter = get_slope_limiter(limiter)
-        self.ndim = self.grid.dimensions
+        self.ndim = self.grid.ndim
         self.kernels = create_averaging_kernels(self.ndim)  # [kernel_x, kernel_y, ...]
 
         self.iflux = {"x": None, "y": None, "z": None}
@@ -196,7 +203,7 @@ class Flux:
         But in reality the first and last entries in the direction of the flux calculation is not needed.
         """
 
-        unphysical_fluxes = self._compute_unphysical_fluxes()  # [Pu, Pv, ...]
+        unphysical_fluxes = self._compute_unphysical_fluxes()  # [Pu, Pv, [Pw]]
         directions = [
             "x",
             "y",
@@ -209,7 +216,7 @@ class Flux:
         ):
             self.iflux[direction] = sp.signal.fftconvolve(flux, kernel, mode=mode)
             _, _, _, inner_index = directional_indices(self.ndim, direction, full=False)
-            self.flux[direction][..., VI.RHOY][inner_index] = self.iflux[direction]
+            self.flux[direction][inner_index + (VI.RHOY,)] = self.iflux[direction]
 
     def apply_reconstruction(
         self, lmbda: float, direction: str
@@ -221,7 +228,7 @@ class Flux:
         ----------
         direction : str
             The direction of the flux calculation.
-        lambda : float
+        lmbda : float
             The ratio of delta_t to delta_x.
         """
         # Initialize variable objects
@@ -254,10 +261,8 @@ class Flux:
         Pu = velocity * cell_vars[..., VI.RHOY]
 
         # Calculate the P = rho*Theta by averaging and advecting
-        lefts.cell_vars[..., VI.RHOY][lefts_idx] = rights.cell_vars[..., VI.RHOY][
-            rights_idx
-        ] = 0.5 * (
-            (cell_vars[..., VI.RHOY][lefts_idx] + cell_vars[..., VI.RHOY][rights_idx])
+        lefts.cell_vars[lefts_idx + (VI.RHOY,)] = rights.cell_vars[rights_idx + (VI.RHOY,)]= 0.5 * (
+            (cell_vars[lefts_idx + (VI.RHOY,)] + cell_vars[rights_idx + (VI.RHOY,)])
             - lmbda * (Pu[lefts_idx] + Pu[rights_idx])
         )
 
@@ -287,6 +292,10 @@ class Flux:
         )
 
 
+from line_profiler import profile
+
+
+@profile
 def main():
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.physics.eos import ExnerBasedEOS
@@ -295,12 +304,19 @@ def main():
 
     dt = 0.1
 
-    dim = [DimensionSpec(1, 0, 2, 2), DimensionSpec(2, 0, 2, 2)]
+    nx = 1
+    ngx = 2
+    nnx = nx + 2 * ngx
+    ny = 2
+    ngy = 2
+    nny = ny + 2 * ngy
+
+    dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
     grid = create_grid(dim)
     rng = np.random.default_rng()
-    arr = np.arange(30)
+    arr = np.arange(nnx * nny)
     rng.shuffle(arr)
-    array = arr.reshape(5, 6)
+    array = arr.reshape(nnx, nny)
 
     variables = Variables(grid, 5, 1)
     variables.cell_vars[..., VI.RHO] = 1
@@ -308,7 +324,7 @@ def main():
     variables.cell_vars[..., VI.RHOY] = 2
 
     rng.shuffle(arr)
-    array = arr.reshape(5, 6)
+    array = arr.reshape(nnx, nny)
     variables.cell_vars[..., VI.RHOV] = array
     eos = ExnerBasedEOS()
     flux = Flux(grid, variables, eos, dt)
@@ -326,7 +342,9 @@ def main():
     direction = "x"
     diffs = calculate_variable_differences(primitives, 2, direction_str=direction)
     slopes = calculate_slopes(diffs, direction, flux.limiter, 2)
-    amplitudes = calculate_amplitudes(slopes, np.arange(30).reshape(5, 6), 1, True)
+    amplitudes = calculate_amplitudes(
+        slopes, np.arange(nnx * nny).reshape(nnx, nny), 1, True
+    )
 
     lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
         2, direction

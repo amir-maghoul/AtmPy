@@ -8,11 +8,14 @@ from atmpy.flux.reconstruction_utility import (
 import numpy as np
 from atmpy.flux.utility import direction_mapping, directional_indices
 
+
 # Dummy PVI with attribute Y. In the production code PVI.Y is used as an index.
 class DummyPVI:
     Y = 2
 
+
 PVI = DummyPVI()
+
 
 # --- Test for calculate_variable_differences ---
 def test_calculate_variable_differences_1d():
@@ -25,7 +28,7 @@ def test_calculate_variable_differences_1d():
         and variable index 2 uses np.diff along axis 0.
     """
     # Create a small primitives array (4 points, 3 variables)
-    primitives = np.random.rand(4, 3)*10
+    primitives = np.random.rand(4, 3) * 10
     ndim = 1
     direction_str = "x"
 
@@ -37,31 +40,30 @@ def test_calculate_variable_differences_1d():
     np.testing.assert_array_almost_equal(
         diffs[:-1, :2],
         expected_first,
-        err_msg="Differences for variable 0 do not match expected values."
+        err_msg="Differences for variable 0 do not match expected values.",
     )
     # Check variable 1:
     np.testing.assert_array_almost_equal(
         diffs[:-1, 2],
         expected_y,
-        err_msg="Differences for variable at PVI.Y do not match expected values."
+        err_msg="Differences for variable at PVI.Y do not match expected values.",
     )
     # Check variable 2:
     np.testing.assert_array_almost_equal(
         diffs[:-1, 3:],
         expected_rest,
-        err_msg="Differences for variable after PVI.Y do not match expected values."
+        err_msg="Differences for variable after PVI.Y do not match expected values.",
     )
     # The last row should not have been updated and remain zeros.
     np.testing.assert_array_equal(
-        diffs[-1],
-        np.zeros(3),
-        err_msg="The last row of differences should be zeros."
+        diffs[-1], np.zeros(3), err_msg="The last row of differences should be zeros."
     )
     assert np.all(diffs[-1, :] == 0)
 
+
 def test_calculate_variable_differences_2d():
     # Create a small 2D primitives array (4x5 grid, 3 variables)
-    primitives = np.random.rand(4, 3, 5)*10
+    primitives = np.random.rand(4, 3, 5) * 10
     ndim = 2
     direction_str = "x"
     diffs = calculate_variable_differences(primitives, ndim, direction_str)
@@ -74,21 +76,21 @@ def test_calculate_variable_differences_2d():
     np.testing.assert_array_almost_equal(
         diffs[:-1, :, :2],
         expected_first,
-        err_msg="Differences for variables 0 and 1 do not match expected values."
+        err_msg="Differences for variables 0 and 1 do not match expected values.",
     )
 
     # Check variable 2:
     np.testing.assert_array_almost_equal(
         diffs[:-1, :, 2],
         expected_y,
-        err_msg="Differences for variable at PVI.Y do not match expected values."
+        err_msg="Differences for variable at PVI.Y do not match expected values.",
     )
 
     # Check variables after PVI.Y:
     np.testing.assert_array_almost_equal(
         diffs[:-1, :, 3:],
         expected_rest,
-        err_msg="Differences for variables after PVI.Y do not match expected values."
+        err_msg="Differences for variables after PVI.Y do not match expected values.",
     )
     assert np.all(diffs[-1, :, :] == 0)
 
@@ -103,21 +105,21 @@ def test_calculate_variable_differences_2d():
     np.testing.assert_array_almost_equal(
         diffs[:, :-1, :2],
         expected_first,
-        err_msg="Differences for variables 0 and 1 do not match expected values."
+        err_msg="Differences for variables 0 and 1 do not match expected values.",
     )
 
     # Check variable 2:
     np.testing.assert_array_almost_equal(
         diffs[:, :-1, 2],
         expected_y,
-        err_msg="Differences for variable at PVI.Y do not match expected values."
+        err_msg="Differences for variable at PVI.Y do not match expected values.",
     )
 
     # Check variables after PVI.Y:
     np.testing.assert_array_almost_equal(
         diffs[:, :-1, 3:],
         expected_rest,
-        err_msg="Differences for variables after PVI.Y do not match expected values."
+        err_msg="Differences for variables after PVI.Y do not match expected values.",
     )
 
     assert np.all(diffs[:, -1, :] == 0)
@@ -138,24 +140,23 @@ def test_calculate_variable_differences_3d():
     np.testing.assert_array_almost_equal(
         diffs[:, :, :-1, :2],
         expected_first,
-        err_msg="Differences for variables 0 and 1 do not match expected values."
+        err_msg="Differences for variables 0 and 1 do not match expected values.",
     )
 
     # Check variable 2:
     np.testing.assert_array_almost_equal(
         diffs[:, :, :-1, 2],
         expected_y,
-        err_msg="Differences for variable at PVI.Y do not match expected values."
+        err_msg="Differences for variable at PVI.Y do not match expected values.",
     )
 
     # Check variables after PVI.Y:
     np.testing.assert_array_almost_equal(
         diffs[:, :, :-1, 3:],
         expected_rest,
-        err_msg="Differences for variables after PVI.Y do not match expected values."
+        err_msg="Differences for variables after PVI.Y do not match expected values.",
     )
     assert np.all(diffs[:, :, -1, :] == 0)
-
 
 
 # --- Test for calculate_slopes ---
@@ -168,7 +169,7 @@ def dummy_limiter(left: np.ndarray, right: np.ndarray) -> np.ndarray:
 
 def test_calculate_slopes_1d():
     # Create a sample diffs array with shape (4, 3)
-    diffs = np.random.rand(4, 3)*10
+    diffs = np.random.rand(4, 3) * 10
     ndim = 1
     direction_str = "x"
 
@@ -182,10 +183,9 @@ def test_calculate_slopes_1d():
     expected[1:-1] = limited
 
     np.testing.assert_array_almost_equal(
-        limited_slopes,
-        expected,
-        err_msg="Limited slopes do not match expected values."
+        limited_slopes, expected, err_msg="Limited slopes do not match expected values."
     )
+
 
 import numpy as np
 
@@ -210,7 +210,7 @@ def test_calculate_slopes_2d():
     np.testing.assert_array_almost_equal(
         limited_slopes,
         expected,
-        err_msg="Limited slopes do not match expected values for 2D."
+        err_msg="Limited slopes do not match expected values for 2D.",
     )
 
     direction_str = "y"
@@ -228,7 +228,7 @@ def test_calculate_slopes_2d():
     np.testing.assert_array_almost_equal(
         limited_slopes,
         expected,
-        err_msg="Limited slopes do not match expected values for 2D."
+        err_msg="Limited slopes do not match expected values for 2D.",
     )
 
 
@@ -241,7 +241,9 @@ def test_calculate_slopes_3d():
     limited_slopes = calculate_slopes(diffs, direction_str, dummy_limiter, ndim)
 
     # Assuming the limiter operates along x, y, and z directions
-    left_variable_slopes = diffs[:, :, :-2, :]  # Exclude the last indices in each dimension
+    left_variable_slopes = diffs[
+        :, :, :-2, :
+    ]  # Exclude the last indices in each dimension
     right_variable_slopes = diffs[:, :, 1:-1, :]  # Shifted by one in all directions
     limited = dummy_limiter(left_variable_slopes, right_variable_slopes)
 
@@ -252,13 +254,14 @@ def test_calculate_slopes_3d():
     np.testing.assert_array_almost_equal(
         limited_slopes,
         expected,
-        err_msg="Limited slopes do not match expected values for 3D."
+        err_msg="Limited slopes do not match expected values for 3D.",
     )
+
 
 # --- Test for calculate_amplitudes ---
 def test_calculate_amplitudes_1d():
     # Create sample slopes array of shape (4, 3)
-    slopes = np.random.rand(4, 3)*10
+    slopes = np.random.rand(4, 3) * 10
     # Create sample speed array of shape (4,)
     speed = np.array([0.5, 1.0, 1.5, 2.0])
     lmbda = 0.1
@@ -269,7 +272,7 @@ def test_calculate_amplitudes_1d():
     np.testing.assert_array_almost_equal(
         amplitudes_left,
         expected_left,
-        err_msg="Left state amplitudes do not match expected values."
+        err_msg="Left state amplitudes do not match expected values.",
     )
 
     # Test for right state (left=False, sign should be 1)
@@ -278,8 +281,9 @@ def test_calculate_amplitudes_1d():
     np.testing.assert_array_almost_equal(
         amplitudes_right,
         expected_right,
-        err_msg="Right state amplitudes do not match expected values."
+        err_msg="Right state amplitudes do not match expected values.",
     )
+
 
 def test_calculate_amplitudes_2d():
     # Create sample slopes array of shape (4, 3, 2)
@@ -294,7 +298,7 @@ def test_calculate_amplitudes_2d():
     np.testing.assert_array_almost_equal(
         amplitudes_left,
         expected_left,
-        err_msg="Left state amplitudes (2D) do not match expected values."
+        err_msg="Left state amplitudes (2D) do not match expected values.",
     )
 
     # Test for right state (left=False, sign should be 1)
@@ -303,7 +307,7 @@ def test_calculate_amplitudes_2d():
     np.testing.assert_array_almost_equal(
         amplitudes_right,
         expected_right,
-        err_msg="Right state amplitudes (2D) do not match expected values."
+        err_msg="Right state amplitudes (2D) do not match expected values.",
     )
 
 
@@ -322,7 +326,7 @@ def test_calculate_amplitudes_3d():
     np.testing.assert_array_almost_equal(
         amplitudes_left,
         expected_left,
-        err_msg="Left state amplitudes (3D) do not match expected values."
+        err_msg="Left state amplitudes (3D) do not match expected values.",
     )
 
     # Test for right state (left=False, sign should be 1)
@@ -331,6 +335,5 @@ def test_calculate_amplitudes_3d():
     np.testing.assert_array_almost_equal(
         amplitudes_right,
         expected_right,
-        err_msg="Right state amplitudes (3D) do not match expected values."
+        err_msg="Right state amplitudes (3D) do not match expected values.",
     )
-
