@@ -55,20 +55,21 @@ class FluxReconstructions(Enum):
 class BoundaryConditions(Enum):
     """Map name to class for boundary conditions."""
 
+    ABSTRACT = "abstract"
     SLIP_WALL = "slip_wall"
     INFLOW = "inflow"
     OUTFLOW = "outflow"
     NON_REFLECTIVE_OUTLET = "non_reflective_outlet"
     PERIODIC = "periodic"
-    ReflectiveGravity = "gravity_reflective_boundary"
+    REFLECTIVE_GRAVITY = "gravity_reflective_boundary"
 
 
 class BoundarySide(Enum):
     """Map name to boundary direction."""
 
-    LEFT = "left"
-    RIGHT = "right"
-    TOP = "top"
-    BOTTOM = "bottom"
-    FRONT = "front"
-    BACK = "back"
+    LEFT = "left"           # Beginning of array in x-axis
+    RIGHT = "right"         # End of the array in x-axis
+    BOTTOM = "bottom"       # Beginning of the array in y-axis
+    TOP = "top"             # End of the array in y-axis
+    FRONT = "front"         # Beginning of the array in z-axis
+    BACK = "back"           # End of the array in z-axis

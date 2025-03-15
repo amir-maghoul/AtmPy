@@ -72,6 +72,20 @@ class BoundaryConditions:
         }
     )
 
+@dataclass
+class BoundaryConditionsData:
+# Here we use a dict with keys from BoundarySide.
+    conditions: Dict[Any, BoundaryConditionStructure] = field(
+        default_factory=lambda: {
+            'LEFT': BoundaryConditionStructure(type="INFLOW", params={"inflow_value": 1.0}),
+            'RIGHT': BoundaryConditionStructure(type="OUTFLOW", params={"outflow_value": 0.0}),
+            'TOP': BoundaryConditionStructure(type="SLIP_WALL", params={"wall_coeff": 0.5}),
+            'BOTTOM':BoundaryConditionStructure(type="SLIP_WALL", params={"wall_coeff": 0.5}),
+            'FRONT': BoundaryConditionStructure(type="PERIODIC", params={}),
+            'BACK': BoundaryConditionStructure(type="PERIODIC", params={}),
+        }
+    )
+
 
 @dataclass
 class Temporal:

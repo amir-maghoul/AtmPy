@@ -9,7 +9,15 @@ from atmpy.infrastructure.enums import VariableIndices as VI
 from atmpy.infrastructure.enums import BoundarySide
 from atmpy.flux.utility import direction_mapping
 from atmpy.physics.thermodynamics import Thermodynamics
+from atmpy.infrastructure.enums import BoundaryConditions as BdryType
 
+
+class KwargsTypes(TypedDict):
+    """Constructor class for dictionary typing of kwargs"""
+
+    direction: str
+    grid: Grid
+    side: str
 
 class BaseBoundaryCondition(ABC):
     """Abstract base class for all boundary conditions.
@@ -17,7 +25,7 @@ class BaseBoundaryCondition(ABC):
     Attributes
     ----------
     params : dict
-        The dictionary of all parameters. It must at least contain the key "direction", "inner_slice", side and ng.
+        The dictionary of all parameters. It must at least contain the key "direction", "inner_slice", "side" and "ng".
     direction : int
         The direction of the boundary condition.
     side : BoundarySide
@@ -37,12 +45,6 @@ class BaseBoundaryCondition(ABC):
     the "inner_slice" key of the params is the tuple of all inner slices in all directions.
     """
 
-    class KwargsTypes(TypedDict):
-        """Constructor class for dictionary typing of kwargs"""
-
-        direction: str
-        grid: Grid
-
     def __init__(self, **kwargs: Unpack[KwargsTypes]) -> None:
 
         self.direction: int = direction_mapping(kwargs["direction"])
@@ -55,6 +57,8 @@ class BaseBoundaryCondition(ABC):
         self.directional_inner_slice: Tuple[slice, ...] = (
             self._create_directional_inner_slice()
         )
+        self.type: BdryType = BdryType.ABSTRACT
+        self.side = kwargs["side"]
 
     @abstractmethod
     def apply(self, cell_vars, *args, **kwargs):
@@ -83,6 +87,10 @@ class BaseBoundaryCondition(ABC):
 
 
 class PeriodicBoundary(BaseBoundaryCondition):
+    def __init__(self, **kwargs: Unpack[KwargsTypes]):
+        super().__init__(**kwargs)
+        self.type = BdryType.PERIODIC
+
     def apply(self, cell_vars: np.ndarray, *args, **kwargs):
         """Apply periodic boundary condition to the cell_vars.
 
@@ -111,8 +119,8 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         The axis in which the gravity affects the boundary.
     stratification: Callable
         The given stratification function
-    side: str
-        The signifier of which side we are working on. The valid values are "bottom" and "top".
+    facet: str
+        The signifier of which side of the gravity axis is considered. The valid values are "bottom" and "top".
         They don't mean anything in themselves. "bottom" is a signifier for the beginning of the array
         in the given axis. "top" is a signifier for the end of the array in the given axis.
     is_lamb: bool
@@ -133,6 +141,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
 
     def __init__(self, **kwargs: Unpack[KwargsType]) -> None:
         super().__init__(**kwargs)
+        self.type = BdryType.REFLECTIVE_GRAVITY
         self.th: Thermodynamics = kwargs["thermodynamics"]
         self.gravity: Union[List[float], np.ndarray] = kwargs["gravity"]
         if len(np.nonzero(self.gravity)[0]) > 1:
@@ -147,9 +156,9 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
                 "The first axis is reserved for horizontal velocity. It cannot have gravity."
             )
         self.stratification: Callable[[Any], Any] = kwargs["stratification"]
-        self.side: str = kwargs["side"]
-        if self.side not in ["top", "bottom"]:
-            raise ValueError("Side must be either 'top' or 'bottom'.")
+        self.facet: str = self._find_facet()
+        if self.facet not in ["top", "bottom"]:
+            raise ValueError("Facet must be either 'top' or 'bottom'.")
         self.is_lamb: bool = kwargs["is_lamb"]
         self.is_compressible: bool = kwargs["is_compressible"]
 
@@ -173,7 +182,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         )
 
         # sign to calculate the derivative of Pi. -1 if on the topside boundary and 1 if on the downside
-        sign = -1 if self.side == "top" else 1
+        sign = -1 if self.facet == "top" else 1
         dr = self.grid.dxyz[
             self.gravity_axis
         ]  # discretization fineness in the gravity direction
@@ -279,13 +288,13 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         ng_tuple: Tuple[int, ...] = self.grid.ng[self.direction]
         N: int = self.grid.nc_total[self.direction]
 
-        if self.side == "bottom":
+        if self.facet == "bottom":
             ng = ng_tuple[0]
             ng_arange = np.arange(ng)
             image = ng - 1 - ng_arange  # ghost cells indices (will be updated)
             last = ng - ng_arange  # adjacent inner/ghost cell index
             source = ng + ng_arange  # inner cells moving inward
-        elif self.side == "top":
+        elif self.facet == "top":
             ng = ng_tuple[1]
             ng_arange = np.arange(ng)
             image = N - ng + ng_arange  # ghost cell indices at upper boundary
@@ -304,6 +313,16 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         nsource[self.gravity_axis] = source
 
         return tuple(nsource), tuple(nlast), tuple(nimage)
+
+    def _find_facet(self):
+        """ Find which end of the array is the gravity being applied on"""
+        if self.side == BoundarySide.TOP or self.side == BoundarySide.BACK:
+            return "top"
+        elif self.side == BoundarySide.BOTTOM or self.side == BoundarySide.FRONT:
+            return "bottom"
+        else:
+            raise ValueError("'Left' and 'Right' are not valid side for gravity axis.")
+
 
 
 class SlipWall(BaseBoundaryCondition):
@@ -373,9 +392,9 @@ def example_usage():
     params = {
         "direction": "y",
         "grid": grid,
+        "side": BoundarySide.BOTTOM,
         "gravity": gravity,
         "stratification": lambda x: x**2,
-        "side": "top",
         "thermodynamics": th,
         "is_lamb": False,
         "is_compressible": True,

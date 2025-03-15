@@ -261,7 +261,9 @@ class Flux:
         Pu = velocity * cell_vars[..., VI.RHOY]
 
         # Calculate the P = rho*Theta by averaging and advecting
-        lefts.cell_vars[lefts_idx + (VI.RHOY,)] = rights.cell_vars[rights_idx + (VI.RHOY,)]= 0.5 * (
+        lefts.cell_vars[lefts_idx + (VI.RHOY,)] = rights.cell_vars[
+            rights_idx + (VI.RHOY,)
+        ] = 0.5 * (
             (cell_vars[lefts_idx + (VI.RHOY,)] + cell_vars[rights_idx + (VI.RHOY,)])
             - lmbda * (Pu[lefts_idx] + Pu[rights_idx])
         )

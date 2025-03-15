@@ -15,6 +15,8 @@ from atmpy.infrastructure.registries import (
     BOUNDARY_CONDITIONS,
 )
 
+from atmpy.boundary_conditions.boundary_conditions import BaseBoundaryCondition
+
 
 def get_slope_limiter(name: SlopeLimiters) -> callable:
     """
@@ -75,7 +77,9 @@ def get_reconstruction_method(name: FluxReconstructions) -> callable:
         raise ValueError(f"Unknown reconstruction method: {name}")
 
 
-def get_boundary_conditions(name: BoundaryConditions, **params) -> object:
+def get_boundary_conditions(
+    name: BoundaryConditions, **params
+) -> BaseBoundaryCondition:
     """
     Retrieves the boundary condition class based on the provided enum member.
 
@@ -88,11 +92,13 @@ def get_boundary_conditions(name: BoundaryConditions, **params) -> object:
 
     Returns
     -------
-    BoundaryCondition: The corresponding boundary condition class.
+    BaseBoundaryCondition: The corresponding boundary condition class.
 
     """
-    try:
-        boundary_condition_class = BOUNDARY_CONDITIONS[name]
-        return boundary_condition_class(**params)
-    except KeyError:
-        raise ValueError(f"Unknown boundary conditions: {name}")
+    # try:
+    #     boundary_condition_class = BOUNDARY_CONDITIONS[name]
+    #     return boundary_condition_class(**params)
+    # except KeyError:
+    #     raise ValueError(f"Unknown boundary conditions: {name}")
+    boundary_condition_class = BOUNDARY_CONDITIONS[name]
+    return boundary_condition_class(**params)

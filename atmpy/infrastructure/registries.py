@@ -38,5 +38,5 @@ BOUNDARY_CONDITIONS = {
     BoundaryConditions.OUTFLOW: OutflowBoundary,
     BoundaryConditions.NON_REFLECTIVE_OUTLET: NonReflectiveOutlet,
     BoundaryConditions.PERIODIC: PeriodicBoundary,
-    BoundaryConditions.ReflectiveGravity: ReflectiveGravityBoundary,
+    BoundaryConditions.REFLECTIVE_GRAVITY: ReflectiveGravityBoundary,
 }
