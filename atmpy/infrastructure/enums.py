@@ -24,6 +24,17 @@ class PrimitiveVariableIndices(IntEnum):
     V = 4  # Horizontal Velocity y-component
     W = 5  # Vertical Velocity
 
+class HydrostateIndices(IntEnum):
+    """Create constants for variable indices in the variable container (ndarray) for better readability"""
+
+    # Indices of Multiple Pressure Variables
+    P0 = 0
+    P2_0 = 1
+    RHO0 = 2
+    RHOY0 = 3
+    Y0 = 4
+    S0 = 5
+
 
 class SlopeLimiters(Enum):
     """Map name to function for the slope limiter"""
