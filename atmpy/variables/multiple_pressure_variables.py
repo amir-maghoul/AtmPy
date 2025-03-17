@@ -7,7 +7,10 @@ from atmpy.grid.kgrid import Grid
 from atmpy.grid.utility import DimensionSpec, create_grid
 from atmpy.infrastructure.enums import HydrostateIndices as HI
 from atmpy.variables.variables import Variables
+from atmpy.physics.thermodynamics import Thermodynamics
 import scipy as sp
+from physics.thermodynamics import Thermodynamics
+
 
 class MPV:
     """ Container for 'Multiple Pressure Variables'
@@ -111,3 +114,83 @@ class MPV:
         tile_shape = list(self.grid.cshape)
         tile_shape[self.direction] = 1
         return tile_shape
+
+
+    def state(self, gravity_strength, Msq):
+        """ Computes the initial values for the multiple pressure variables
+
+        Parameters
+        ----------
+        gravity_strength : np.ndarray or List of shape (3,)
+            the array of gravity strengths in each direction
+
+        Msq : float
+            Mach number squared
+        """
+        thermo = Thermodynamics()
+        g = gravity_strength[self.direction]
+
+        if g != 0.0:
+            Gamma = thermo.Gamma
+            Hex = 1.0 / (Gamma * g)
+            dr = self.grid.dxyz[self.direction]
+            nodes = self.grid.get_node_coordinates(self.direction)
+            cells = self.grid.get_cell_coordinates(self.direction)
+
+            pi_np = np.exp(-(nodes + 0.5 * dr) / Hex)
+            pi_nm = np.exp(-(nodes - 0.5 * dr) / Hex)
+            pi_n = np.exp(-(nodes) / Hex)
+
+            Y_n = - Gamma * g * dr / (pi_np - pi_nm)
+            P_n = pi_n**thermo.gm1inv
+            p_n = pi_n**thermo.Gammainv
+            rho_n = P_n / Y_n
+
+            self.hydrostate.node_vars[..., HI.P2_0] = pi_n / Msq
+            self.hydrostate.node_vars[..., HI.P0] = p_n
+            self.hydrostate.node_vars[..., HI.RHO0] = rho_n
+            self.hydrostate.node_vars[..., HI.RHOY0] = P_n
+            self.hydrostate.node_vars[..., HI.Y0] = Y_n
+            self.hydrostate.node_vars[..., HI.S0] = 1.0 / Y_n
+
+            pi_cp = np.exp(-(cells + 0.5 * dr) / Hex)
+            pi_cm = np.exp(-(cells - 0.5 * dr) / Hex)
+            pi_c  = np.exp(-(cells) / Hex)
+
+            Y_c = - Gamma * g * dr / (pi_cp - pi_cm)
+            P_c = pi_c**thermo.gm1inv
+            p_c = pi_c**thermo.Gammainv
+            rho_c = P_c / Y_c
+
+            self.hydrostate.cell_vars[..., HI.P2_0] = pi_c / Msq
+            self.hydrostate.cell_vars[..., HI.P0] = p_c
+            self.hydrostate.cell_vars[..., HI.RHO0] = rho_c
+            self.hydrostate.cell_vars[..., HI.RHOY0] = P_c
+            self.hydrostate.cell_vars[..., HI.Y0] = Y_c
+            self.hydrostate.cell_vars[..., HI.S0] = 1.0 / Y_c
+
+        else:
+            # In absence of gravity, we set every pressure to 1.
+            self.hydrostate.cell_vars[...] = 1.0
+            self.hydrostate.node_vars[...] = 1.0
+
+if __name__ == '__main__':
+    dt = 0.1
+
+    nx = 1
+    ngx = 2
+    nnx = nx + 2 * ngx
+    ny = 2
+    ngy = 2
+    nny = ny + 2 * ngy
+
+    dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
+    grid = create_grid(dim)
+    rng = np.random.default_rng()
+    arr = np.arange(nnx * nny)
+    rng.shuffle(arr)
+
+    mvp = MPV(grid)
+
+    mvp.state([0, 1, 0], 1.)
+    print(mvp.hydrostate.cell_vars[...])
