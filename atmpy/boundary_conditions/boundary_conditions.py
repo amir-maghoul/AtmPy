@@ -175,7 +175,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         Y_last = cell_vars[nlast + (VI.RHOY,)] / cell_vars[nlast + (VI.RHO,)]
 
         # get the coordinate values of the grid in the direction of gravity
-        axis_coordinate_cells = self.grid.get_coordinates(self.gravity_axis)
+        axis_coordinate_cells = self.grid.get_cell_coordinates(self.gravity_axis)
 
         # calculate the stratification function on the ghost cells
         strat = 1.0 / self.stratification(

@@ -64,10 +64,6 @@ class Grid:
         Coordinate array of nodes in y-direction
     z_nodes : np.ndarray, optional
         Coordinate array of nodes in z-direction
-    cell_mesh : Tuple[np.ndarray, ...]
-        the meshgrid created from the cell centers according to the dimension
-    node_mesh : Tuple[np.ndarray, ...]
-        the meshgrid created from the nodes according to the dimension
     grid_type : str, default="cartesian"
         the grid type
     ng : List[Tuple[int, int]]
@@ -274,40 +270,25 @@ class Grid:
                 "Cannot have mixed of None and not None values for parameters of the ndim."
             )
 
-    @property
-    def cell_mesh(self):
-        """Create a mesh using the dimension and cell coordinates"""
-
-        if self.ndim == 1:
-            return (self.x_cells,)
-        elif self.ndim == 2:
-            return np.meshgrid(self.x_cells, self.y_cells, indexing="ij")
-        elif self.ndim == 3:
-            return np.meshgrid(
-                self.x_cells,
-                self.y_cells,
-                self.z_cells,
-                indexing="ij",
-            )
-
-    @property
-    def node_mesh(self):
-        """Create a mesh using the dimension and node coordinates"""
-        if self.ndim == 1:
-            return (self.x_nodes,)
-        elif self.ndim == 2:
-            return np.meshgrid(self.x_nodes, self.y_nodes, indexing="ij")
-        elif self.ndim == 3:
-            return np.meshgrid(self.x_nodes, self.y_nodes, self.z_nodes, indexing="ij")
-
-    def get_coordinates(self, axis):
-        """Get method for coordinate values in each direction"""
+    def get_cell_coordinates(self, axis):
+        """Get method for cell coordinate values in each direction"""
         if axis == 0:
             return self.x_cells
         elif axis == 1:
             return self.y_cells
         elif axis == 2:
             return self.z_cells
+        else:
+            raise ValueError("Invalid value for 'axis'.")
+
+    def get_node_coordinates(self, axis):
+        """Get method for node coordinate values in each direction"""
+        if axis == 0:
+            return self.x_nodes
+        elif axis == 1:
+            return self.y_nodes
+        elif axis == 2:
+            return self.z_nodes
         else:
             raise ValueError("Invalid value for 'axis'.")
 
