@@ -15,7 +15,6 @@ from atmpy.infrastructure.registries import (
     FLUX_RECONSTRUCTION,
     BOUNDARY_CONDITIONS,
     ADVECTION_ROUTINES,
-    TIME_INTEGRATORS,
 )
 
 from atmpy.boundary_conditions.boundary_conditions import BaseBoundaryCondition
