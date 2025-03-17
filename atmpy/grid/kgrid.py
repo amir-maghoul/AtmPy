@@ -140,7 +140,6 @@ class Grid:
 
         # Unifying lists of important properties for all dimensions
         self.dxyz: List[int, ...] = [None] * 3  # Discretization fineness
-        self.nc_total: List[int, ...] = [None] * 3
 
         # Grid parameters in x-direction
         self.nx: int = nx
@@ -152,7 +151,6 @@ class Grid:
 
         # Total number of cells and nodes including ghost cells in x-direction
         self.ncx_total: int = nx + 2 * ngx
-        self.nc_total[0] = self.ncx_total
         self.nnx_total: int = self.ncx_total + 1
         self.cshape: Tuple[int, ...] = (self.ncx_total,)
         self.nshape: Tuple[int, ...] = (self.nnx_total,)
@@ -200,7 +198,6 @@ class Grid:
 
             # Total number of cells and nodes including ghost cells in y-direction
             self.ncy_total: int = ny + 2 * self.ngy
-            self.nc_total[1] = self.ncy_total
             self.nny_total: int = self.ncy_total + 1
             self.cshape = (self.ncx_total, self.ncy_total)
             self.nshape = (self.nnx_total, self.nny_total)
@@ -250,7 +247,6 @@ class Grid:
 
             # Total number of cells and nodes including ghost cells in z-direction
             self.ncz_total: int = nz + 2 * self.ngz
-            self.nc_total[2] = self.ncz_total
             self.nnz_total: int = self.ncz_total + 1
 
             self.cshape = (self.ncx_total, self.ncy_total, self.ncz_total)

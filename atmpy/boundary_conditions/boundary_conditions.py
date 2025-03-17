@@ -287,7 +287,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
 
         """
         ng_tuple: Tuple[int, ...] = self.grid.ng[self.direction]
-        N: int = self.grid.nc_total[self.direction]
+        N: int = self.grid.cshape[self.direction]
 
         if self.facet == "bottom":
             ng = ng_tuple[0]
@@ -392,7 +392,7 @@ def example_usage():
     params = {
         "direction": "y",
         "grid": grid,
-        "side": BoundarySide.BOTTOM,
+        "side": BoundarySide.TOP,
         "gravity": gravity,
         "stratification": lambda x: x**2,
         "thermodynamics": th,

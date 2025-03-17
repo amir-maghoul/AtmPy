@@ -130,7 +130,7 @@ def boundary_manager_2d():
         "is_compressible": True,
     }
     bc_dict = {
-        BdrySide.TOP: {"type": BdryType.REFLECTIVE_GRAVITY, "params": params},
+        BdrySide.BOTTOM: {"type": BdryType.REFLECTIVE_GRAVITY, "params": params},
     }
 
     manager = BoundaryManager()
