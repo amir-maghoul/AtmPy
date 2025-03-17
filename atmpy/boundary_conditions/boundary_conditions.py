@@ -19,6 +19,7 @@ class KwargsTypes(TypedDict):
     grid: Grid
     side: str
 
+
 class BaseBoundaryCondition(ABC):
     """Abstract base class for all boundary conditions.
 
@@ -315,14 +316,13 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         return tuple(nsource), tuple(nlast), tuple(nimage)
 
     def _find_facet(self):
-        """ Find which end of the array is the gravity being applied on"""
+        """Find which end of the array is the gravity being applied on"""
         if self.side == BoundarySide.TOP or self.side == BoundarySide.BACK:
             return "top"
         elif self.side == BoundarySide.BOTTOM or self.side == BoundarySide.FRONT:
             return "bottom"
         else:
             raise ValueError("'Left' and 'Right' are not valid side for gravity axis.")
-
 
 
 class SlipWall(BaseBoundaryCondition):

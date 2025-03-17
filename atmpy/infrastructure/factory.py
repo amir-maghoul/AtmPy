@@ -7,12 +7,15 @@ from atmpy.infrastructure.enums import (
     RiemannSolvers,
     FluxReconstructions,
     BoundaryConditions,
+    AdvectionRoutines,
 )
 from atmpy.infrastructure.registries import (
     SLOPE_LIMITERS,
     RIEMANN_SOLVERS,
     FLUX_RECONSTRUCTION,
     BOUNDARY_CONDITIONS,
+    ADVECTION_ROUTINES,
+    TIME_INTEGRATORS,
 )
 
 from atmpy.boundary_conditions.boundary_conditions import BaseBoundaryCondition
@@ -95,10 +98,30 @@ def get_boundary_conditions(
     BaseBoundaryCondition: The corresponding boundary condition class.
 
     """
-    # try:
-    #     boundary_condition_class = BOUNDARY_CONDITIONS[name]
-    #     return boundary_condition_class(**params)
-    # except KeyError:
-    #     raise ValueError(f"Unknown boundary conditions: {name}")
-    boundary_condition_class = BOUNDARY_CONDITIONS[name]
+    try:
+        boundary_condition_class = BOUNDARY_CONDITIONS[name]
+
+    except KeyError:
+        raise ValueError(f"Unknown boundary conditions: {name}")
+
     return boundary_condition_class(**params)
+
+def get_advection_routines(name: AdvectionRoutines) -> callable:
+    """
+    Retrieves the advection routine based on the provided enum member.
+
+    Parameters
+    ----------
+    name: AdvectionRoutines
+        The enum member specifying the desired advection routine.
+
+    Returns
+    -------
+    Callable: The corresponding advection function.
+    """
+    try:
+        return ADVECTION_ROUTINES[name]
+    except KeyError:
+        raise ValueError(f"Unknown advection routine: {name}")
+
+

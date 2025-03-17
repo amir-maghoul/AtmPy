@@ -8,8 +8,10 @@ from atmpy.infrastructure.enums import (
     RiemannSolvers,
     FluxReconstructions,
     BoundaryConditions,
+    AdvectionRoutines,
 )
 from atmpy.boundary_conditions.boundary_conditions import *
+from atmpy.solver.advection_routines import *
 
 SLOPE_LIMITERS = {
     SlopeLimiters.MINMOD: minmod,
@@ -40,3 +42,9 @@ BOUNDARY_CONDITIONS = {
     BoundaryConditions.PERIODIC: PeriodicBoundary,
     BoundaryConditions.REFLECTIVE_GRAVITY: ReflectiveGravityBoundary,
 }
+
+ADVECTION_ROUTINES = {
+    AdvectionRoutines.STRANG_SPLIT : strang_advection_update,
+}
+
+

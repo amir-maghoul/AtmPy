@@ -8,10 +8,10 @@ from atmpy.boundary_conditions.boundary_conditions import (
     BaseBoundaryCondition as BaseBC,
 )
 
+
 class BoundaryManager:
     def __init__(self):
         self.boundary_conditions: Dict[BdrySide, BaseBC] = {}
-
 
     def setup_conditions(self, bc_dict: Dict[BdrySide, Dict[str, Any]]):
         for side, bc_data in bc_dict.items():
@@ -22,7 +22,7 @@ class BoundaryManager:
             self.boundary_conditions[side] = bc_instance
         self.validate_boundary_condition(side=side, **params)
 
-    def validate_boundary_condition(self, **kwargs:Dict[str, Any]):
+    def validate_boundary_condition(self, **kwargs: Dict[str, Any]):
         """
         Validates the configured boundary conditions.
 
@@ -36,17 +36,19 @@ class BoundaryManager:
         # Define opposites for a cube grid.
 
         mapping = {
-            "x" : {BdrySide.LEFT, BdrySide.RIGHT},
-            "y" : {BdrySide.BOTTOM, BdrySide.TOP},
-            "z" : {BdrySide.FRONT, BdrySide.BACK},
+            "x": (BdrySide.LEFT, BdrySide.RIGHT),
+            "y": (BdrySide.BOTTOM, BdrySide.TOP),
+            "z": (BdrySide.FRONT, BdrySide.BACK),
         }
         # Check whether the side is compatible with the direction
         direction = kwargs["direction"]
         side = kwargs["side"]
         if not side in mapping.get(direction):
-            raise ValueError(f"{side} is not a valid side for the direction {direction}")
+            raise ValueError(
+                f"{side} is not a valid side for the direction {direction}"
+            )
 
-        #-----------------------------------------------------------------------------------
+        # -----------------------------------------------------------------------------------
         # Validate BOTH sides of the periodic boundary condition have actually periodic boundary condtions
 
         opposites = {
@@ -75,17 +77,23 @@ class BoundaryManager:
                         f"the opposite boundary '{opposite_side}' is set as {opposite_condition.type}."
                     )
 
-    def apply_boundary_conditions(self, cells,):
+    def apply_boundary_conditions(
+        self,
+        cells,
+    ):
         for side, condition in self.boundary_conditions.items():
             condition.apply(cells)
 
 
 import numpy as np
+
+
 def boundary_manager_2d():
     from atmpy.physics.thermodynamics import Thermodynamics
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.variables.variables import Variables
     from atmpy.infrastructure.enums import VariableIndices as VI
+
     nx = 1
     ngx = 2
     nnx = nx + 2 * ngx
@@ -122,7 +130,7 @@ def boundary_manager_2d():
         "is_compressible": True,
     }
     bc_dict = {
-        BdrySide.TOP:   {"type": BdryType.REFLECTIVE_GRAVITY, "params":params},
+        BdrySide.TOP: {"type": BdryType.REFLECTIVE_GRAVITY, "params": params},
     }
 
     manager = BoundaryManager()
@@ -132,6 +140,8 @@ def boundary_manager_2d():
     print("Applying boundary conditions for 2D test:")
 
     manager.apply_boundary_conditions(variables.cell_vars)
+    print(variables.cell_vars[..., VI.RHO])
+
 
 if __name__ == "__main__":
     boundary_manager_2d()

@@ -19,7 +19,6 @@ class BoundaryFace:
 class BoundaryConditionStructure:
     type: BdryType
     params: Dict[str, Any] = field(default_factory=dict)
-    faces: List[BoundaryFace] = field(default_factory=list)
 
 
 @dataclass
@@ -64,25 +63,34 @@ class SpatialGrid:
 class BoundaryConditions:
     conditions: Dict[BoundarySide, BdryType] = field(
         default_factory=lambda: {
-            BoundarySide.LEFT: BoundaryConditionStructure(type=BdryType.INFLOW),
-            BoundarySide.RIGHT: BoundaryConditionStructure(type=BdryType.INFLOW),
-            BoundarySide.TOP: BoundaryConditionStructure(type=BdryType.INFLOW),
-            BoundarySide.BOTTOM: BoundaryConditionStructure(type=BdryType.INFLOW),
+            BoundarySide.LEFT: BoundaryConditionStructure(type=BdryType.INFLOW, params=None),
+            BoundarySide.RIGHT: BoundaryConditionStructure(type=BdryType.INFLOW, params=None),
+            BoundarySide.TOP: BoundaryConditionStructure(type=BdryType.INFLOW, params=None),
+            BoundarySide.BOTTOM: BoundaryConditionStructure(type=BdryType.INFLOW, params=None),
             # Add FRONT and BACK if needed
         }
     )
 
+
 @dataclass
 class BoundaryConditionsData:
-# Here we use a dict with keys from BoundarySide.
+    # Here we use a dict with keys from BoundarySide.
     conditions: Dict[Any, BoundaryConditionStructure] = field(
         default_factory=lambda: {
-            'LEFT': BoundaryConditionStructure(type="INFLOW", params={"inflow_value": 1.0}),
-            'RIGHT': BoundaryConditionStructure(type="OUTFLOW", params={"outflow_value": 0.0}),
-            'TOP': BoundaryConditionStructure(type="SLIP_WALL", params={"wall_coeff": 0.5}),
-            'BOTTOM':BoundaryConditionStructure(type="SLIP_WALL", params={"wall_coeff": 0.5}),
-            'FRONT': BoundaryConditionStructure(type="PERIODIC", params={}),
-            'BACK': BoundaryConditionStructure(type="PERIODIC", params={}),
+            "LEFT": BoundaryConditionStructure(
+                type="INFLOW", params={"inflow_value": 1.0}
+            ),
+            "RIGHT": BoundaryConditionStructure(
+                type="OUTFLOW", params={"outflow_value": 0.0}
+            ),
+            "TOP": BoundaryConditionStructure(
+                type="SLIP_WALL", params={"wall_coeff": 0.5}
+            ),
+            "BOTTOM": BoundaryConditionStructure(
+                type="SLIP_WALL", params={"wall_coeff": 0.5}
+            ),
+            "FRONT": BoundaryConditionStructure(type="PERIODIC", params={}),
+            "BACK": BoundaryConditionStructure(type="PERIODIC", params={}),
         }
     )
 

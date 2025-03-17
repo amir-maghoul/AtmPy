@@ -67,9 +67,14 @@ class BoundaryConditions(Enum):
 class BoundarySide(Enum):
     """Map name to boundary direction."""
 
-    LEFT = "left"           # Beginning of array in x-axis
-    RIGHT = "right"         # End of the array in x-axis
-    BOTTOM = "bottom"       # Beginning of the array in y-axis
-    TOP = "top"             # End of the array in y-axis
-    FRONT = "front"         # Beginning of the array in z-axis
-    BACK = "back"           # End of the array in z-axis
+    LEFT = "left"  # Beginning of array in x-axis
+    RIGHT = "right"  # End of the array in x-axis
+    BOTTOM = "bottom"  # Beginning of the array in y-axis
+    TOP = "top"  # End of the array in y-axis
+    FRONT = "front"  # Beginning of the array in z-axis
+    BACK = "back"  # End of the array in z-axis
+
+class AdvectionRoutines(Enum):
+    """Map name to function for the advection solver"""
+    STRANG_SPLIT = "strang_split"
+
