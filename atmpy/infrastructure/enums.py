@@ -24,6 +24,7 @@ class PrimitiveVariableIndices(IntEnum):
     V = 4  # Horizontal Velocity y-component
     W = 5  # Vertical Velocity
 
+
 class HydrostateIndices(IntEnum):
     """Create constants for variable indices in the variable container (ndarray) for better readability"""
 
@@ -85,7 +86,8 @@ class BoundarySide(Enum):
     FRONT = "front"  # Beginning of the array in z-axis
     BACK = "back"  # End of the array in z-axis
 
+
 class AdvectionRoutines(Enum):
     """Map name to function for the advection solver"""
-    STRANG_SPLIT = "strang_split"
 
+    STRANG_SPLIT = "strang_split"

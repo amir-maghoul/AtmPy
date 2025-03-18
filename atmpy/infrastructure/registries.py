@@ -44,7 +44,5 @@ BOUNDARY_CONDITIONS = {
 }
 
 ADVECTION_ROUTINES = {
-    AdvectionRoutines.STRANG_SPLIT : upwind_strang_split_advection,
+    AdvectionRoutines.STRANG_SPLIT: upwind_strang_split_advection,
 }
-
-

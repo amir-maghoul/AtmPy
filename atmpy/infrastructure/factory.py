@@ -105,6 +105,7 @@ def get_boundary_conditions(
 
     return boundary_condition_class(**params)
 
+
 def get_advection_routines(name: AdvectionRoutines) -> callable:
     """
     Retrieves the advection routine based on the provided enum member.
@@ -122,5 +123,3 @@ def get_advection_routines(name: AdvectionRoutines) -> callable:
         return ADVECTION_ROUTINES[name]
     except KeyError:
         raise ValueError(f"Unknown advection routine: {name}")
-
-
