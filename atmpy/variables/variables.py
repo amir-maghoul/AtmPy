@@ -5,6 +5,7 @@ from atmpy.infrastructure.enums import (
     PrimitiveVariableIndices as PVI,
 )
 from atmpy.grid.utility import DimensionSpec, create_grid
+from atmpy.grid.kgrid import Grid
 from atmpy.physics import eos
 from atmpy.physics.eos import IdealGasEOS, BarotropicEOS, ExnerBasedEOS
 
@@ -32,7 +33,7 @@ class Variables:
         Number of spatial ndim.
     """
 
-    def __init__(self, grid, num_vars_cell: int, num_vars_node: int = 1):
+    def __init__(self, grid: Grid, num_vars_cell: int, num_vars_node: int = 1):
         """
         Initializes the VariableContainer with cell-centered and node-based variables.
 
@@ -45,10 +46,10 @@ class Variables:
         num_vars_node : int (default = 1)
             Number of node-based variables.
         """
-        self.grid = grid
-        self.num_vars_cell = num_vars_cell
-        self.num_vars_node = num_vars_node
-        self.ndim = grid.ndim
+        self.grid: Grid = grid
+        self.num_vars_cell: int = num_vars_cell
+        self.num_vars_node: int = num_vars_node
+        self.ndim: int = grid.ndim
 
         if self.ndim not in [1, 2, 3]:
             raise ValueError("Number of ndim not supported.")
