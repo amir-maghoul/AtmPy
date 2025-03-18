@@ -1,1 +1,1 @@
-""" This module contains different time integrators"""
+"""This module contains different time integrators"""

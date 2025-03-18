@@ -32,4 +32,3 @@ def upwind_strang_split_advection(flux_obj, variables, grid, direction, dt):
     print(f"Advection update in {direction} direction with dt = {dt}")
     # For illustration purposes, you might imagine
     # variables.cell_vars = update(variables.cell_vars, flux_obj.flux_data[direction])
-

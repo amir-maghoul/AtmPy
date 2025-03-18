@@ -9,7 +9,7 @@ from infrastructure.factory import get_time_integrators, get_advection_routines
 
 
 class Solver:
-    """ The manager class for connecting other parts of the code together.
+    """The manager class for connecting other parts of the code together.
 
     Attributes:
     ----------
@@ -32,8 +32,18 @@ class Solver:
     current_time: float
         The current timestep of the simulation
     """
+
     def __init__(
-        self, grid, variables, flux, BoundaryManager, advection_routine, time_integrator, dt, t_end, maxstep
+        self,
+        grid,
+        variables,
+        flux,
+        BoundaryManager,
+        advection_routine,
+        time_integrator,
+        dt,
+        t_end,
+        maxstep,
     ):
         """
         Parameters:

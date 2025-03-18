@@ -63,10 +63,18 @@ class SpatialGrid:
 class BoundaryConditions:
     conditions: Dict[BoundarySide, BdryType] = field(
         default_factory=lambda: {
-            BoundarySide.LEFT: BoundaryConditionStructure(type=BdryType.INFLOW, params=None),
-            BoundarySide.RIGHT: BoundaryConditionStructure(type=BdryType.INFLOW, params=None),
-            BoundarySide.TOP: BoundaryConditionStructure(type=BdryType.INFLOW, params=None),
-            BoundarySide.BOTTOM: BoundaryConditionStructure(type=BdryType.INFLOW, params=None),
+            BoundarySide.LEFT: BoundaryConditionStructure(
+                type=BdryType.INFLOW, params=None
+            ),
+            BoundarySide.RIGHT: BoundaryConditionStructure(
+                type=BdryType.INFLOW, params=None
+            ),
+            BoundarySide.TOP: BoundaryConditionStructure(
+                type=BdryType.INFLOW, params=None
+            ),
+            BoundarySide.BOTTOM: BoundaryConditionStructure(
+                type=BdryType.INFLOW, params=None
+            ),
             # Add FRONT and BACK if needed
         }
     )
