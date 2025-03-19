@@ -35,6 +35,7 @@ class HydrostateIndices(IntEnum):
     RHOY0 = 3
     Y0 = 4
     S0 = 5
+    S1_0 = 6
 
 
 class SlopeLimiters(Enum):
