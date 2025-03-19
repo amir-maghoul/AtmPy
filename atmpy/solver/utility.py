@@ -41,3 +41,20 @@ def boundary_map(ndim: int):
         raise ValueError("Unsupported dimensionality")
 
     return {direction: None for direction in directions}
+
+def zipped_direction(ndim: int):
+    """ Return the zipped string and integer of directions corresponding to the ndim."""
+    if ndim == 1:
+        dir_string = ["x"]
+        dir_idx = [0]
+    elif ndim == 2:
+        dir_string = ["x", "y"]
+        dir_idx = [0, 1]
+    elif ndim == 3:
+        dir_string = ["x", "y", "z"]
+        dir_idx = [0, 1, 2]
+    else:
+        raise ValueError("Unsupported dimensionality")
+
+    return zip(dir_string, dir_idx)
+
