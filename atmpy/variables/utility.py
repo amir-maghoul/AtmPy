@@ -181,6 +181,13 @@ def compute_stratification(
     # Move the integration axis to the front for easier vectorized operations.
     Y_axis0 = np.moveaxis(Y, axis, 0)
     Y_n_axis0 = np.moveaxis(Y_n, axis, 0)
+    hydrostate_cells_vars_axis0 = np.moveaxis(hydrostate.cell_vars, axis, 0)
+    hydrostate_nodes_vars_axis0 = np.moveaxis(hydrostate.node_vars, axis, 0)
+
+    # Computing reference values
+    rhoY0 = 1.0
+    p0 = rhoY0**th.gamma
+    pi0 = rhoY0**th.gm1
 
     # Compute the primary integrand arrays:
     # S_p is cell based (1/Y)
@@ -268,3 +275,82 @@ def compute_stratification(
     hydrostate.node_vars[inner_idx + (HI.S0,)] = 1.0 / Y_n
     hydrostate.node_vars[inner_idx + (HI.Y0,)] = 1.0 / Y_n
     hydrostate.node_vars[inner_idx + (HI.RHOY0,)] = rhoY_hydro_n_final
+
+
+# def column(HydroState, Y, Y_n, grid, gravity_strength, Msq):
+#     th = Thermodynamics()
+#     Gamma = th.gm1 / th.gamma
+#     gamm = th.gamma
+#     gm1 = th.gm1
+#     Gamma_inv = 1.0 / Gamma
+#     gm1_inv = 1.0 / gm1
+#
+#     icy = grid.ncy_total
+#     igy = grid.ngy
+#     dy = grid.dy
+#
+#     xc_idx = slice(0, -1)
+#     yc_idx = slice(0, -1)
+#
+#     c_idx = (xc_idx, yc_idx)
+#
+#     rhoY0 = 1.0
+#
+#     g = gravity_strength[1]
+#
+#     p0 = rhoY0 ** gamm
+#     pi0 = rhoY0 ** gm1
+#     HydroState.node_vars[..., HI.RHO0][xc_idx, igy] = rhoY0 / Y_n[:, igy]
+#     HydroState.node_vars[..., HI.RHOY0][xc_idx, igy] = rhoY0
+#     HydroState.node_vars[..., HI.Y0][xc_idx, igy] = Y_n[:, igy]
+#     HydroState.node_vars[..., HI.S0][xc_idx, igy] = 1.0 / Y_n[:, igy]
+#     HydroState.node_vars[..., HI.P0][xc_idx, igy] = p0
+#     HydroState.node_vars[..., HI.P2_0][xc_idx, igy] = pi0 / Msq
+#
+#     dys = np.array([-dy] + [-dy / 2] + [dy / 2] + list(np.ones((icy - 3)) * dy))
+#     print(icy)
+#     S_p = 1.0 / Y[:, :]
+#     S_m = np.zeros_like(S_p)
+#     S_m[:, igy - 1:igy + 1] = 1.0 / Y_n[:, igy].reshape(-1, 1)
+#     S_m[:, 0] = 1.0 / Y[:, igy - 1]
+#     S_m[:, igy + 1:] = 1.0 / Y[:, igy:-1]
+#
+#     S_integral_p = dys * 0.5 * (S_p + S_m)
+#     S_integral_p[:, :igy] = np.cumsum(S_integral_p[:, :igy][:, ::-1], axis=1)[:, ::-1]
+#     S_integral_p[:, igy:] = np.cumsum(S_integral_p[:, igy:], axis=1)
+#
+#     print(S_integral_p.shape)
+#
+#     pi_hydro = pi0 - Gamma * g * S_integral_p
+#     p_hydro = pi_hydro ** Gamma_inv
+#     rhoY_hydro = pi_hydro ** gm1_inv
+#
+#     HydroState.cell_vars[..., HI.RHO0][c_idx] = rhoY_hydro * S_p
+#     HydroState.cell_vars[..., HI.P0][c_idx] = p_hydro
+#     HydroState.cell_vars[..., HI.P2_0][c_idx] = pi_hydro / Msq
+#     HydroState.cell_vars[..., HI.S0][c_idx] = S_p
+#     HydroState.cell_vars[..., HI.S1_0][c_idx] = 0.0
+#     HydroState.cell_vars[..., HI.Y0][c_idx] = 1.0 / S_p
+#     HydroState.cell_vars[..., HI.RHOY0][c_idx] = rhoY_hydro
+#
+#     Sn_p = 1.0 / Y[:, :]
+#     dys = np.ones((icy)) * dy
+#     dys[:igy] *= -1
+#     Sn_integral_p = dys * Sn_p
+#     Sn_integral_p[:, :igy] = np.cumsum(Sn_integral_p[:, :igy][:, ::-1], axis=1)[:, ::-1]
+#     Sn_integral_p[:, igy:] = np.cumsum(Sn_integral_p[:, igy:], axis=1)
+#
+#     pi_hydro_n = pi0 - Gamma * g * Sn_integral_p
+#     rhoY_hydro_n = pi_hydro_n ** gm1_inv
+#
+#     HydroState.node_vars[..., HI.RHO0][xc_idx, :igy] = rhoY_hydro_n[:, :igy]
+#     HydroState.node_vars[..., HI.Y0][xc_idx, :igy] = Y_n[0, :igy]
+#     HydroState.node_vars[..., HI.S0][xc_idx, :igy] = 1.0 / Y_n[:, :igy]
+#     HydroState.node_vars[..., HI.P0][xc_idx, :igy] = rhoY_hydro_n[:, :igy] ** th.gamma
+#     HydroState.node_vars[..., HI.P2_0][xc_idx, :igy] = pi_hydro_n[:, :igy] / Msq
+#
+#     HydroState.node_vars[..., HI.RHO0][xc_idx, igy + 1:] = rhoY_hydro_n[:, igy:]
+#     HydroState.node_vars[..., HI.Y0][xc_idx, igy + 1:] = Y_n[0, igy:]
+#     HydroState.node_vars[..., HI.S0][xc_idx, igy + 1:] = 1.0 / Y_n[:, igy:]
+#     HydroState.node_vars[..., HI.P0][xc_idx, igy + 1:] = rhoY_hydro_n[:, igy:] ** th.gamma
+#     HydroState.node_vars[..., HI.P2_0][xc_idx, igy + 1:] = pi_hydro_n[:, igy:] / Msq
