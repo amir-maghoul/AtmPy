@@ -1,7 +1,6 @@
 import numpy as np
 from atmpy.infrastructure.enums import BoundarySide
 
-
 def boundary_map(ndim: int):
     """Create a boundary map for the name of the boundary sides for different ndim.
         Notice the name of the sides are in upper case to be compatible with the boundary

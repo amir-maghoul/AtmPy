@@ -5,8 +5,6 @@ from atmpy.boundary_conditions.boundary_manager import BoundaryManager
 from atmpy.flux.flux import Flux
 from atmpy.grid.kgrid import Grid
 from atmpy.variables.variables import Variables
-from infrastructure.factory import get_time_integrators, get_advection_routines
-
 
 class Solver:
     """The manager class for connecting other parts of the code together.
