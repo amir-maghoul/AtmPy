@@ -239,10 +239,12 @@ def simple_test():
 
     mpv = MPV(grid)
     mpv.state(gravity, Msq)
-    hydrostatics = Variables(grid, num_vars_cell=6, num_vars_node=6)
+    hydrostatics = Variables(grid, num_vars_cell=7, num_vars_node=7)
+    hydrostatics2 = Variables(grid, num_vars_cell=7, num_vars_node=7)
     compute_stratification(hydrostatics, Y, Yn, grid, axis, gravity, Msq)
+    column(hydrostatics, Y, Yn, grid, gravity, Msq)
     print(hydrostatics.cell_vars[4, :, HI.P0])
-    print(hydrostatics.node_vars[:, -1, HI.P0])
+
 
     # End of compute_stratification method
 

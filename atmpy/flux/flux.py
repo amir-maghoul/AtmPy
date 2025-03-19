@@ -1,9 +1,11 @@
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, TYPE_CHECKING
 from atmpy.flux.utility import create_averaging_kernels
-from atmpy.grid.kgrid import Grid
+if TYPE_CHECKING:
+    from atmpy.grid.kgrid import Grid
+    from atmpy.physics.eos import EOS
+
 from atmpy.variables.variables import Variables
-from atmpy.physics.eos import EOS
 from atmpy.infrastructure.enums import (
     VariableIndices as VI,
     PrimitiveVariableIndices as PVI,
@@ -47,9 +49,9 @@ class Flux:
 
     def __init__(
         self,
-        grid: Grid,
+        grid: "Grid",
         variables: Variables,
-        eos: EOS,
+        eos: "EOS",
         dt: float,
         solver: RiemannSolvers = RiemannSolvers.MODIFIED_HLL,
         reconstruction: FluxReconstructions = FluxReconstructions.MODIFIED_MUSCL,

@@ -2,21 +2,21 @@
 
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import List, Any, Tuple, Callable, TypeGuard, TypedDict, Unpack, cast, Union
+from typing import List, Any, Tuple, Callable, TypeGuard, TypedDict, Unpack, cast, Union, TYPE_CHECKING
 
-from atmpy.grid.kgrid import Grid
-from atmpy.infrastructure.enums import VariableIndices as VI
-from atmpy.infrastructure.enums import BoundarySide
+if TYPE_CHECKING:
+    from atmpy.grid.kgrid import Grid
+    from atmpy.physics.thermodynamics import Thermodynamics
+
 from atmpy.flux.utility import direction_mapping
-from atmpy.physics.thermodynamics import Thermodynamics
-from atmpy.infrastructure.enums import BoundaryConditions as BdryType
+from atmpy.infrastructure.enums import BoundaryConditions as BdryType, BoundarySide, VariableIndices as VI
 
 
 class KwargsTypes(TypedDict):
     """Constructor class for dictionary typing of kwargs"""
 
     direction: str
-    grid: Grid
+    grid: "Grid"
     side: str
 
 
@@ -49,7 +49,7 @@ class BaseBoundaryCondition(ABC):
     def __init__(self, **kwargs: Unpack[KwargsTypes]) -> None:
 
         self.direction: int = direction_mapping(kwargs["direction"])
-        self.grid: Grid = kwargs["grid"]
+        self.grid: "Grid" = kwargs["grid"]
         self.ndim: int = self.grid.ndim
         self.ng: List[Tuple[Any, Any]] = self.grid.ng[self.direction]
         self.pad_width: List[Tuple[int, int]] = (
@@ -133,7 +133,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
     class KwargsType(TypedDict):
         """Constructor class for typing of kwargs dictionary"""
 
-        thermodynamics: Thermodynamics
+        thermodynamics: "Thermodynamics"
         gravity: Union[List[float], np.ndarray]
         stratification: Callable[[Any], Any]
         side: str
@@ -143,7 +143,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
     def __init__(self, **kwargs: Unpack[KwargsType]) -> None:
         super().__init__(**kwargs)
         self.type = BdryType.REFLECTIVE_GRAVITY
-        self.th: Thermodynamics = kwargs["thermodynamics"]
+        self.th: "Thermodynamics" = kwargs["thermodynamics"]
         self.gravity: Union[List[float], np.ndarray] = kwargs["gravity"]
         if len(np.nonzero(self.gravity)[0]) > 1:
             raise ValueError("Only one axis can have gravity strength.")
@@ -359,6 +359,7 @@ def example_usage():
     from atmpy.grid.utility import create_grid, DimensionSpec
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.variables.variables import Variables
+    from atmpy.physics.thermodynamics import Thermodynamics
 
     np.set_printoptions(linewidth=100)
 

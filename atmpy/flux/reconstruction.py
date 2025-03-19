@@ -1,10 +1,11 @@
 """This module is responsible for creating the left and right state to pass to the riemann solver."""
 
 import numpy as np
-from typing import Callable, List
+from typing import Callable, List, TYPE_CHECKING
 from atmpy.flux.utility import directional_indices, direction_mapping
 from atmpy.physics.eos import EOS
-from atmpy.variables.variables import Variables
+if TYPE_CHECKING:
+    from atmpy.variables.variables import Variables
 from atmpy.flux.reconstruction_utility import (
     calculate_amplitudes,
     calculate_slopes,
@@ -17,7 +18,7 @@ from atmpy.infrastructure.enums import (
 
 
 def modified_muscl(
-    variables: Variables,
+    variables: "Variables",
     flux: dict[str, np.ndarray],
     eos: EOS,
     limiter: Callable[[np.ndarray, np.ndarray], np.ndarray],
