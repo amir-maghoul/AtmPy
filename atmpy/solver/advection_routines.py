@@ -58,21 +58,25 @@ def first_order_rk(grid: "Grid", variables: "Variables", flux: "Flux", dt: float
         The time step.
     """
     # direction of calculation of the flux
-    direction: str = kwargs.pop("direction")
     ndim: int = grid.ndim
     directions = zipped_direction(ndim)
 
 
-
     for direction_str, direction_int in directions:
         lmbda = dt / grid.dxyz[direction_int]
+        # Find the left and right indices
+        left_idx, right_idx, _, _ = directional_indices(ndim, direction_str, full=True)
         flux.apply_riemann_solver(lmbda, direction_str)
+        variables.cell_vars[...] += lmbda * (flux.flux[direction_str][left_idx] - flux.flux[direction_str][right_idx])
 
 if  __name__ == "__main__":
     from atmpy.physics.eos import ExnerBasedEOS
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.variables.variables import Variables
     from atmpy.flux.flux import Flux
+
+    np.set_printoptions(linewidth=100)
+
 
     dt = 0.1
 
@@ -101,8 +105,63 @@ if  __name__ == "__main__":
     eos = ExnerBasedEOS()
     flux = Flux(grid, variables, eos, dt)
 
-    kwargs = {"direction": "x"}
-    first_order_rk(grid, variables, flux, dt, **kwargs)
-    print(flux.flux["x"][..., VI.RHOU])
+    import copy
+    variables2 = copy.deepcopy(variables)
+
+    # kwargs = {"direction": "x"}
+    # first_order_rk(grid, variables, flux, dt, **kwargs)
+    # print(flux.flux["x"][..., VI.RHOU])
+
+
+    from atmpy.infrastructure.enums import BoundarySide as BdrySide, BoundaryConditions as BdryType
+    from atmpy.boundary_conditions.boundary_manager import BoundaryManager
+
+    direction = "y"
+    params = {
+        "direction": "y",
+        "grid": grid,
+        # "gravity": gravity,
+        "stratification": lambda x: x**2,
+        # "thermodynamics": th,
+        "is_lamb": False,
+        "is_compressible": True,
+    }
+    bc_dict = {
+        BdrySide.LEFT: {"type": BdryType.PERIODIC, "params": params},
+        BdrySide.RIGHT: {"type": BdryType.PERIODIC, "params": params},
+        BdrySide.BOTTOM: {"type": BdryType.PERIODIC, "params": params},
+        BdrySide.TOP: {"type": BdryType.PERIODIC, "params": params},
+    }
+    # print(variables.cell_vars[..., VI.RHO])
+    # print("------- Before Boundary Conditions ------")
+
+    manager = BoundaryManager()
+    manager.setup_conditions(bc_dict)
+    manager.apply_boundary_conditions(variables.cell_vars)
+
+    # print("---------Before riemann solver ------")
+    # print(flux.flux[direction][..., VI.RHO])
+    # print(variables.cell_vars[..., VI.RHO])
+
+    flux.apply_riemann_solver(1, direction=direction)
+    # print("---------After riemann solver ------")
+    # print(flux.flux[direction][..., VI.RHO])
+    # print(variables.cell_vars[..., VI.RHO])
+
+
+
+    flux = Flux(grid, variables2, eos, dt)
+
+
+    # print("------- before advection ------")
+    # print(flux.flux[direction][..., VI.RHO])
+    # print(variables2.cell_vars[..., VI.RHO])
+
+    first_order_rk(grid, variables2, flux, dt, direction=direction)
+    # print("------- after advection ------")
+    # print(flux.flux[direction][..., VI.RHO])
+    print(variables2.cell_vars[..., VI.RHOU])
+
+
 
 

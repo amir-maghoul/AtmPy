@@ -51,18 +51,10 @@ class BoundaryManager:
         # -----------------------------------------------------------------------------------
         # Validate BOTH sides of the periodic boundary condition have actually periodic boundary condtions
 
-        opposites = {
-            "LEFT": "RIGHT",
-            "RIGHT": "LEFT",
-            "TOP": "BOTTOM",
-            "BOTTOM": "TOP",
-            "FRONT": "BACK",
-            "BACK": "FRONT",
-        }
         # Validation only works for periodic boundary condition for now.
         for side, condition in self.boundary_conditions.items():
             if condition.type == BdryType.PERIODIC:
-                opposite_side = opposites.get(side)
+                opposite_side = side.opposite
                 if opposite_side is None:
                     raise ValueError(f"Unknown opposite side for boundary '{side}'.")
                 if opposite_side not in self.boundary_conditions:
