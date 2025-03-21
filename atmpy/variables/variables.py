@@ -171,16 +171,17 @@ class Variables:
             args = (self.cell_vars[..., VI.RHOY], True)
 
         rho = self.cell_vars[..., VI.RHO]
+        nonzero_idx = np.nonzero(rho)
         self.primitives[..., PVI.P] = eos.pressure(*args)
-        self.primitives[..., PVI.U] = self.cell_vars[..., VI.RHOU] / rho
-        self.primitives[..., PVI.X] = self.cell_vars[..., VI.RHOX] / rho
-        self.primitives[..., PVI.Y] = self.cell_vars[..., VI.RHOY] / rho
+        self.primitives[*nonzero_idx, PVI.U] = self.cell_vars[*nonzero_idx, VI.RHOU] / rho[nonzero_idx]
+        self.primitives[*nonzero_idx, PVI.X] = self.cell_vars[*nonzero_idx, VI.RHOX] / rho[nonzero_idx]
+        self.primitives[*nonzero_idx, PVI.Y] = self.cell_vars[*nonzero_idx, VI.RHOY] / rho[nonzero_idx]
 
         if ndim == 2:
-            self.primitives[..., PVI.V] = self.cell_vars[..., VI.RHOV] / rho
+            self.primitives[*nonzero_idx, PVI.V] = self.cell_vars[*nonzero_idx, VI.RHOV] / rho[nonzero_idx]
         elif ndim == 3:
-            self.primitives[..., PVI.V] = self.cell_vars[..., VI.RHOV] / rho
-            self.primitives[..., PVI.W] = self.cell_vars[..., VI.RHOW] / rho
+            self.primitives[*nonzero_idx, PVI.V] = self.cell_vars[*nonzero_idx, VI.RHOV] / rho[nonzero_idx]
+            self.primitives[*nonzero_idx, PVI.W] = self.cell_vars[*nonzero_idx, VI.RHOW] / rho[nonzero_idx]
 
         elif ndim > 3 or ndim < 1:
             raise ValueError("Unsupported number of ndim.")

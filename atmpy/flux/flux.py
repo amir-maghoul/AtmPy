@@ -271,13 +271,12 @@ class Flux:
         )
 
         # Find the rho conservative variable from the new updated primitive variables
-        left_rho = lefts.cell_vars[..., VI.RHO] / lefts.primitives[..., PVI.Y]
-        right_rho = rights.cell_vars[..., VI.RHO] / rights.primitives[..., PVI.Y]
+        left_rho = lefts.cell_vars[..., VI.RHOY] / lefts.primitives[..., PVI.Y]
+        right_rho = rights.cell_vars[..., VI.RHOY] / rights.primitives[..., PVI.Y]
 
         # Compute the conservative variables for left and right states
         lefts.to_conservative(left_rho)
         rights.to_conservative(right_rho)
-
         return lefts, rights
 
     def apply_riemann_solver(self, lmbda: float, direction: str) -> None:
