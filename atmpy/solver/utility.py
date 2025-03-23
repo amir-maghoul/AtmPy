@@ -57,3 +57,17 @@ def zipped_direction(ndim: int):
 
     return zip(dir_string, dir_idx)
 
+def dimension_directions(ndim: int):
+    """ Returns the list of directions corresponding to the ndim."""
+    if ndim == 1:
+        directions = ["x"]
+    elif ndim == 2:
+        directions = ["x", "y"]
+    elif ndim == 3:
+        directions = ["x", "y", "z"]
+    else:
+        raise ValueError("Unsupported dimensionality")
+
+    return directions
+
+
