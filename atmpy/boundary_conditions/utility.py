@@ -1,15 +1,15 @@
 """Utility module for the boundary handling"""
 
-import numpy as np
+from typing import Dict, Any, Tuple
+from atmpy.infrastructure.enums import (
+    BoundarySide as BdrySide,
+)
 
-
-def get_grid_info_for_gravity():
-    """Create a mapping between the given gravity axis as int and the grid information of that axis for the gravity
-    handling.
-
-    Parameters
-    ----------
-    gravity_axis : int
-        The index of the gravity axis
-
-    """
+def side_direction_mapping(direction: str) -> Tuple[BdrySide, BdrySide]:
+    """ Returns the two sides of a given direction."""
+    mapping = {
+        "x": (BdrySide.LEFT, BdrySide.RIGHT),
+        "y": (BdrySide.BOTTOM, BdrySide.TOP),
+        "z": (BdrySide.FRONT, BdrySide.BACK),
+    }
+    return mapping[direction]
