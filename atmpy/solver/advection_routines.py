@@ -33,8 +33,6 @@ def upwind_strang_split_advection(
         The variables container.
     flux: Flux
         The flux object.
-    direction: str
-        The direction of advection.
     dt: float
         The time step.
     """
