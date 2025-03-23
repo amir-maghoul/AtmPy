@@ -2,14 +2,29 @@
 
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import List, Any, Tuple, Callable, TypeGuard, TypedDict, Unpack, cast, Union, TYPE_CHECKING
+from typing import (
+    List,
+    Any,
+    Tuple,
+    Callable,
+    TypeGuard,
+    TypedDict,
+    Unpack,
+    cast,
+    Union,
+    TYPE_CHECKING,
+)
 
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
     from atmpy.physics.thermodynamics import Thermodynamics
 
 from atmpy.flux.utility import direction_mapping
-from atmpy.infrastructure.enums import BoundaryConditions as BdryType, BoundarySide, VariableIndices as VI
+from atmpy.infrastructure.enums import (
+    BoundaryConditions as BdryType,
+    BoundarySide,
+    VariableIndices as VI,
+)
 
 
 class KwargsTypes(TypedDict):

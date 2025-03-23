@@ -1,6 +1,7 @@
 import numpy as np
 from typing import List, Tuple, TYPE_CHECKING
 from atmpy.flux.utility import create_averaging_kernels
+
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
     from atmpy.physics.eos import EOS

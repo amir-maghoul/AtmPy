@@ -4,6 +4,7 @@ import numpy as np
 from typing import Callable, List, TYPE_CHECKING
 from atmpy.flux.utility import directional_indices, direction_mapping
 from atmpy.physics.eos import EOS
+
 if TYPE_CHECKING:
     from atmpy.variables.variables import Variables
 from atmpy.flux.reconstruction_utility import (

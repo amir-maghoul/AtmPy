@@ -24,9 +24,10 @@ class BoundaryManager:
             self.boundary_conditions[side] = bc_instance
         self._validate_periodic_boundary_condition(side=side, **params)
 
-
-    def _validate_side_direction_compatibility(self, side: BdrySide, **params: Dict[str, Any]):
-        """ Validates whether the given side is compatible with the given direction"""
+    def _validate_side_direction_compatibility(
+        self, side: BdrySide, **params: Dict[str, Any]
+    ):
+        """Validates whether the given side is compatible with the given direction"""
 
         # Check whether the side is compatible with the direction
         direction: int = params["direction"]
@@ -34,6 +35,7 @@ class BoundaryManager:
             raise ValueError(
                 f"{side} is not a valid side for the direction {direction}"
             )
+
     def _validate_periodic_boundary_condition(self, **kwargs: Dict[str, Any]):
         """
         Validates that in presence of Periodic BC in one side, the opposite side also has periodic BC.
@@ -65,7 +67,7 @@ class BoundaryManager:
                     )
 
     def apply_single_boundary_condition(self, cells, direction):
-        """ Apply the boundary conditions on a single direction. If the boundary condition of the first side is
+        """Apply the boundary conditions on a single direction. If the boundary condition of the first side is
         PERIODIC, then skip the next side since the condition is automatically applied on the next side too.
 
         Parameters
@@ -143,7 +145,6 @@ def boundary_manager_2d():
     bc_dict = {
         BdrySide.TOP: {"type": BdryType.PERIODIC, "params": params},
         BdrySide.BOTTOM: {"type": BdryType.PERIODIC, "params": params},
-
     }
 
     manager = BoundaryManager()

@@ -89,12 +89,14 @@ class BoundarySide(Enum):
 
     @property
     def opposite(self):
-        opposites = {BoundarySide.LEFT: BoundarySide.RIGHT,
-                     BoundarySide.RIGHT: BoundarySide.LEFT,
-                     BoundarySide.BOTTOM: BoundarySide.TOP,
-                     BoundarySide.TOP: BoundarySide.BOTTOM,
-                     BoundarySide.FRONT: BoundarySide.BACK,
-                     BoundarySide.BACK: BoundarySide.FRONT,}
+        opposites = {
+            BoundarySide.LEFT: BoundarySide.RIGHT,
+            BoundarySide.RIGHT: BoundarySide.LEFT,
+            BoundarySide.BOTTOM: BoundarySide.TOP,
+            BoundarySide.TOP: BoundarySide.BOTTOM,
+            BoundarySide.FRONT: BoundarySide.BACK,
+            BoundarySide.BACK: BoundarySide.FRONT,
+        }
         return opposites[self]
 
 
@@ -102,4 +104,3 @@ class AdvectionRoutines(Enum):
     """Map name to function for the advection solver"""
 
     STRANG_SPLIT = "strang_split"
-

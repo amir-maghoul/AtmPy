@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 from typing import Any, TYPE_CHECKING
+
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
     from atmpy.grid.kgrid import Grid
@@ -15,7 +16,7 @@ from atmpy.infrastructure.factory import get_advection_routines
 
 
 class AbstractTimeIntegrator(ABC):
-    """ Abstract class for different time integrators
+    """Abstract class for different time integrators
 
     grid: Grid
         Object containing the spatial discretization.
@@ -68,8 +69,9 @@ class AbstractTimeIntegrator(ABC):
     def step(self):
         pass
 
+
 class TimeIntegrator(AbstractTimeIntegrator):
-    """ This is the main time integrator of the project. The algorithm is based on the algorithm introduced in
+    """This is the main time integrator of the project. The algorithm is based on the algorithm introduced in
     BK19 paper."""
 
     def __init__(
@@ -83,12 +85,19 @@ class TimeIntegrator(AbstractTimeIntegrator):
         t_end: float,
         maxstep: int,
     ):
-        super().__init__(grid, variables, flux, boundary_manager, advection_routine, dt, t_end, maxstep)
+        super().__init__(
+            grid,
+            variables,
+            flux,
+            boundary_manager,
+            advection_routine,
+            dt,
+            t_end,
+            maxstep,
+        )
 
     def initialize(self):
         pass
 
     def step(self):
         pass
-
-

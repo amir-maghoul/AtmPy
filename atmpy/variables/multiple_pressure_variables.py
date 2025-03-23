@@ -245,7 +245,6 @@ def simple_test():
     column(hydrostatics, Y, Yn, grid, gravity, Msq)
     print(hydrostatics.cell_vars[4, :, HI.P0])
 
-
     # End of compute_stratification method
 
 

@@ -6,6 +6,7 @@ from atmpy.flux.flux import Flux
 from atmpy.grid.kgrid import Grid
 from atmpy.variables.variables import Variables
 
+
 class Solver:
     """The manager class for connecting other parts of the code together.
 

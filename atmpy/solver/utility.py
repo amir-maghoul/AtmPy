@@ -1,6 +1,7 @@
 import numpy as np
 from atmpy.infrastructure.enums import BoundarySide
 
+
 def boundary_map(ndim: int):
     """Create a boundary map for the name of the boundary sides for different ndim.
         Notice the name of the sides are in upper case to be compatible with the boundary
@@ -41,8 +42,9 @@ def boundary_map(ndim: int):
 
     return {direction: None for direction in directions}
 
+
 def zipped_direction(ndim: int):
-    """ Return the zipped string and integer of directions corresponding to the ndim."""
+    """Return the zipped string and integer of directions corresponding to the ndim."""
     if ndim == 1:
         dir_string = ["x"]
         dir_idx = [0]
@@ -57,8 +59,9 @@ def zipped_direction(ndim: int):
 
     return zip(dir_string, dir_idx)
 
+
 def dimension_directions(ndim: int):
-    """ Returns the list of directions corresponding to the ndim."""
+    """Returns the list of directions corresponding to the ndim."""
     if ndim == 1:
         directions = ["x"]
     elif ndim == 2:
@@ -69,5 +72,3 @@ def dimension_directions(ndim: int):
         raise ValueError("Unsupported dimensionality")
 
     return directions
-
-

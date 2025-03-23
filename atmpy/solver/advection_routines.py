@@ -10,11 +10,17 @@ if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
     from atmpy.variables.variables import Variables
     from atmpy.grid.kgrid import Grid
-from atmpy.infrastructure.enums import VariableIndices as VI, PrimitiveVariableIndices as PI
+from atmpy.infrastructure.enums import (
+    VariableIndices as VI,
+    PrimitiveVariableIndices as PI,
+)
 from atmpy.flux.utility import directional_indices, direction_mapping
 
-def upwind_strang_split_advection(grid: "Grid", variables: "Variables", flux: "Flux", dt: float, *args, **kwargs) -> None:
-    """ Compute the Strang-split upwind advection in all directions. This function applies the boundary conditions on
+
+def upwind_strang_split_advection(
+    grid: "Grid", variables: "Variables", flux: "Flux", dt: float, *args, **kwargs
+) -> None:
+    """Compute the Strang-split upwind advection in all directions. This function applies the boundary conditions on
     updated values of the variables in each iteration. The boundary manager object should be passed as a keyword argument.
     It should not be an empty object. It should have been completely set up using its setup_boundary_conditions method
     prior to passing it to this function.
@@ -35,7 +41,9 @@ def upwind_strang_split_advection(grid: "Grid", variables: "Variables", flux: "F
     boundary_manager: BoundaryManager = kwargs.pop("boundary_manager")
     # Check whether the boundary manager has already been set up or not
     if not boundary_manager.boundary_conditions:
-        raise ValueError("The setup of the boundary manager object should have been done before passing it to the advection function.")
+        raise ValueError(
+            "The setup of the boundary manager object should have been done before passing it to the advection function."
+        )
 
     ndim: int = grid.ndim
     directions = dimension_directions(ndim)
@@ -43,18 +51,20 @@ def upwind_strang_split_advection(grid: "Grid", variables: "Variables", flux: "F
     # First round of strang splitting. Forward: x-y-z
     for direction in directions:
         boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
-        first_order_directional_rk(grid, variables, flux, direction, dt/2)
+        first_order_directional_rk(grid, variables, flux, direction, dt / 2)
         boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
 
     # Second round of strang splitting. Backward: z-y-x
     for direction in directions[::-1]:
         boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
-        first_order_directional_rk(grid, variables, flux, direction, dt/2)
+        first_order_directional_rk(grid, variables, flux, direction, dt / 2)
         boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
 
 
-def first_order_directional_rk(grid: "Grid", variables: "Variables", flux: "Flux", direction: str, dt: float) -> None:
-    """ Computes the upwind first-order Runge-Kutta integration in the given direction. This is the core function to be
+def first_order_directional_rk(
+    grid: "Grid", variables: "Variables", flux: "Flux", direction: str, dt: float
+) -> None:
+    """Computes the upwind first-order Runge-Kutta integration in the given direction. This is the core function to be
     applied to multiple directions to complete the advection routine in strang splitting.
 
     Parameters
@@ -78,16 +88,18 @@ def first_order_directional_rk(grid: "Grid", variables: "Variables", flux: "Flux
     # Find the left and right indices
     left_idx, right_idx, _, _ = directional_indices(ndim, direction, full=True)
     flux.apply_riemann_solver(lmbda, direction)
-    variables.cell_vars[...] += lmbda * (flux.flux[direction][left_idx] - flux.flux[direction][right_idx])
+    variables.cell_vars[...] += lmbda * (
+        flux.flux[direction][left_idx] - flux.flux[direction][right_idx]
+    )
 
-if  __name__ == "__main__":
+
+if __name__ == "__main__":
     from atmpy.physics.eos import ExnerBasedEOS
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.variables.variables import Variables
     from atmpy.flux.flux import Flux
 
     np.set_printoptions(linewidth=100)
-
 
     dt = 0.1
 
@@ -117,14 +129,17 @@ if  __name__ == "__main__":
     flux = Flux(grid, variables, eos, dt)
 
     import copy
+
     variables2 = copy.deepcopy(variables)
 
     # kwargs = {"direction": "x"}
     # first_order_rk(grid, variables, flux, dt, **kwargs)
     # print(flux.flux["x"][..., VI.RHOU])
 
-
-    from atmpy.infrastructure.enums import BoundarySide as BdrySide, BoundaryConditions as BdryType
+    from atmpy.infrastructure.enums import (
+        BoundarySide as BdrySide,
+        BoundaryConditions as BdryType,
+    )
     from atmpy.boundary_conditions.boundary_manager import BoundaryManager
 
     gravity = [0, 1.0, 0]
@@ -142,7 +157,7 @@ if  __name__ == "__main__":
         "direction": "x",
         "grid": grid,
         # "gravity": gravity,
-        "stratification": lambda x: x ** 2,
+        "stratification": lambda x: x**2,
         # "thermodynamics": th,
         "is_lamb": False,
         "is_compressible": True,
@@ -189,10 +204,7 @@ if  __name__ == "__main__":
     # print(flux.flux[direction][..., VI.RHOU])
     # print(variables.cell_vars[..., VI.RHOU])
 
-
-
     # flux = Flux(grid, variables2, eos, dt)
-
 
     # print("------- before advection ------")
     # print(flux.flux[direction][..., VI.RHO])
@@ -203,9 +215,3 @@ if  __name__ == "__main__":
     # print("------- after advection ------")
     # print(flux.flux[direction][..., VI.RHO])
     print(variables2.cell_vars[..., VI.RHOU])
-
-
-
-
-
-
