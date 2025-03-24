@@ -122,6 +122,7 @@ def boundary_manager_2d():
 
     variables = Variables(grid, 6, 1)
     variables.cell_vars[..., VI.RHO] = 1
+    variables.cell_vars[..., VI.RHO][1:-1, 1:-1] = 4
     variables.cell_vars[..., VI.RHOU] = array
     variables.cell_vars[..., VI.RHOY] = 2
     variables.cell_vars[..., VI.RHOW] = 3

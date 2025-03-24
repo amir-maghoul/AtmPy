@@ -50,13 +50,13 @@ def upwind_strang_split_advection(
     for direction in directions:
         boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
         first_order_directional_rk(grid, variables, flux, direction, dt / 2)
-        boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
+        # boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
 
     # Second round of strang splitting. Backward: z-y-x
     for direction in directions[::-1]:
         boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
         first_order_directional_rk(grid, variables, flux, direction, dt / 2)
-        boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
+        # boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
 
 
 def first_order_directional_rk(
@@ -96,6 +96,12 @@ if __name__ == "__main__":
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.variables.variables import Variables
     from atmpy.flux.flux import Flux
+    from atmpy.boundary_conditions.utility import create_params
+    from atmpy.infrastructure.enums import (
+        BoundarySide as BdrySide,
+        BoundaryConditions as BdryType,
+    )
+    from atmpy.boundary_conditions.boundary_manager import BoundaryManager
 
     np.set_printoptions(linewidth=100)
 
@@ -117,6 +123,7 @@ if __name__ == "__main__":
 
     variables = Variables(grid, 5, 1)
     variables.cell_vars[..., VI.RHO] = 1
+    variables.cell_vars[..., VI.RHO][1:-1, 1:-1] = 4
     variables.cell_vars[..., VI.RHOU] = array
     variables.cell_vars[..., VI.RHOY] = 2
 
@@ -126,90 +133,16 @@ if __name__ == "__main__":
     eos = ExnerBasedEOS()
     flux = Flux(grid, variables, eos, dt)
 
-    import copy
 
-    variables2 = copy.deepcopy(variables)
-
-    # kwargs = {"direction": "x"}
-    # first_order_rk(grid, variables, flux, dt, **kwargs)
-    # print(flux.flux["x"][..., VI.RHOU])
-
-    from atmpy.infrastructure.enums import (
-        BoundarySide as BdrySide,
-        BoundaryConditions as BdryType,
-    )
-    from atmpy.boundary_conditions.boundary_manager import BoundaryManager
-
-    gravity = [0, 1.0, 0]
-    left_params = {
-        "direction": "x",
-        "grid": grid,
-        # "gravity": gravity,
-        "stratification": lambda x: x**2,
-        # "thermodynamics": th,
-        "is_lamb": False,
-        "is_compressible": True,
-    }
-
-    right_params = {
-        "direction": "x",
-        "grid": grid,
-        # "gravity": gravity,
-        "stratification": lambda x: x**2,
-        # "thermodynamics": th,
-        "is_lamb": False,
-        "is_compressible": True,
-    }
-
-    top_params = {
-        "direction": "y",
-        "grid": grid,
-        "gravity": gravity,
-        "stratification": lambda x: x**2,
-        # "thermodynamics": th,
-        "is_lamb": False,
-        "is_compressible": True,
-    }
-
-    bottom_params = {
-        "direction": "y",
-        "grid": grid,
-        "gravity": gravity,
-        "stratification": lambda x: x**2,
-        # "thermodynamics": th,
-        "is_lamb": False,
-        "is_compressible": True,
-    }
-    bc_dict = {
-        BdrySide.LEFT: {"type": BdryType.PERIODIC, "params": left_params},
-        BdrySide.RIGHT: {"type": BdryType.PERIODIC, "params": right_params},
-        BdrySide.BOTTOM: {"type": BdryType.PERIODIC, "params": bottom_params},
-        BdrySide.TOP: {"type": BdryType.PERIODIC, "params": top_params},
-    }
-    # print(variables.cell_vars[..., VI.RHO])
-    # print("------- Before Boundary Conditions ------")
+    bc_data = {}
+    create_params(bc_data, BdrySide.LEFT, BdryType.PERIODIC, direction="x", grid=grid)
+    create_params(bc_data, BdrySide.RIGHT, BdryType.PERIODIC, direction="x", grid=grid)
+    create_params(bc_data, BdrySide.BOTTOM, BdryType.PERIODIC, direction="y", grid=grid)
+    create_params(bc_data, BdrySide.TOP, BdryType.PERIODIC, direction="y", grid=grid)
 
     manager = BoundaryManager()
-    manager.setup_conditions(bc_dict)
-    # manager.apply_boundary_conditions(variables.cell_vars)
+    manager.setup_conditions(bc_data)
 
-    # print("---------Before riemann solver ------")
-    # print(flux.flux[direction][..., VI.RHO])
-    # print(variables.cell_vars[..., VI.RHOU])
 
-    # flux.apply_riemann_solver(1, direction=direction)
-    # print("---------After riemann solver ------")
-    # print(flux.flux[direction][..., VI.RHOU])
-    # print(variables.cell_vars[..., VI.RHOU])
-
-    # flux = Flux(grid, variables2, eos, dt)
-
-    # print("------- before advection ------")
-    # print(flux.flux[direction][..., VI.RHO])
-    # print(variables2.cell_vars[..., VI.RHO])
-    # print(variables2.cell_vars[..., VI.RHOU])
-
-    upwind_strang_split_advection(grid, variables2, flux, dt, boundary_manager=manager)
-    # print("------- after advection ------")
-    # print(flux.flux[direction][..., VI.RHO])
-    print(variables2.cell_vars[..., VI.RHOU])
+    upwind_strang_split_advection(grid, variables, flux, dt, boundary_manager=manager)
+    print(variables.cell_vars[..., VI.RHOU])
