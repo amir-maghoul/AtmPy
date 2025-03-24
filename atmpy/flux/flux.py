@@ -341,7 +341,7 @@ def main():
         calculate_slopes,
         modified_muscl,
     )
-    from atmpy.flux.utility import directional_indices, direction_mapping
+    from atmpy.infrastructure.utility import directional_indices, direction_mapping
 
     direction = "x"
     diffs = calculate_variable_differences(primitives, 2, direction_str=direction)

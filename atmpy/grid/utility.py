@@ -65,10 +65,10 @@ def create_grid(dimensions: List[DimensionSpec]):
     return Grid(**args)
 
 
-def nodal_derivative(cell_var: np.ndarray, direction: str):
-    """ Calculates the nodal derivative of the given cell variable in the given direction."""
-
-    cell_vars
+# def nodal_derivative(cell_var: np.ndarray, direction: str):
+#     """ Calculates the nodal derivative of the given cell variable in the given direction."""
+#
+#     cell_vars
 
 
 def cell_to_node_average(
