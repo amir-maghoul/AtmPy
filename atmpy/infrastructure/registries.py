@@ -35,7 +35,7 @@ FLUX_RECONSTRUCTION = {
 }
 
 BOUNDARY_CONDITIONS = {
-    BoundaryConditions.SLIP_WALL: SlipWall,
+    BoundaryConditions.WALL: Wall,
     BoundaryConditions.INFLOW: InflowBoundary,
     BoundaryConditions.OUTFLOW: OutflowBoundary,
     BoundaryConditions.NON_REFLECTIVE_OUTLET: NonReflectiveOutlet,

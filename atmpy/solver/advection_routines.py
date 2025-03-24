@@ -4,7 +4,7 @@ function are the same."""
 import numpy as np
 from typing import TYPE_CHECKING
 
-from atmpy.solver.utility import dimension_directions
+from atmpy.infrastructure.utility import dimension_directions, directional_indices, direction_mapping
 
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
@@ -14,7 +14,6 @@ from atmpy.infrastructure.enums import (
     VariableIndices as VI,
     PrimitiveVariableIndices as PI,
 )
-from atmpy.flux.utility import directional_indices, direction_mapping
 
 
 def upwind_strang_split_advection(

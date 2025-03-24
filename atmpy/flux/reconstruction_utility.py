@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Callable
-from atmpy.flux.utility import directional_indices, direction_mapping
+from atmpy.infrastructure.utility import directional_indices, direction_mapping
 from atmpy.infrastructure.enums import PrimitiveVariableIndices as PVI
 
 

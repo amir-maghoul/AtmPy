@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
     from atmpy.physics.thermodynamics import Thermodynamics
 
-from atmpy.flux.utility import direction_mapping
+from atmpy.infrastructure.utility import direction_mapping
 from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
     BoundarySide,
@@ -167,9 +167,12 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
                 "There is no gravity strength in the specified direction. Wrong boundary conditions."
             )
         self.gravity_axis: int = cast(int, np.nonzero(self.gravity)[0][0])
+        if self.gravity_axis >= self.ndim:
+            raise ValueError(f"An {self.ndim}-dimensional problem cannot have gravity on axis {self.gravity_axis}.")
+
         if self.gravity_axis == 0:
             raise ValueError(
-                "The first axis is reserved for horizontal velocity. It cannot have gravity."
+                "In reflective gravity boundary condition, the first axis is reserved for horizontal velocity. It cannot have gravity."
             )
         self.stratification: Callable[[Any], Any] = kwargs["stratification"]
         self.facet: str = self._find_facet()
@@ -245,6 +248,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         # Actual X
         X = cell_vars[nsource + (VI.RHOX,)] / cell_vars[nsource + (VI.RHO,)]
 
+        # Calculate intermediate rho
         rho = rhoY * strat
 
         # Evaluate variables (all) at the ghost cells
@@ -340,7 +344,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             raise ValueError("'Left' and 'Right' are not valid side for gravity axis.")
 
 
-class SlipWall(BaseBoundaryCondition):
+class Wall(BaseBoundaryCondition):
     def apply(self, cell_vars, *args, **kwargs):
         # Zero normal velocity, reflect tangential components
         pass

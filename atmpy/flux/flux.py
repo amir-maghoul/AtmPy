@@ -22,7 +22,7 @@ from atmpy.infrastructure.factory import (
     get_slope_limiter,
 )
 import scipy as sp
-from atmpy.flux.utility import directional_indices, direction_mapping
+from atmpy.infrastructure.utility import directional_indices, direction_mapping
 
 
 class Flux:

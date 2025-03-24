@@ -1,6 +1,5 @@
 """Utility module for the boundary handling"""
-from curses import has_key
-from typing import Dict, Any, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
 from atmpy.physics.thermodynamics import Thermodynamics
@@ -8,16 +7,6 @@ from atmpy.infrastructure.enums import (
     BoundarySide as BdrySide,
     BoundaryConditions as BdryType
 )
-
-
-def side_direction_mapping(direction: str) -> Tuple[BdrySide, BdrySide]:
-    """Returns the two sides of a given direction."""
-    mapping = {
-        "x": (BdrySide.LEFT, BdrySide.RIGHT),
-        "y": (BdrySide.BOTTOM, BdrySide.TOP),
-        "z": (BdrySide.FRONT, BdrySide.BACK),
-    }
-    return mapping[direction]
 
 def create_params(bc_data:dict, side: BdrySide, condition: BdryType, **kwargs):
     """ Create or updates the parameters needed for creating boundary managers. It gets the bc_data dicts, adds the

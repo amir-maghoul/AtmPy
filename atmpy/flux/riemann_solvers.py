@@ -4,7 +4,7 @@ from atmpy.infrastructure.enums import (
     VariableIndices as VI,
     PrimitiveVariableIndices as PVI,
 )
-from atmpy.flux.utility import directional_indices
+from atmpy.infrastructure.utility import directional_indices
 
 
 def modified_hll(

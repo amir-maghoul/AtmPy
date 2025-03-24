@@ -69,7 +69,8 @@ class BoundaryConditions(Enum):
     """Map name to class for boundary conditions."""
 
     ABSTRACT = "abstract"
-    SLIP_WALL = "slip_wall"
+    WALL = "wall"
+    REYLEICH = "reyleich"
     INFLOW = "inflow"
     OUTFLOW = "outflow"
     NON_REFLECTIVE_OUTLET = "non_reflective_outlet"

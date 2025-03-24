@@ -3,7 +3,7 @@ The code is the modified version of what appears in PyBella project.
 """
 
 import numpy as np
-from atmpy.flux.utility import direction_mapping
+from atmpy.infrastructure.utility import direction_mapping
 from atmpy.grid.kgrid import Grid
 from atmpy.grid.utility import DimensionSpec, create_grid
 from atmpy.infrastructure.enums import HydrostateIndices as HI

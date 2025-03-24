@@ -7,7 +7,7 @@ from atmpy.infrastructure.enums import (
 from atmpy.boundary_conditions.boundary_conditions import (
     BaseBoundaryCondition as BaseBC,
 )
-from atmpy.boundary_conditions.utility import side_direction_mapping
+from atmpy.infrastructure.utility import side_direction_mapping
 
 
 class BoundaryManager:
@@ -105,6 +105,8 @@ def boundary_manager_2d():
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.variables.variables import Variables
     from atmpy.infrastructure.enums import VariableIndices as VI
+    from atmpy.boundary_conditions.utility import create_params
+    np.set_printoptions(linewidth=100)
 
     nx = 1
     ngx = 2
@@ -133,20 +135,13 @@ def boundary_manager_2d():
     gravity = np.array([0.0, 1.0, 0.0])
     th = Thermodynamics()
 
+    stratification = lambda x: x**2
+
+    gravity = [0.0, 1.0, 0.0]
     direction = "y"
-    params = {
-        "direction": direction,
-        "grid": grid,
-        "gravity": gravity,
-        "stratification": lambda x: x**2,
-        "thermodynamics": th,
-        "is_lamb": False,
-        "is_compressible": True,
-    }
-    bc_dict = {
-        BdrySide.TOP: {"type": BdryType.PERIODIC, "params": params},
-        BdrySide.BOTTOM: {"type": BdryType.PERIODIC, "params": params},
-    }
+    bc_dict = {}
+    create_params(bc_dict, BdrySide.TOP, BdryType.REFLECTIVE_GRAVITY, direction=direction, grid=grid, gravity=gravity, stratification=stratification)
+    create_params(bc_dict, BdrySide.BOTTOM, BdryType.REFLECTIVE_GRAVITY, direction=direction, grid=grid, gravity=gravity, stratification=stratification)
 
     manager = BoundaryManager()
     manager.setup_conditions(bc_dict)
@@ -156,7 +151,7 @@ def boundary_manager_2d():
 
     manager.apply_single_boundary_condition(variables.cell_vars, direction)
     # manager.apply_full_boundary_conditions(variables.cell_vars)
-    print(variables.cell_vars[..., VI.RHO])
+    print(variables.cell_vars[..., VI.RHOW])
 
 
 if __name__ == "__main__":

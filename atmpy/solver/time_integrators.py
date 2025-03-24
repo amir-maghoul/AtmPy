@@ -62,10 +62,6 @@ class AbstractTimeIntegrator(ABC):
         self.current_time: float = 0
 
     @abstractmethod
-    def initialize(self):
-        pass
-
-    @abstractmethod
     def step(self):
         pass
 
@@ -96,8 +92,9 @@ class TimeIntegrator(AbstractTimeIntegrator):
             maxstep,
         )
 
-    def initialize(self):
+    def non_advective_explicit_update(self):
         pass
 
-    def step(self):
+    def non_advective_implicit_update(self):
         pass
+
