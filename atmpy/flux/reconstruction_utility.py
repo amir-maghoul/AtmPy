@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Callable
-from atmpy.infrastructure.utility import directional_indices, direction_mapping
+from atmpy.infrastructure.utility import directional_indices, direction_axis
 from atmpy.infrastructure.enums import PrimitiveVariableIndices as PVI
 
 
@@ -32,7 +32,7 @@ def calculate_variable_differences(
     and diffs, the PVI.Y variable is Chi not Theta. Therefore the difference is calculated by the inversed values of Theta.
     """
 
-    direction = direction_mapping(direction_str)
+    direction = direction_axis(direction_str)
     diffs = np.zeros_like(primitives)  # The final difference array]
 
     # # Set the difference slice (one fewer element than the original array) in the corresponding direction

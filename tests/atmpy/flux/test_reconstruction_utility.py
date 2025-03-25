@@ -6,7 +6,7 @@ from atmpy.flux.reconstruction_utility import (
     calculate_amplitudes,
 )
 import numpy as np
-from atmpy.infrastructure.utility import directional_indices, direction_mapping
+from atmpy.infrastructure.utility import directional_indices, direction_axis
 
 
 # Dummy PVI with attribute Y. In the production code PVI.Y is used as an index.

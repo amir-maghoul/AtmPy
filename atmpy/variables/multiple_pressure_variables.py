@@ -3,7 +3,7 @@ The code is the modified version of what appears in PyBella project.
 """
 
 import numpy as np
-from atmpy.infrastructure.utility import direction_mapping
+from atmpy.infrastructure.utility import direction_axis
 from atmpy.grid.kgrid import Grid
 from atmpy.grid.utility import DimensionSpec, create_grid
 from atmpy.infrastructure.enums import HydrostateIndices as HI
@@ -40,7 +40,7 @@ class MPV:
         # where grid.cshape (cell shape) and grid.nshape (node shape) are defined in kgrid.py.
         self.grid: Grid = grid
         self.direction_str: str = direction
-        self.direction: int = direction_mapping(direction)
+        self.direction: int = direction_axis(direction)
         self.grid1D: Grid = self._create_1D_grid_in_direction()
         self.p0: float = 1.0
         self.p00: float = 1.0

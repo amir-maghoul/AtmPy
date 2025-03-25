@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
     from atmpy.physics.thermodynamics import Thermodynamics
 
-from atmpy.infrastructure.utility import direction_mapping
+from atmpy.infrastructure.utility import direction_axis
 from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
     BoundarySide,
@@ -63,7 +63,7 @@ class BaseBoundaryCondition(ABC):
 
     def __init__(self, **kwargs: Unpack[KwargsTypes]) -> None:
 
-        self.direction: int = direction_mapping(kwargs["direction"])
+        self.direction: int = direction_axis(kwargs["direction"])
         self.grid: "Grid" = kwargs["grid"]
         self.ndim: int = self.grid.ndim
         self.ng: List[Tuple[Any, Any]] = self.grid.ng[self.direction]

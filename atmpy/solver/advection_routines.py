@@ -4,7 +4,7 @@ function are the same."""
 import numpy as np
 from typing import TYPE_CHECKING
 
-from atmpy.infrastructure.utility import dimension_directions, directional_indices, direction_mapping
+from atmpy.infrastructure.utility import dimension_directions, directional_indices, direction_axis
 
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
@@ -79,7 +79,7 @@ def first_order_directional_rk(
     """
 
     ndim: int = grid.ndim
-    direction_int: int = direction_mapping(direction)
+    direction_int: int = direction_axis(direction)
 
     lmbda: float = dt / grid.dxyz[direction_int]
     # Find the left and right indices

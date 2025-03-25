@@ -50,7 +50,7 @@ def directional_indices(
         [slice(None)] * (ndim + 1),
     )
     if direction_string in ["x", "y", "z"]:
-        direction = direction_mapping(direction_string)
+        direction = direction_axis(direction_string)
         left_idx[direction] = slice(0, -1)
         right_idx[direction] = slice(1, None)
         directional_inner_idx[direction] = slice(1, -1)
@@ -74,7 +74,7 @@ def directional_indices(
         )
 
 
-def direction_mapping(direction: str) -> int:
+def direction_axis(direction: str) -> int:
     """Utility function to map the string direction to its indices in variables."""
     direction_map = {"x": 0, "y": 1, "z": 2}
     return direction_map[direction]

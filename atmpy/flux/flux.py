@@ -22,7 +22,7 @@ from atmpy.infrastructure.factory import (
     get_slope_limiter,
 )
 import scipy as sp
-from atmpy.infrastructure.utility import directional_indices, direction_mapping
+from atmpy.infrastructure.utility import directional_indices, direction_axis
 
 
 class Flux:
@@ -254,7 +254,7 @@ class Flux:
 
         # Index mapping
         velocity_indices = [PVI.U, PVI.V, PVI.W]
-        direction_int = direction_mapping(direction)
+        direction_int = direction_axis(direction)
 
         # Find velocity in the direction
         cell_vars = self.variables.cell_vars
@@ -341,7 +341,7 @@ def main():
         calculate_slopes,
         modified_muscl,
     )
-    from atmpy.infrastructure.utility import directional_indices, direction_mapping
+    from atmpy.infrastructure.utility import directional_indices, direction_axis
 
     direction = "x"
     diffs = calculate_variable_differences(primitives, 2, direction_str=direction)
