@@ -258,11 +258,12 @@ class Flux:
         direction_int = direction_axis(direction)
         momentum_idx = momentum_index(direction_int)
 
-        # Find velocity in the direction
-        cell_vars = self.variables.cell_vars
-        velocity = cell_vars[..., momentum_idx]
+        # Find primitive velocity in the direction
+        primitives = self.variables.primitives
+        velocity = primitives[..., momentum_idx]
 
         # Compute the unphysical flux Pu
+        cell_vars = self.variables.cell_vars
         Pu = velocity * cell_vars[..., VI.RHOY]
 
         # Calculate the P = rho*Theta by averaging and advecting
