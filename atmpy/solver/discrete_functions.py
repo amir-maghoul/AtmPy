@@ -6,8 +6,9 @@ if TYPE_CHECKING:
     from atmpy.variables.variables import Variables
     from atmpy.boundary_conditions.boundary_manager import BoundaryManager
 from atmpy.infrastructure.enums import VariableIndices as VI
+from atmpy.grid.utility import nodal_derivative
 
-def velocity_divergence(grid:"Grid", variables:"Variables", boundary_manager: "BoundaryManager") -> np.ndarray:
+def velocity_divergence(grid:"Grid", variables:"Variables") -> np.ndarray:
     """ Calculates the divergence of the velocity vector. This works as the right hand side of the pressure equation in
     the euler steps.
 
@@ -17,56 +18,39 @@ def velocity_divergence(grid:"Grid", variables:"Variables", boundary_manager: "B
         The grid on which the problem is defined.
     variables : Variables
         The container for the variables.
-    boundary_manager : BoundaryManager
-        The boundary manager object.
+
+    Returns
+    -------
+    np.ndarray of shape (nx-1, [ny-1], [nz-1])
+        The divergence of the velocity vector on the nodes.
+
+    Notes
+    -----
+    This function calculates the divergence of the velocity vector on the nodes. The result can fill the inner nodes of
+    a nodal variable as the result is of shape (nx-1, [ny-1], [nz-1]).
 
     """
 
     ndim = grid.ndim
-    ng = grid.ng
-
-    # # Enforce boundary conditions (for wall or Rayleigh) in the y–direction if needed.
-    # if not hasattr(ud, 'LAMB_BDRY'):
-    #     if ud.bdry_type[1] in (BdryType.WALL, BdryType.RAYLEIGH):
-    #         # Assuming a 2D or 3D variable cell_vars shape: (ncx_total, ncy_total, [ncz_total,] num_vars).
-    #         # Set the first and last two cells in the y–direction to zero for the momentum variables.
-    #         variables.cell_vars[..., VI.RHOU][:, :2] = 0.0
-    #         variables.cell_vars[..., VI.RHOU][:, -2:] = 0.0
-    #         variables.cell_vars[..., VI.RHOV][:, :2] = 0.0
-    #         variables.cell_vars[..., VI.RHOV][:, -2:] = 0.0
-    #         if ndim == 3:
-    #             variables.cell_vars[..., VI.RHOW][:, :2] = 0.0
-    #             variables.cell_vars[..., VI.RHOW][:, -2:] = 0.0
 
     # Compute the weighting factor Y = (rhoY / rho)
-    # (Make sure to avoid division by zero in a real implementation)
     Y = variables.cell_vars[..., VI.RHOY] / variables.cell_vars[..., VI.RHO]
 
-    # Compute finite differences along the x-direction (axis 0)
-    Ux = np.diff(variables.cell_vars[..., VI.RHOU] * Y, axis=0) / grid.dx
-    # Average to center the differences on the interfaces (discard one extra slice)
-    Ux = 0.5 * (Ux[:, :-1] + Ux[:, 1:])
+    # Derivative of u in x.
+    Ux = nodal_derivative(variables.cell_vars[..., VI.RHOU], ndim, axis=0, ds=grid.dx)
 
     # For one dimensions, we are done.
     if ndim == 1:
         return Ux
 
-    # Compute finite differences along the y-direction (axis 1)
-    Vy = np.diff(variables.cell_vars[..., VI.RHOV] * Y, axis=1) / grid.dy
-    Vy = 0.5 * (Vy[:-1, :] + Vy[1:, :])
-
+    # Derivative of v in y.
+    Vy = nodal_derivative(variables.cell_vars[..., VI.RHOV], ndim, axis=1, ds=grid.dy)
     if ndim == 2:
-        rhs = Ux + Vy
-        return rhs
+        return Ux + Vy
 
+    # Derivative of w in z.
+    Wz = nodal_derivative(variables.cell_vars[..., VI.RHOW], ndim, axis=2, ds=grid.dz)
     if ndim == 3:
-        # For three dimensions, adjust further along the third dimension.
-        Ux = -0.5 * (Ux[..., :-1] + Ux[..., 1:])
-        Vy = 0.5 * (Vy[..., :-1] + Vy[..., 1:])
-        Wz = np.diff(variables.cell_vars[..., VI.RHOW] * Y, axis=2) / grid.dz
-        Wz = 0.5 * (Wz[:-1, ...] + Wz[1:, ...])
-        # A second average in the y-direction (or x–direction) for proper centering.
-        Wz = 0.5 * (Wz[:, :-1, ...] + Wz[:, 1:, ...])
-        # Fill the interior nodes of rhs with the divergence.
-        rhs[1:-1, 1:-1, 1:-1] = Ux + Vy + Wz
-    return rhs
+        return Ux + Vy + Wz
+    else:
+        raise ValueError("Unsupported dimension {}".format(ndim))

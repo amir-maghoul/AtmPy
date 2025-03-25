@@ -2,6 +2,7 @@ from atmpy.grid.kgrid import Grid
 import numpy as np
 from dataclasses import dataclass
 from typing import List
+from atmpy.infrastructure.utility import direction_axis, directional_indices
 
 
 @dataclass
@@ -65,11 +66,55 @@ def create_grid(dimensions: List[DimensionSpec]):
     return Grid(**args)
 
 
-def nodal_derivative(cell_var: np.ndarray, direction: str):
-    """ Calculates the nodal derivative of the given cell variable in the given direction."""
+def nodal_derivative(variable: np.ndarray, ndim: int, axis: int, ds: float):
+    """ Calculates the nodal derivative of the given cell variable in the given direction. This specific derivative
+    is calculated by first finding values on the interfaces by averaging the cells and then use the interfaces around
+    the node to calulcate the derivative. See BK19 paper equation (31a, b).
 
-    axis = 1
+    Parameters
+    ----------
+    variable : np.ndarray
+        The cell-centered values.
+    ds : float
+        The spacing of the cells.
+    axis : int
+        Axis along which to differentiate.
 
+    Returns:
+      A numpy.ndarray containing the nodal derivative
+
+    Notes
+    -----
+    The shape of the resulting array would be the same for derivative in any direction. The reason is simple:
+    The np.diff reduces one shape in direction of derivation. The averaging then reduces one shape in the remaining directions.
+    So the result would have shape (nx-1, [ny-1], [nz-1]).
+    """
+    # Bring the differentiation axis to the front.
+    u_flat = np.moveaxis(variable, axis, 0)
+
+    # Compute the primary difference along the first axis.
+    d = np.diff(u_flat, axis=0) / ds
+    ndim = u_flat.ndim  # This is the original ndim of u.
+
+    # Based on the dimensionality, average over the complementary axes.
+    if ndim == 1:
+        # 1D case: no additional averaging required.
+        result = d
+    elif ndim == 2:
+        # 2D case: average along the second axis.
+        # d has shape (n-1, m), so average adjacent values in m-direction.
+        result = 0.5 * (d[:, :-1] + d[:, 1:])
+    elif ndim == 3:
+        # 3D case: average along both the second and third axes.
+        # d has shape (n-1, m, p) and the nodal value is found by averaging
+        # four neighboring interface values.
+        result = (d[:, :-1, :-1] + d[:, :-1, 1:] +
+                  d[:, 1:, :-1]  + d[:, 1:, 1:]) / 4.
+    else:
+        raise ValueError("Only 1D, 2D, or 3D arrays are supported.")
+
+    # Move the differentiation axis back to its original location.
+    return np.moveaxis(result, 0, axis)
 
 def cell_to_node_average(
     grid: Grid, var_cells: np.ndarray, var_nodes: np.ndarray = None

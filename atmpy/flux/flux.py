@@ -312,7 +312,7 @@ def main():
     ngx = 2
     nnx = nx + 2 * ngx
     ny = 2
-    ngy = 2
+    ngy = 3
     nny = ny + 2 * ngy
 
     dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
@@ -366,8 +366,11 @@ def main():
     flux.apply_riemann_solver(1, direction)
     print(flux.flux[direction][..., VI.RHOU])
     print(flux.variables.cell_vars[..., VI.RHOU])
+    u = variables.cell_vars[..., VI.RHOU]
+    from atmpy.grid.utility import nodal_derivative
+    print(nodal_derivative(u, grid.ndim, 0, 1))
+    print(nodal_derivative(u, grid.ndim, 1, 1))
 
-    # TODO: SHAPE MISMATCH IN HLL
 
 
 if __name__ == "__main__":
