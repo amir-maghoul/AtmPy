@@ -22,7 +22,8 @@ from atmpy.infrastructure.factory import (
     get_slope_limiter,
 )
 import scipy as sp
-from atmpy.infrastructure.utility import directional_indices, direction_axis
+from atmpy.infrastructure.utility import directional_indices, direction_axis, momentum_index
+from line_profiler import profile
 
 
 class Flux:
@@ -47,6 +48,7 @@ class Flux:
     limiter : Callable
         The given limiter function. Default is van Leer.
     """
+
 
     def __init__(
         self,
@@ -253,12 +255,12 @@ class Flux:
         )
 
         # Index mapping
-        velocity_indices = [PVI.U, PVI.V, PVI.W]
         direction_int = direction_axis(direction)
+        momentum_idx = momentum_index(direction_int)
 
         # Find velocity in the direction
         cell_vars = self.variables.cell_vars
-        velocity = cell_vars[..., velocity_indices[direction_int]]
+        velocity = cell_vars[..., momentum_idx]
 
         # Compute the unphysical flux Pu
         Pu = velocity * cell_vars[..., VI.RHOY]
@@ -296,10 +298,7 @@ class Flux:
         )
 
 
-from line_profiler import profile
 
-
-@profile
 def main():
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.physics.eos import ExnerBasedEOS
