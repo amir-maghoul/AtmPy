@@ -1,13 +1,14 @@
 from abc import abstractmethod
 import numpy as np
+from typing import Union, TYPE_CHECKING
+if TYPE_CHECKING:
+    from atmpy.grid.kgrid import Grid
 from atmpy.infrastructure.enums import (
     VariableIndices as VI,
     PrimitiveVariableIndices as PVI,
 )
-from atmpy.grid.utility import DimensionSpec, create_grid
-from atmpy.grid.kgrid import Grid
-from atmpy.physics import eos
 from atmpy.physics.eos import IdealGasEOS, BarotropicEOS, ExnerBasedEOS
+from atmpy.infrastructure.utility import momentum_index
 
 
 class Variables:
@@ -33,7 +34,7 @@ class Variables:
         Number of spatial ndim.
     """
 
-    def __init__(self, grid: Grid, num_vars_cell: int, num_vars_node: int = 1):
+    def __init__(self, grid: "Grid", num_vars_cell: int, num_vars_node: int = 1):
         """
         Initializes the VariableContainer with cell-centered and node-based variables.
 
@@ -46,7 +47,7 @@ class Variables:
         num_vars_node : int (default = 1)
             Number of node-based variables.
         """
-        self.grid: Grid = grid
+        self.grid: "Grid" = grid
         self.num_vars_cell: int = num_vars_cell
         self.num_vars_node: int = num_vars_node
         self.ndim: int = grid.ndim
@@ -218,6 +219,24 @@ class Variables:
             self.cell_vars[..., VI.RHOW] = rho * self.primitives[..., PVI.W]
         elif ndim > 3 or ndim < 1:
             raise ValueError("Unsupported number of ndim.")
+
+    def background_wind(self, wind_speed: Union[np.ndarray, list], scale: float) -> None:
+        """ Modify the momenta using the background wind and the given factor
+
+        Parameters
+        ----------
+        wind_speed : Union[np.ndarray, list] of shape (3, 1)
+            The list or numpy array containing the wind velocities in each direction.
+        scale : float
+            The scaling factor
+        """
+        AXES: int = 3
+        for axis in range(AXES):
+            momentum_idx = momentum_index(axis)
+            try:
+                self.cell_vars[..., momentum_idx] += wind_speed[axis] * scale * self.cell_vars[..., VI.RHO]
+            except IndexError:
+                print(f"The cell variables does not have enough variables. Index {momentum_idx} is missing.")
 
     def get_node_vars(self):
         """
