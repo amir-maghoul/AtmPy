@@ -1,18 +1,21 @@
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, TYPE_CHECKING
+if TYPE_CHECKING:
+    from atmpy.boundary_conditions.boundary_conditions import (
+        BaseBoundaryCondition as BaseBC,
+    )
+    import numpy as np
 from atmpy.infrastructure.factory import get_boundary_conditions
 from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
     BoundarySide as BdrySide,
 )
-from atmpy.boundary_conditions.boundary_conditions import (
-    BaseBoundaryCondition as BaseBC,
-)
+
 from atmpy.infrastructure.utility import side_direction_mapping
 
 
 class BoundaryManager:
     def __init__(self):
-        self.boundary_conditions: Dict[BdrySide, BaseBC] = {}
+        self.boundary_conditions: Dict[BdrySide, "BaseBC"] = {}
 
     def setup_conditions(self, bc_dict: Dict[BdrySide, Dict[str, Any]]):
         for side, bc_data in bc_dict.items():
@@ -66,7 +69,7 @@ class BoundaryManager:
                         f"the opposite boundary '{opposite_side}' is set as {opposite_condition.type}."
                     )
 
-    def apply_single_boundary_condition(self, cells, direction):
+    def apply_single_boundary_condition(self, cells: "np.ndarray", direction: str):
         """Apply the boundary conditions on a single direction. If the boundary condition of the first side is
         PERIODIC, then skip the next side since the condition is automatically applied on the next side too.
 
@@ -78,7 +81,8 @@ class BoundaryManager:
             The direction to apply the boundary condition on. Values should be "x", "y" or "z".
         """
 
-        sides = side_direction_mapping(direction)
+        sides: Tuple[BdrySide, BdrySide] = side_direction_mapping(direction)
+        print(f"Apply boundary conditions on sides: {sides}")
         for side in sides:
             # if side in self.boundary_conditions.keys():
             condition = self.boundary_conditions[side]
@@ -91,10 +95,44 @@ class BoundaryManager:
         self,
         cells,
     ):
+        """ Apply the boundary conditions on all sides."""
         print("Applying full boundary conditions...")
-        print(self.boundary_conditions[BdrySide.TOP])
         for side, condition in self.boundary_conditions.items():
             condition.apply(cells)
+
+    def apply_single_rhs(self, rhs: np.ndarray, direction: str):
+        """ Apply the correction on the boundary in a single direction on the source term.
+
+        Parameters
+        ----------
+        rhs: np.ndarray
+            The source variable. The right-hand side of the euler equation.
+        direction: str
+            The direction of the correction.
+
+        """
+        sides = side_direction_mapping(direction)
+        print(f"Apply boundary conditions on sides: {sides}")
+        for side in sides:
+            # if side in self.boundary_conditions.keys():
+            condition = self.boundary_conditions[side]
+            condition.apply_rhs(rhs)
+            # Since the periodic boundary condition is automatically applied on both sides, skip the other side
+            if condition.type == BdryType.PERIODIC:
+                break
+
+    def apply_all_rhs(self, rhs):
+        """Apply boundary corrections to an external source on all sides and directions.
+
+        Parameters
+        ----------
+        rhs: np.ndarray
+            right-hand side of the euler equations. Source terms.
+        """
+        for side, condition in self.boundary_conditions.items():
+            # Only call apply_rhs if the method is implemented.
+            if hasattr(condition, "apply_rhs"):
+                condition.apply_rhs(rhs)
 
 
 import numpy as np

@@ -22,7 +22,7 @@ from atmpy.infrastructure.factory import (
     get_slope_limiter,
 )
 import scipy as sp
-from atmpy.infrastructure.utility import directional_indices, direction_axis, momentum_index
+from atmpy.infrastructure.utility import directional_indices, direction_axis, velocity_index
 from line_profiler import profile
 
 
@@ -256,11 +256,11 @@ class Flux:
 
         # Index mapping
         direction_int = direction_axis(direction)
-        momentum_idx = momentum_index(direction_int)
+        velocity_idx = velocity_index(direction_int)
 
         # Find primitive velocity in the direction
         primitives = self.variables.primitives
-        velocity = primitives[..., momentum_idx]
+        velocity = primitives[..., velocity_idx]
 
         # Compute the unphysical flux Pu
         cell_vars = self.variables.cell_vars
@@ -367,9 +367,10 @@ def main():
     print(flux.flux[direction][..., VI.RHOU])
     print(flux.variables.cell_vars[..., VI.RHOU])
     u = variables.cell_vars[..., VI.RHOU]
-    from atmpy.grid.utility import nodal_derivative
-    print(nodal_derivative(u, grid.ndim, 0, 1))
-    print(nodal_derivative(u, grid.ndim, 1, 1))
+
+    vels = [3, 4, 5]
+    variables.background_wind(vels, 1)
+    print(variables.cell_vars[..., VI.RHOW])
 
 
 

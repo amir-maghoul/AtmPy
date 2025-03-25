@@ -78,6 +78,11 @@ class BaseBoundaryCondition(ABC):
 
     @abstractmethod
     def apply(self, cell_vars, *args, **kwargs):
+        """ Apply the boundary condition on the cell variables"""
+        pass
+
+    def apply_rhs(self, rhs, *args, **kwargs):
+        """ Apply the correction to the rhs on the boundary"""
         pass
 
     def _create_directional_inner_slice(self) -> Tuple[slice, ...]:
@@ -181,6 +186,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         self.is_lamb: bool = kwargs["is_lamb"]
         self.is_compressible: bool = kwargs["is_compressible"]
 
+
     def apply(self, cell_vars: np.ndarray, *args, **kwargs):
         """Apply the reflective boundary condition for the given side of the gravity axis. If self.side is top, this means
         that the boundary condition for the top side of the vertical axis is the 'Lid' boundary. The sponge BC should be
@@ -221,7 +227,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             ) ** self.th.gm1inv
         else:
             raise NotImplementedError(
-                "The compressible boundary condition is not implemented yet."
+                "The incompressible boundary condition is not implemented yet."
             )
 
         # Get the index of the velocities in cell_vars for the gravity and nongravity directions
