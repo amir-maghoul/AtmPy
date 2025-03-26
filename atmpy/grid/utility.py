@@ -66,7 +66,7 @@ def create_grid(dimensions: List[DimensionSpec]):
     return Grid(**args)
 
 
-def nodal_derivative(variable: np.ndarray, ndim: int, axis: int, ds: float):
+def nodal_derivative(variable: np.ndarray, axis: int, ds: float):
     """ Calculates the nodal derivative of the given cell variable in the given direction. This specific derivative
     is calculated by first finding values on the interfaces by averaging the cells and then use the interfaces around
     the node to calulcate the derivative. See BK19 paper equation (31a, b).
@@ -80,7 +80,8 @@ def nodal_derivative(variable: np.ndarray, ndim: int, axis: int, ds: float):
     axis : int
         Axis along which to differentiate.
 
-    Returns:
+    Returns
+    -------
       A numpy.ndarray containing the nodal derivative
 
     Notes
