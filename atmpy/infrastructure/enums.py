@@ -12,7 +12,7 @@ class VariableIndices(IntEnum):
     RHOV = 4  # Horizontal Velocity y-component
     RHOW = 5  # Vertical Velocity
 
-
+# For now the assumption is that the number of cell variables and the number of primitive variables are the same
 class PrimitiveVariableIndices(IntEnum):
     """Create constants for variable indices in the variable container (ndarray) for better readability"""
 

@@ -9,11 +9,18 @@ from atmpy.infrastructure.enums import (
 )
 from atmpy.physics.eos import IdealGasEOS, BarotropicEOS, ExnerBasedEOS
 from atmpy.infrastructure.utility import momentum_index
+import warnings
 
 
 class Variables:
     """
     A unified class for storing both cell-centered and node-based conservative variables.
+
+    Notes
+    -----
+    The assumption is that the number of conservative variables and the number of primitive variables are the same. So
+    that if future places such as reconstruction or riemann solvers, one can use the numpy vectorization to do
+    calculations on a combination of both.
 
     Attributes
     ----------
@@ -77,6 +84,8 @@ class Variables:
                 "Number of cell-based variables should not be None or less than 4."
             )
 
+        # Notice the hard assumption: The number of primitive variables are the same as
+        # the number of conservative variables
         self.primitives = np.zeros(self.cell_vars.shape)
 
         # Initialize node-based variables
@@ -146,9 +155,7 @@ class Variables:
         Converts cell-centered conservative variables to primitive variables.
 
         The conservative variables are assumed to be ordered as follows:
-        - 1D: [rho, rhoX, rhoY, rho*u]
-        - 2D: [rho, rhoX, rhoY, rho*u, rho*v]
-        - 3D: [rho, rhoX, rhoY, rho*u, rho*v, rho*w]
+        - [rho, rhoX, rhoY, rho*u, [rho*v], [rho*w]]
 
         Parameters
         ----------
@@ -160,8 +167,6 @@ class Variables:
         np.ndarray
             Array of primitive variables with one additional dimension.
         """
-        ndim = self.ndim
-
         if isinstance(eos, IdealGasEOS):
             raise NotImplementedError(
                 "IdealGasEOS not yet supported for primitives: No way to calculate the energy"
@@ -184,23 +189,19 @@ class Variables:
             self.cell_vars[*nonzero_idx, VI.RHOY] / rho[nonzero_idx]
         )
 
-        if ndim == 2:
+        warnings.warn("""For a better performance and a good vectorization in calculations, the current assumption of 
+        the project is that the number of primitive variables and the number of conservative variables are the same.""")
+        if PVI.V < self.num_vars_cell:
             self.primitives[*nonzero_idx, PVI.V] = (
                 self.cell_vars[*nonzero_idx, VI.RHOV] / rho[nonzero_idx]
             )
-        elif ndim == 3:
-            self.primitives[*nonzero_idx, PVI.V] = (
-                self.cell_vars[*nonzero_idx, VI.RHOV] / rho[nonzero_idx]
-            )
+        if PVI.W < self.num_vars_cell:
             self.primitives[*nonzero_idx, PVI.W] = (
                 self.cell_vars[*nonzero_idx, VI.RHOW] / rho[nonzero_idx]
             )
 
-        elif ndim > 3 or ndim < 1:
-            raise ValueError("Unsupported number of ndim.")
-
     def to_conservative(self, rho: np.ndarray) -> None:
-        ndim = self.ndim
+        """ Converts the primitive variables to conservative variables using the given rho."""
         self.cell_vars[..., VI.RHO] = rho
         self.cell_vars[..., VI.RHOX] = rho * self.primitives[..., PVI.X]
         self.cell_vars[..., VI.RHOY] = self.primitives[
@@ -208,13 +209,10 @@ class Variables:
         ]  # Remember P = rho*Theta = rho*Y
         self.cell_vars[..., VI.RHOU] = rho * self.primitives[..., PVI.U]
 
-        if ndim == 2:
+        if VI.RHOV < self.num_vars_cell:
             self.cell_vars[..., VI.RHOV] = rho * self.primitives[..., PVI.V]
-        elif ndim == 3:
-            self.cell_vars[..., VI.RHOV] = rho * self.primitives[..., PVI.V]
+        if VI.RHOW < self.num_vars_cell:
             self.cell_vars[..., VI.RHOW] = rho * self.primitives[..., PVI.W]
-        elif ndim > 3 or ndim < 1:
-            raise ValueError("Unsupported number of ndim.")
 
     def background_wind(self, wind_speed: Union[np.ndarray, list], scale: float) -> None:
         """ Modify the momenta using the background wind and the given factor
