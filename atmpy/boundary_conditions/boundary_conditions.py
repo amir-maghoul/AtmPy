@@ -382,15 +382,20 @@ class Wall(BaseBoundaryCondition):
         pad_slice = self.padded_slices()
         inner_slice = self.compute_inner_slice()
 
-        for variable in range(cell_vars.shape[-1]):
-            pass
-
-        # Apply np.pad with mode "wrap" on ALL variables for periodic BC.
-        cell_vars[...] = np.pad(
-            cell_vars[inner_slice],
-            pad_width,
-            mode="symmetric",
-        )
+        if self.grid.nc[self.direction] == 1:
+            # Apply np.pad with mode "edge" on ALL variables for wall BC, to copy the single cell to ghost cells
+            cell_vars[...] = np.pad(
+                cell_vars[inner_slice],
+                pad_width,
+                mode="edge",
+            )
+        else:
+            # Apply np.pad with mode "symmetric" on ALL variables for wall BC.
+            cell_vars[...] = np.pad(
+                cell_vars[inner_slice],
+                pad_width,
+                mode="symmetric",
+            )
 
         cell_vars[pad_slice + (normal_momentum_index,)] *= -1
 

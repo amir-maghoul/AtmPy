@@ -136,16 +136,21 @@ class Grid:
 
         # Unifying lists of important properties for all dimensions
         self.dxyz: List[int, ...] = [None] * 3  # Discretization fineness
+        self.nc: List[int, ...] = [None] * 3    # Number of inner cells in all direction
 
+        ################################
         # Grid parameters in x-direction
+        ################################
         self.nx: int = nx
         self.x_start: float = x_start
         self.x_end: float = x_end
         self.dx: float = (x_end - x_start) / nx
         self.ngx: int = ngx  # Number of ghost cells in x-direction
         self.dxyz[0] = self.dx
+        self.nc[0] = self.nx
 
         # Total number of cells and nodes including ghost cells in x-direction
+
         self.ncx_total: int = nx + 2 * ngx
         self.nnx_total: int = self.ncx_total + 1
         self.cshape: Tuple[int, ...] = (self.ncx_total,)
@@ -171,7 +176,9 @@ class Grid:
         self.ng[0] = (self.ngx, self.ngx)
         self.inner_slice[0] = self.inner_slice_x
 
-        # Check for 2D grid
+        ################################
+        # Grid parameters in y direction
+        ################################
         if (
             ny is not None
             and y_start is not None
@@ -187,6 +194,7 @@ class Grid:
             self.y_start: float = y_start
             self.y_end: float = y_end
             self.dy: float = (y_end - y_start) / ny
+            self.nc[1] = self.ny
             self.dxyz[1] = self.dy
             self.ngy: int = (
                 ngy if ngy is not None else ngx
@@ -220,7 +228,9 @@ class Grid:
                 "Cannot have mixed of None and not None values for parameters of the ndim."
             )
 
-        # Check for 3D grid
+        ################################
+        # Grid parameters in z direction
+        ################################
         if (
             nz is not None
             and z_start is not None
@@ -237,6 +247,7 @@ class Grid:
             self.z_end: float = z_end
             self.dz: float = (z_end - z_start) / nz
             self.dxyz[2] = self.dz
+            self.nc[2] = self.nz
             self.ngz: int = (
                 ngz if ngz is not None else ngx
             )  # Use ngx if ngz not specified
