@@ -199,10 +199,6 @@ class Variables:
         elif ndim > 3 or ndim < 1:
             raise ValueError("Unsupported number of ndim.")
 
-    # -------------------
-    # Node-Based Methods
-    # -------------------
-
     def to_conservative(self, rho: np.ndarray) -> None:
         ndim = self.ndim
         self.cell_vars[..., VI.RHO] = rho
@@ -236,7 +232,12 @@ class Variables:
             try:
                 self.cell_vars[..., momentum_idx] += wind_speed[axis] * scale * self.cell_vars[..., VI.RHO]
             except IndexError:
-                print(f"The cell variables does not have enough variables. Index {momentum_idx} is missing.")
+                print("Calculating the background wind...")
+                print(f"The cell variables container does not have enough variables. Index {momentum_idx} is missing.")
+
+    # -------------------
+    # Node-Based Methods
+    # -------------------
 
     def get_node_vars(self):
         """
