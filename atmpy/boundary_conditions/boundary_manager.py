@@ -1,4 +1,5 @@
 from typing import Dict, Any, Tuple, TYPE_CHECKING
+
 if TYPE_CHECKING:
     from atmpy.boundary_conditions.boundary_conditions import (
         BaseBoundaryCondition as BaseBC,
@@ -84,24 +85,24 @@ class BoundaryManager:
         sides: Tuple[BdrySide, BdrySide] = side_direction_mapping(direction)
         print(f"Apply boundary conditions on sides: {sides}")
         for side in sides:
-            # if side in self.boundary_conditions.keys():
-            condition = self.boundary_conditions[side]
-            condition.apply(cells)
-            # Since the periodic boundary condition is automatically applied on both sides, skip the other side
-            if condition.type == BdryType.PERIODIC:
-                break
+            if side in self.boundary_conditions.keys():
+                condition = self.boundary_conditions[side]
+                condition.apply(cells)
+                # Since the periodic boundary condition is automatically applied on both sides, skip the other side
+                if condition.type == BdryType.PERIODIC:
+                    break
 
     def apply_full_boundary_conditions(
         self,
         cells,
     ):
-        """ Apply the boundary conditions on all sides."""
+        """Apply the boundary conditions on all sides."""
         print("Applying full boundary conditions...")
         for side, condition in self.boundary_conditions.items():
             condition.apply(cells)
 
-    def apply_single_rhs(self, rhs: np.ndarray, direction: str):
-        """ Apply the correction on the boundary in a single direction on the source term.
+    def apply_single_rhs(self, rhs: "np.ndarray", direction: str):
+        """Apply the correction on the boundary in a single direction on the source term.
 
         Parameters
         ----------
@@ -144,6 +145,7 @@ def boundary_manager_2d():
     from atmpy.variables.variables import Variables
     from atmpy.infrastructure.enums import VariableIndices as VI
     from atmpy.boundary_conditions.utility import create_params
+
     np.set_printoptions(linewidth=100)
 
     nx = 1
@@ -178,18 +180,39 @@ def boundary_manager_2d():
     gravity = [0.0, 1.0, 0.0]
     direction = "y"
     bc_dict = {}
-    create_params(bc_dict, BdrySide.TOP, BdryType.REFLECTIVE_GRAVITY, direction=direction, grid=grid, gravity=gravity, stratification=stratification)
-    create_params(bc_dict, BdrySide.BOTTOM, BdryType.REFLECTIVE_GRAVITY, direction=direction, grid=grid, gravity=gravity, stratification=stratification)
+    create_params(
+        bc_dict,
+        BdrySide.TOP,
+        BdryType.WALL,
+        direction=direction,
+        grid=grid,
+        gravity=gravity,
+        stratification=stratification,
+    )
+    create_params(
+        bc_dict,
+        BdrySide.BOTTOM,
+        BdryType.WALL,
+        direction=direction,
+        grid=grid,
+        gravity=gravity,
+        stratification=stratification,
+    )
 
     manager = BoundaryManager()
     manager.setup_conditions(bc_dict)
     print(manager.boundary_conditions.keys())
 
     print("Applying boundary conditions for 2D test:")
-
+    print(variables.cell_vars[..., VI.RHOU])
+    x = variables.cell_vars[..., VI.RHOV]
     manager.apply_single_boundary_condition(variables.cell_vars, direction)
-    # manager.apply_full_boundary_conditions(variables.cell_vars)
-    print(variables.cell_vars[..., VI.RHOW])
+
+    # # manager.apply_full_boundary_conditions(variables.cell_vars)
+    print(variables.cell_vars[..., VI.RHOV])
+    # rhs = np.arange(grid.nnx_total * grid.nny_total).reshape(grid.nshape)
+    # print(x)
+    # print(np.pad(x[tuple(directional_inner_slice)], pad_width, negative_symmetric))
 
 
 if __name__ == "__main__":
