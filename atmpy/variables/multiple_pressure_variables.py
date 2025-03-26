@@ -3,14 +3,14 @@ The code is the modified version of what appears in PyBella project.
 """
 
 import numpy as np
+from typing import List, Union, TYPE_CHECKING
+if TYPE_CHECKING:
+    from atmpy.grid.kgrid import Grid
 from atmpy.infrastructure.utility import direction_axis
-from atmpy.grid.kgrid import Grid
 from atmpy.grid.utility import DimensionSpec, create_grid
 from atmpy.infrastructure.enums import HydrostateIndices as HI
 from atmpy.variables.variables import Variables
 from atmpy.physics.thermodynamics import Thermodynamics
-from atmpy.variables.utility import get_left_index_in_all_directions
-from typing import List, Union
 
 
 class MPV:
@@ -24,7 +24,7 @@ class MPV:
         the 1D version of the self.grid in the direction of hydrostacity
     """
 
-    def __init__(self, grid, num_vars=6, direction="y"):
+    def __init__(self, grid: "Grid", num_vars: int = 6, direction: str = "y"):
         """Initialize the container for pressure variables.
 
         Parameters
@@ -36,9 +36,7 @@ class MPV:
         direction : str (default="y")
             the direction of hydrostacity. Values can be "x", "y" or "z".
         """
-        # Instead of using elem.sc and node.sc, get the shapes from the grid,
-        # where grid.cshape (cell shape) and grid.nshape (node shape) are defined in kgrid.py.
-        self.grid: Grid = grid
+        self.grid: "Grid" = grid
         self.direction_str: str = direction
         self.direction: int = direction_axis(direction)
         self.grid1D: Grid = self._create_1D_grid_in_direction()
@@ -55,6 +53,7 @@ class MPV:
         self.v: np.ndarray = np.zeros(grid.cshape)
         self.w: np.ndarray = np.zeros(grid.cshape)
 
+        # Right hand side of the pressure equation. Defined on nodes.
         self.rhs: np.ndarray = np.zeros(grid.nshape)
         self.wcenter: np.ndarray = np.zeros(grid.nshape)
         self.wplus: np.ndarray = np.zeros((grid.ndim,) + grid.cshape)
@@ -73,7 +72,7 @@ class MPV:
         nghosts: int = getattr(self.grid, "ng" + self.direction_str)
 
         dims: List[DimensionSpec] = [DimensionSpec(ncells, start, end, nghosts)]
-        grid: Grid = create_grid(dims)
+        grid: "Grid" = create_grid(dims)
 
         return grid
 
@@ -179,6 +178,7 @@ class MPV:
 
 def simple_test():
     from atmpy.variables.utility import compute_stratification
+    from atmpy.grid.kgrid import Grid
 
     R_gas = 287.4
     R_vap = 461.0
@@ -242,7 +242,6 @@ def simple_test():
     hydrostatics = Variables(grid, num_vars_cell=7, num_vars_node=7)
     hydrostatics2 = Variables(grid, num_vars_cell=7, num_vars_node=7)
     compute_stratification(hydrostatics, Y, Yn, grid, axis, gravity, Msq)
-    column(hydrostatics, Y, Yn, grid, gravity, Msq)
     print(hydrostatics.cell_vars[4, :, HI.P0])
 
     # End of compute_stratification method
