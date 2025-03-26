@@ -239,36 +239,34 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             / cell_vars[nsource + (VI.RHO,)]
         )
 
+        # Calculate intermediate rho and evaluate the corresponding ghost cell.
+        rho = rhoY * strat
+        cell_vars[nimage + (VI.RHO,)] = rho
+
         if not self.is_lamb:
+            # Find velocity in the direction of gravity and update ghost cells.
             v = Pv / rhoY
             Th_slc = 1.0
+            cell_vars[nimage + (momentum_index[0],)] = rho * v
         else:
             raise ValueError("The lamb boundary condition is not implemented yet.")
 
         # This is the actual horizontal velocity, since the gravity axis can never be the first axis.
         u = cell_vars[nsource + (VI.RHOU,)] / cell_vars[nsource + (VI.RHO,)]
-
-        # w is a placeholder for the velocity in the direction of non-gravity.
-        w = cell_vars[nsource + (momentum_index[1],)] / cell_vars[nsource + (VI.RHO,)]
-
-        # Actual X
-        X = cell_vars[nsource + (VI.RHOX,)] / cell_vars[nsource + (VI.RHO,)]
-
-        # Calculate intermediate rho
-        rho = rhoY * strat
-
-        # Evaluate variables (all) at the ghost cells
-        cell_vars[nimage + (VI.RHO,)] = rho
         cell_vars[nimage + (VI.RHOU,)] = rho * u * Th_slc
-        if not self.is_lamb:
-            cell_vars[nimage + (momentum_index[0],)] = rho * v
-        else:
-            raise NotImplementedError(
-                "The lamb boundary condition is not implemented yet."
-            )
-        cell_vars[nimage + (momentum_index[1],)] = rho * w * Th_slc
+
+        # w is a placeholder for the velocity in the direction of non-gravity. First, check whether the variable container
+        # can be indexed that far.
+        if momentum_index[1] < cell_vars.shape[-1]:
+            w = cell_vars[nsource + (momentum_index[1],)] / cell_vars[nsource + (VI.RHO,)]
+            cell_vars[nimage + (momentum_index[1],)] = rho * w * Th_slc
+
+        # Compute the actual X and evaluate the ghost cells.
+        X = cell_vars[nsource + (VI.RHOX,)] / cell_vars[nsource + (VI.RHO,)]
         cell_vars[nimage + (VI.RHOY,)] = rhoY
         cell_vars[nimage + (VI.RHOX,)] = rho * X
+
+
 
     def _get_gravity_momentum_index(self) -> Tuple[int, int]:
         """Helper method to get the momentum variable index in the direction of gravity as the first output and the
