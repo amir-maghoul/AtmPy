@@ -150,7 +150,7 @@ class Grid:
         self.nnx_total: int = self.ncx_total + 1
         self.cshape: Tuple[int, ...] = (self.ncx_total,)
         self.nshape: Tuple[int, ...] = (self.nnx_total,)
-        self.ng = [None]
+        self.ng: List[Tuple[int, int]] = [None]
         self.inner_slice = [None]
 
         # Generate x-coordinate arrays

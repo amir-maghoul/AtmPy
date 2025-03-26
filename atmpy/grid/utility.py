@@ -67,7 +67,7 @@ def create_grid(dimensions: List[DimensionSpec]):
 
 
 def nodal_derivative(variable: np.ndarray, axis: int, ds: float):
-    """ Calculates the nodal derivative of the given cell variable in the given direction. This specific derivative
+    """Calculates the nodal derivative of the given cell variable in the given direction. This specific derivative
     is calculated by first finding values on the interfaces by averaging the cells and then use the interfaces around
     the node to calulcate the derivative. See BK19 paper equation (31a, b).
 
@@ -109,13 +109,13 @@ def nodal_derivative(variable: np.ndarray, axis: int, ds: float):
         # 3D case: average along both the second and third axes.
         # d has shape (n-1, m, p) and the nodal value is found by averaging
         # four neighboring interface values.
-        result = (d[:, :-1, :-1] + d[:, :-1, 1:] +
-                  d[:, 1:, :-1]  + d[:, 1:, 1:]) / 4.
+        result = (d[:, :-1, :-1] + d[:, :-1, 1:] + d[:, 1:, :-1] + d[:, 1:, 1:]) / 4.0
     else:
         raise ValueError("Only 1D, 2D, or 3D arrays are supported.")
 
     # Move the differentiation axis back to its original location.
     return np.moveaxis(result, 0, axis)
+
 
 def cell_to_node_average(
     grid: Grid, var_cells: np.ndarray, var_nodes: np.ndarray = None

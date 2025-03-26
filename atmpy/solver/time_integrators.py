@@ -97,4 +97,3 @@ class TimeIntegrator(AbstractTimeIntegrator):
 
     def non_advective_implicit_update(self):
         pass
-

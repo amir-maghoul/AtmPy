@@ -4,6 +4,7 @@ The code is the modified version of what appears in PyBella project.
 
 import numpy as np
 from typing import List, Union, TYPE_CHECKING
+
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
 from atmpy.infrastructure.utility import direction_axis

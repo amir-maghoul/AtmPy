@@ -61,5 +61,3 @@ def create_averaging_kernels(dimension: int) -> List[np.ndarray]:
 
     else:
         raise ValueError("dimension must be 1, 2, or 3.")
-
-

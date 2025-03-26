@@ -1,8 +1,12 @@
-""" This module contains the utility functions that are shared in the whole project """
+"""This module contains the utility functions that are shared in the whole project"""
+
 from typing import Tuple
 
 from atmpy.infrastructure.enums import BoundarySide, BoundarySide as BdrySide
-from atmpy.infrastructure.enums import VariableIndices as VI, PrimitiveVariableIndices as PVI
+from atmpy.infrastructure.enums import (
+    VariableIndices as VI,
+    PrimitiveVariableIndices as PVI,
+)
 
 
 def dimension_directions(ndim: int):
@@ -148,10 +152,12 @@ def side_direction_mapping(direction: str) -> Tuple[BdrySide, BdrySide]:
     }
     return mapping[direction]
 
+
 def momentum_index(axis: int):
     """Returns the velocity index for a given axis."""
     momenta = [VI.RHOU, VI.RHOV, VI.RHOW]
     return momenta[axis]
+
 
 def velocity_index(axis: int):
     """Returns the primitive velocity index for a given axis."""

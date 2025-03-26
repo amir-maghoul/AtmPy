@@ -22,7 +22,11 @@ from atmpy.infrastructure.factory import (
     get_slope_limiter,
 )
 import scipy as sp
-from atmpy.infrastructure.utility import directional_indices, direction_axis, velocity_index
+from atmpy.infrastructure.utility import (
+    directional_indices,
+    direction_axis,
+    velocity_index,
+)
 from line_profiler import profile
 
 
@@ -48,7 +52,6 @@ class Flux:
     limiter : Callable
         The given limiter function. Default is van Leer.
     """
-
 
     def __init__(
         self,
@@ -299,12 +302,11 @@ class Flux:
         )
 
 
-
 def main():
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.physics.eos import ExnerBasedEOS
 
-    np.set_printoptions(linewidth=100)
+    np.set_printoptions(linewidth=200)
 
     dt = 0.1
 
@@ -322,7 +324,7 @@ def main():
     rng.shuffle(arr)
     array = arr.reshape(nnx, nny)
 
-    variables = Variables(grid, 5, 1)
+    variables = Variables(grid, 6, 1)
     variables.cell_vars[..., VI.RHO] = 1
     variables.cell_vars[..., VI.RHOU] = array
     variables.cell_vars[..., VI.RHOY] = 2
@@ -343,7 +345,7 @@ def main():
     )
     from atmpy.infrastructure.utility import directional_indices, direction_axis
 
-    direction = "x"
+    direction = "y"
     diffs = calculate_variable_differences(primitives, 2, direction_str=direction)
     slopes = calculate_slopes(diffs, direction, flux.limiter, 2)
     amplitudes = calculate_amplitudes(
@@ -366,12 +368,7 @@ def main():
     flux.apply_riemann_solver(1, direction)
     print(flux.flux[direction][..., VI.RHOU])
     print(flux.variables.cell_vars[..., VI.RHOU])
-    u = variables.cell_vars[..., VI.RHOU]
-
-    vels = [3, 4, 5]
-    variables.background_wind(vels, 1)
-    print(variables.cell_vars[..., VI.RHOW])
-
+    u = variables.cell_vars[..., VI.RHOW]
 
 
 if __name__ == "__main__":

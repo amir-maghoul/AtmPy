@@ -1,6 +1,7 @@
 from abc import abstractmethod
 import numpy as np
 from typing import Union, TYPE_CHECKING
+
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
 from atmpy.infrastructure.enums import (
@@ -189,8 +190,10 @@ class Variables:
             self.cell_vars[*nonzero_idx, VI.RHOY] / rho[nonzero_idx]
         )
 
-        warnings.warn("""For a better performance and a good vectorization in calculations, the current assumption of 
-        the project is that the number of primitive variables and the number of conservative variables are the same.""")
+        warnings.warn(
+            """For a better performance and a good vectorization in calculations, the current assumption of 
+        the project is that the number of primitive variables and the number of conservative variables are the same."""
+        )
         if PVI.V < self.num_vars_cell:
             self.primitives[*nonzero_idx, PVI.V] = (
                 self.cell_vars[*nonzero_idx, VI.RHOV] / rho[nonzero_idx]
@@ -201,7 +204,7 @@ class Variables:
             )
 
     def to_conservative(self, rho: np.ndarray) -> None:
-        """ Converts the primitive variables to conservative variables using the given rho."""
+        """Converts the primitive variables to conservative variables using the given rho."""
         self.cell_vars[..., VI.RHO] = rho
         self.cell_vars[..., VI.RHOX] = rho * self.primitives[..., PVI.X]
         self.cell_vars[..., VI.RHOY] = self.primitives[
@@ -214,8 +217,10 @@ class Variables:
         if VI.RHOW < self.num_vars_cell:
             self.cell_vars[..., VI.RHOW] = rho * self.primitives[..., PVI.W]
 
-    def background_wind(self, wind_speed: Union[np.ndarray, list], scale: float) -> None:
-        """ Modify the momenta using the background wind and the given factor
+    def background_wind(
+        self, wind_speed: Union[np.ndarray, list], scale: float
+    ) -> None:
+        """Modify the momenta using the background wind and the given factor
 
         Parameters
         ----------
@@ -228,10 +233,14 @@ class Variables:
         for axis in range(AXES):
             momentum_idx = momentum_index(axis)
             try:
-                self.cell_vars[..., momentum_idx] += wind_speed[axis] * scale * self.cell_vars[..., VI.RHO]
+                self.cell_vars[..., momentum_idx] += (
+                    wind_speed[axis] * scale * self.cell_vars[..., VI.RHO]
+                )
             except IndexError:
                 print("Calculating the background wind...")
-                print(f"The cell variables container does not have enough variables. Index {momentum_idx} is missing.")
+                print(
+                    f"The cell variables container does not have enough variables. Index {momentum_idx} is missing."
+                )
 
     # -------------------
     # Node-Based Methods

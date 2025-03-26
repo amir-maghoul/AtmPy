@@ -4,7 +4,11 @@ function are the same."""
 import numpy as np
 from typing import TYPE_CHECKING
 
-from atmpy.infrastructure.utility import dimension_directions, directional_indices, direction_axis
+from atmpy.infrastructure.utility import (
+    dimension_directions,
+    directional_indices,
+    direction_axis,
+)
 
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
@@ -132,7 +136,6 @@ if __name__ == "__main__":
     eos = ExnerBasedEOS()
     flux = Flux(grid, variables, eos, dt)
 
-
     bc_data = {}
     create_params(bc_data, BdrySide.LEFT, BdryType.PERIODIC, direction="x", grid=grid)
     create_params(bc_data, BdrySide.RIGHT, BdryType.PERIODIC, direction="x", grid=grid)
@@ -141,7 +144,6 @@ if __name__ == "__main__":
 
     manager = BoundaryManager()
     manager.setup_conditions(bc_data)
-
 
     upwind_strang_split_advection(grid, variables, flux, dt, boundary_manager=manager)
     print(variables.cell_vars[..., VI.RHOU])
