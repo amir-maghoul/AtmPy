@@ -8,9 +8,9 @@ if TYPE_CHECKING:
 from atmpy.infrastructure.enums import VariableIndices as VI
 from atmpy.grid.utility import nodal_derivative
 
-def velocity_divergence(grid:"Grid", variables:"Variables") -> np.ndarray:
-    """ Calculates the divergence of the velocity vector. This works as the right hand side of the pressure equation in
-    the euler steps.
+def momenta_divergence(grid:"Grid", variables:"Variables") -> np.ndarray:
+    """ Calculates the divergence of the pressured-momenta vector (Pu, Pv, Pw). This works as the right hand side
+    of the pressure equation in the euler steps.
 
     Parameters
     ----------
@@ -26,9 +26,8 @@ def velocity_divergence(grid:"Grid", variables:"Variables") -> np.ndarray:
 
     Notes
     -----
-    This function calculates the divergence of the velocity vector on the nodes. The result can fill the inner nodes of
-    a nodal variable as the result is of shape (nx-1, [ny-1], [nz-1]).
-
+    This function calculates the divergence of the pressured-momenta vector on the nodes. The result can fill
+    the inner nodes of a nodal variable as the result is of shape (nx-1, [ny-1], [nz-1]).
     """
 
     ndim = grid.ndim
@@ -37,19 +36,19 @@ def velocity_divergence(grid:"Grid", variables:"Variables") -> np.ndarray:
     Y = variables.cell_vars[..., VI.RHOY] / variables.cell_vars[..., VI.RHO]
 
     # Derivative of u in x.
-    Ux = nodal_derivative(variables.cell_vars[..., VI.RHOU], ndim, axis=0, ds=grid.dx)
+    Ux = nodal_derivative(variables.cell_vars[..., VI.RHOU]*Y, ndim, axis=0, ds=grid.dx)
 
     # For one dimensions, we are done.
     if ndim == 1:
         return Ux
 
     # Derivative of v in y.
-    Vy = nodal_derivative(variables.cell_vars[..., VI.RHOV], ndim, axis=1, ds=grid.dy)
+    Vy = nodal_derivative(variables.cell_vars[..., VI.RHOV]*Y, ndim, axis=1, ds=grid.dy)
     if ndim == 2:
         return Ux + Vy
 
     # Derivative of w in z.
-    Wz = nodal_derivative(variables.cell_vars[..., VI.RHOW], ndim, axis=2, ds=grid.dz)
+    Wz = nodal_derivative(variables.cell_vars[..., VI.RHOW]*Y, ndim, axis=2, ds=grid.dz)
     if ndim == 3:
         return Ux + Vy + Wz
     else:
