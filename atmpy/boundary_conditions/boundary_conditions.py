@@ -7,11 +7,11 @@ from typing import (
     Any,
     Tuple,
     Callable,
-    TypeGuard,
     TypedDict,
     Unpack,
     cast,
     Union,
+    Literal,
     TYPE_CHECKING,
 )
 
@@ -44,8 +44,6 @@ class BaseBoundaryCondition(ABC):
 
     Attributes
     ----------
-    params : dict
-        The dictionary of all parameters. It must at least contain the key "direction", "inner_slice", "side" and "ng".
     direction : int
         The direction of the boundary condition.
     side : BoundarySide
@@ -74,8 +72,13 @@ class BaseBoundaryCondition(ABC):
         """Apply the boundary condition on the cell variables"""
         pass
 
-    def apply_rhs(self, rhs, *args, **kwargs):
-        """Apply the correction to the rhs on the boundary"""
+    def apply_nodal(self, rhs, *args, **kwargs):
+        """Apply the boundary condition on a nodal variable. Original motivation is to apply the correction on the
+        right-hand side of the pressure equation."""
+        pass
+
+    def apply_pressure(self, pressure, *args, **kwargs):
+        """Apply the boundary conditions on the pressure variable"""
         pass
 
     def _find_side_axis(self):
@@ -103,6 +106,7 @@ class PeriodicBoundary(BaseBoundaryCondition):
     def __init__(self, **kwargs: Unpack[KwargsTypes]):
         super().__init__(**kwargs)
         self.type = BdryType.PERIODIC
+        self.side_axis: int = self._find_side_axis()
 
     def apply(self, cell_vars: np.ndarray, *args, **kwargs):
         """Apply periodic boundary condition to the cell_vars.
@@ -112,35 +116,86 @@ class PeriodicBoundary(BaseBoundaryCondition):
         cell_vars : ndarray of shape (nx, [ny], [nz], num_vars)
             The array container for all the variables.
         """
-
+        inner_padded_slice = self.inner_and_padded_slices()
         # Apply np.pad with mode "wrap" on ALL variables for periodic BC.
-        cell_vars[...] = np.pad(
-            cell_vars[self.directional_inner_slice],
+        cell_vars[inner_padded_slice] = np.pad(
+            cell_vars[self.inner_slice],
             self.pad_width,
             mode="wrap",
         )
 
+    def apply_pressure(self, pressure: np.ndarray, *args, **kwargs):
+        """ Apply the periodic boundary condition on the pressure variable."""
+        if pressure.shape != self.grid.cshape:
+            raise ValueError(
+                f"""Cell-valued pressure variable has shape {pressure.shape}, 
+            but it must have the same shape as the cells: {self.grid.cshape}."""
+            )
+
+        pressure[...] = np.pad(
+            pressure[self.inner_slice[:-1]],
+            self.pad_width[:-1],
+            mode="wrap",
+        )
+
     @property
-    def pad_width(self) -> List[Tuple[int, int]]:
+    def pad_width(self):
         """Create the pad width for a single direction. The "ng" attribute contains a
         list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
         Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
         avoid padding the boundary in all direction with the same number of ghost cells, we need to create a
         pad width tuple containing zero tuples in the undesired directions, i.e.  for x direction padding
-        [(ngx, ngx), (0, 0), (0, 0)]."""
+        [(ngx, ngx), (0, 0), (0, 0)]. For wall boundary, this is reduced to one-sided padding: for example for x direction
+        and the left side: [(ngx, 0), (0, 0), (0, 0)]"""
 
+        side: int = self.side_axis
+        # create (ng, 0) or (0, ng)
+        ng: List[int] = [0 if i != side else self.ng[side] for i in range(2)]
+        # create the pad width
         pad_width = [(0, 0)] * (self.ndim + 1)
-        pad_width[self.direction] = self.ng
+        pad_width[self.direction] = ng
         return pad_width
 
+    # @property
+    # def inner_slice(self):
+    #     """Create the inner slice of the array from one side, i.e. either (0, -ng) or (ng, None) in the corresponding
+    #     direction."""
+    #     side: int = self.side_axis
+    #     # create slice(ng, None) or slice(0, ng)
+    #     slc = slice(self.ng[side], None) if side == 0 else slice(0, -self.ng[side])
+    #     # Create the slice object
+    #     inner_slice = [slice(None)] * (self.ndim + 1)
+    #     inner_slice[self.direction] = slc
+    #     return tuple(inner_slice)
+
+    # @property
+    # def pad_width(self) -> List[Tuple[int, int]]:
+    #     """Create the pad width for a single direction. The "ng" attribute contains a
+    #     list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
+    #     Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
+    #     avoid padding the boundary in all direction with the same number of ghost cells, we need to create a
+    #     pad width tuple containing zero tuples in the undesired directions, i.e.  for x direction padding
+    #     [(ngx, ngx), (0, 0), (0, 0)]."""
+    #
+    #     pad_width = [(0, 0)] * (self.ndim + 1)
+    #     pad_width[self.direction] = self.ng
+    #     return pad_width
+
     @property
-    def directional_inner_slice(self) -> Tuple[slice, ...]:
-        """Create the directional inner slice for a single direction.For more details see the docstring for
-        py:meth:`atmpy.boundary_conditions.boundary_conditions.BaseBoundaryCondition._create_pad_width_for_single_direction`.
+    def inner_slice(self) -> Tuple[slice, ...]:
+        """Create the directional inner slice for a single direction.
         """
         directional_inner_slice = [slice(None)] * (self.ndim + 1)
         directional_inner_slice[self.direction] = self.grid.inner_slice[self.direction]
         return tuple(directional_inner_slice)
+
+    def inner_and_padded_slices(self) -> Tuple[slice, ...]:
+        """Returns the slice of the padded part."""
+        side = self._find_side_axis()
+        slc = slice(0, -self.ng[side]) if side == 0 else slice(self.ng[side], None)
+        pad_slice = [slice(None)] * (self.ndim + 1)
+        pad_slice[self.direction] = slc
+        return tuple(pad_slice)
 
 
 class ReflectiveGravityBoundary(BaseBoundaryCondition):
@@ -374,32 +429,51 @@ class Wall(BaseBoundaryCondition):
         self.type = BdryType.WALL
         self.side_axis: int = self._find_side_axis()
 
-    def apply(self, cell_vars, *args, **kwargs):
-        # Zero normal velocity, reflect tangential components
+    def apply(self, cell_vars: np.ndarray, *args, **kwargs):
+        """ Apply the wall boundary condition. All the variables get reflected by the boundary, the normal velocity gets
+        reflected and negated.
+
+        Notes
+        -----
+        in np.pad, mode="symmetric" is used instead of mode="reflect". See the documentation for np.pad.
+        """
 
         normal_momentum_index = momentum_index(self.direction)
-        pad_width = self.create_pad_width()
         pad_slice = self.padded_slices()
-        inner_slice = self.compute_inner_slice()
 
+        # Apply np.pad with mode "symmetric" on ALL variables for wall BC.
+        mode: Literal["symmetric", "edge"] = "symmetric"
         if self.grid.nc[self.direction] == 1:
-            # Apply np.pad with mode "edge" on ALL variables for wall BC, to copy the single cell to ghost cells
-            cell_vars[...] = np.pad(
-                cell_vars[inner_slice],
-                pad_width,
-                mode="edge",
-            )
-        else:
-            # Apply np.pad with mode "symmetric" on ALL variables for wall BC.
-            cell_vars[...] = np.pad(
-                cell_vars[inner_slice],
-                pad_width,
-                mode="symmetric",
-            )
+            # Single cell case
+            # Apply np.pad with mode "edge" to copy the single cell to ghost cells
+            mode = "edge"
+
+        cell_vars[...] = np.pad(
+            cell_vars[self.inner_slice],
+            self.pad_width,
+            mode=mode,
+        )
 
         cell_vars[pad_slice + (normal_momentum_index,)] *= -1
 
-    def create_pad_width(self):
+    def apply_nodal(self, node_vars, *args, **kwargs):
+        raise NotImplementedError(
+            "Method 'apply_nodal' is not implemented for class WALL yet."
+        )
+
+    def apply_pressure(self, pressure: np.ndarray, *args, **kwargs):
+        """ Apply wall boundary condition on the pressure variable. The variables gets reflected on the ghost cells."""
+
+        mode: Literal["symmetric", "edge"] = "symmetric"
+        if self.grid.nc[self.direction] == 1:
+            mode = "edge"
+
+        pressure[...] = np.pad(
+            pressure[self.inner_slice[:-1]], self.pad_width[:-1], mode=mode
+        )
+
+    @property
+    def pad_width(self):
         """Create the pad width for a single direction. The "ng" attribute contains a
         list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
         Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
@@ -410,13 +484,14 @@ class Wall(BaseBoundaryCondition):
 
         side: int = self.side_axis
         # create (ng, 0) or (0, ng)
-        ng: List[int, int] = [0 if i != side else self.ng[side] for i in range(2)]
+        ng: List[int] = [0 if i != side else self.ng[side] for i in range(2)]
         # create the pad width
         pad_width = [(0, 0)] * (self.ndim + 1)
         pad_width[self.direction] = ng
         return pad_width
 
-    def compute_inner_slice(self):
+    @property
+    def inner_slice(self):
         """Create the inner slice of the array from one side, i.e. either (0, -ng) or (ng, None) in the corresponding
         direction."""
         side: int = self.side_axis
