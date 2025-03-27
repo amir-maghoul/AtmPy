@@ -126,13 +126,9 @@ class PeriodicBoundary(BaseBoundaryCondition):
 
     def apply_pressure(self, pressure: np.ndarray, *args, **kwargs):
         """ Apply the periodic boundary condition on the pressure variable."""
-        if pressure.shape != self.grid.cshape:
-            raise ValueError(
-                f"""Cell-valued pressure variable has shape {pressure.shape}, 
-            but it must have the same shape as the cells: {self.grid.cshape}."""
-            )
+        inner_padded_slice = self.inner_and_padded_slices()
 
-        pressure[...] = np.pad(
+        pressure[inner_padded_slice[:-1]] = np.pad(
             pressure[self.inner_slice[:-1]],
             self.pad_width[:-1],
             mode="wrap",
@@ -155,31 +151,6 @@ class PeriodicBoundary(BaseBoundaryCondition):
         pad_width = [(0, 0)] * (self.ndim + 1)
         pad_width[self.direction] = ng
         return pad_width
-
-    # @property
-    # def inner_slice(self):
-    #     """Create the inner slice of the array from one side, i.e. either (0, -ng) or (ng, None) in the corresponding
-    #     direction."""
-    #     side: int = self.side_axis
-    #     # create slice(ng, None) or slice(0, ng)
-    #     slc = slice(self.ng[side], None) if side == 0 else slice(0, -self.ng[side])
-    #     # Create the slice object
-    #     inner_slice = [slice(None)] * (self.ndim + 1)
-    #     inner_slice[self.direction] = slc
-    #     return tuple(inner_slice)
-
-    # @property
-    # def pad_width(self) -> List[Tuple[int, int]]:
-    #     """Create the pad width for a single direction. The "ng" attribute contains a
-    #     list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
-    #     Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
-    #     avoid padding the boundary in all direction with the same number of ghost cells, we need to create a
-    #     pad width tuple containing zero tuples in the undesired directions, i.e.  for x direction padding
-    #     [(ngx, ngx), (0, 0), (0, 0)]."""
-    #
-    #     pad_width = [(0, 0)] * (self.ndim + 1)
-    #     pad_width[self.direction] = self.ng
-    #     return pad_width
 
     @property
     def inner_slice(self) -> Tuple[slice, ...]:

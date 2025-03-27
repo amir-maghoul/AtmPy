@@ -180,11 +180,11 @@ def boundary_manager_2d():
     stratification = lambda x: x**2
 
     gravity = [0.0, 1.0, 0.0]
-    direction = "x"
+    direction = "y"
     bc_dict = {}
     create_params(
         bc_dict,
-        BdrySide.LEFT,
+        BdrySide.BOTTOM,
         BdryType.PERIODIC,
         direction=direction,
         grid=grid,
@@ -208,14 +208,14 @@ def boundary_manager_2d():
     print("Applying boundary conditions for 2D test:")
     print(variables.cell_vars[..., VI.RHOU])
     x = variables.cell_vars[..., VI.RHOV]
-    manager.apply_single_boundary_condition(variables.cell_vars, direction)
+    # manager.apply_single_boundary_condition(variables.cell_vars, direction)
 
     # # manager.apply_full_boundary_conditions(variables.cell_vars)
     # print(variables.cell_vars[..., VI.RHOU])
     # rhs = np.arange(grid.nnx_total * grid.nny_total).reshape(grid.nshape)
     # print(x)
     # print(np.pad(x[tuple(directional_inner_slice)], pad_width, negative_symmetric))
-    # manager.apply_full_pressure(variables.cell_vars[..., VI.RHOU])
+    manager.apply_full_pressure(variables.cell_vars[..., VI.RHOU])
     print(variables.cell_vars[..., VI.RHOU])
 
 

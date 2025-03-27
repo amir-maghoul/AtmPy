@@ -136,7 +136,7 @@ class Grid:
 
         # Unifying lists of important properties for all dimensions
         self.dxyz: List[int, ...] = [None] * 3  # Discretization fineness
-        self.nc: List[int, ...] = [None] * 3    # Number of inner cells in all direction
+        self.nc: List[int, ...] = [None] * 3  # Number of inner cells in all direction
 
         ################################
         # Grid parameters in x-direction
