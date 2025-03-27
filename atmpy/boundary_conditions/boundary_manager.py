@@ -119,9 +119,6 @@ class BoundaryManager:
             # if side in self.boundary_conditions.keys():
             condition = self.boundary_conditions[side]
             condition.apply_pressure(pressure)
-            # Since the periodic boundary condition is automatically applied on both sides, skip the other side
-            if condition.type == BdryType.PERIODIC:
-                break
 
     def apply_full_pressure(self, pressure: "np.ndarray"):
         """Apply the boundary conditions on all sides and directions for the input pressure variable.

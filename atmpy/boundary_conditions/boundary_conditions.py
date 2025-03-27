@@ -125,7 +125,7 @@ class PeriodicBoundary(BaseBoundaryCondition):
         )
 
     def apply_pressure(self, pressure: np.ndarray, *args, **kwargs):
-        """ Apply the periodic boundary condition on the pressure variable."""
+        """Apply the periodic boundary condition on the pressure variable."""
         inner_padded_slice = self.inner_and_padded_slices()
 
         pressure[inner_padded_slice[:-1]] = np.pad(
@@ -154,8 +154,7 @@ class PeriodicBoundary(BaseBoundaryCondition):
 
     @property
     def inner_slice(self) -> Tuple[slice, ...]:
-        """Create the directional inner slice for a single direction.
-        """
+        """Create the directional inner slice for a single direction."""
         directional_inner_slice = [slice(None)] * (self.ndim + 1)
         directional_inner_slice[self.direction] = self.grid.inner_slice[self.direction]
         return tuple(directional_inner_slice)
@@ -401,7 +400,7 @@ class Wall(BaseBoundaryCondition):
         self.side_axis: int = self._find_side_axis()
 
     def apply(self, cell_vars: np.ndarray, *args, **kwargs):
-        """ Apply the wall boundary condition. All the variables get reflected by the boundary, the normal velocity gets
+        """Apply the wall boundary condition. All the variables get reflected by the boundary, the normal velocity gets
         reflected and negated.
 
         Notes
@@ -433,7 +432,7 @@ class Wall(BaseBoundaryCondition):
         )
 
     def apply_pressure(self, pressure: np.ndarray, *args, **kwargs):
-        """ Apply wall boundary condition on the pressure variable. The variables gets reflected on the ghost cells."""
+        """Apply wall boundary condition on the pressure variable. The variables gets reflected on the ghost cells."""
 
         mode: Literal["symmetric", "edge"] = "symmetric"
         if self.grid.nc[self.direction] == 1:
