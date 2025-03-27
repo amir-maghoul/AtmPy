@@ -68,20 +68,21 @@ def momenta_divergence(grid: "Grid", variables: "Variables") -> np.ndarray:
 def nodal_gradient(p: np.ndarray, ndim: int, dxyz: List[float]):
     """
     Taken from reference. See Notes.
-    Calculate the discrete gradient of a given scalar field.
+    Calculate the discrete gradient of a given scalar field in 1D, 2D, or 3D.
 
     Parameters
     ----------
     p : np.ndarray
         The scalar field on which the gradient is applied.
     ndim : int
-        The number of dimensions of the scalar field.
+        The number of dimensions of the scalar field (1, 2, or 3).
     dxyz : List[float]
-        The list of discretization fineness
+        The list of discretization fineness [dx, (dy), (dz)]
 
     Returns
     -------
-    np.ndarray
+    Tuple[np.ndarray, ...]
+        The gradient components (Dpx, Dpy, Dpz). For ndim < 3, unused components are zero.
 
     Notes
     -----
@@ -91,6 +92,12 @@ def nodal_gradient(p: np.ndarray, ndim: int, dxyz: List[float]):
 
     # Compute the slices for differencing (for example p[:-1] - p[1:])
     indices = [idx for idx in it.product([slice(0, -1), slice(1, None)], repeat=ndim)]
+    if ndim == 1:
+        # In 1D, gradient is (p[1:] - p[:-1]) / dx (centered difference)
+        signs_x: Tuple[float, ...] = (-1.0, +1.0)
+        signs_y: Tuple[float, ...] = (0.0, 0.0)
+        signs_z: Tuple[float, ...] = (0.0, 0.0)
+        scale: float = 1.0  # No averaging needed in 1D
     if ndim == 2:
         # Compute the sign factors of each neighboring cell to the center of calculation
         # Basically in 2D we have for example in x-direction:
@@ -98,6 +105,7 @@ def nodal_gradient(p: np.ndarray, ndim: int, dxyz: List[float]):
         signs_x: Tuple[float, ...] = (-1.0, -1.0, +1.0, +1.0)
         signs_y: Tuple[float, ...] = (-1.0, +1.0, -1.0, +1.0)
         signs_z: Tuple[float, ...] = (0.0, 0.0, 0.0, 0.0)
+        scale: float = 0.5
     elif ndim == 3:
         # Compute the sign factors of each neighboring cell to the center of calculation
         # Basically in 3D we have for example in x-direction:
@@ -105,6 +113,7 @@ def nodal_gradient(p: np.ndarray, ndim: int, dxyz: List[float]):
         signs_x: Tuple[float, ...] = (-1.0, -1.0, -1.0, -1.0, +1.0, +1.0, +1.0, +1.0)
         signs_y: Tuple[float, ...] = (-1.0, -1.0, +1.0, +1.0, -1.0, -1.0, +1.0, +1.0)
         signs_z: Tuple[float, ...] = (-1.0, +1.0, -1.0, +1.0, -1.0, +1.0, -1.0, +1.0)
+        scale: float = 0.25
 
     Dpx, Dpy, Dpz = 0.0, 0.0, 0.0
     cnt = 0
@@ -116,8 +125,8 @@ def nodal_gradient(p: np.ndarray, ndim: int, dxyz: List[float]):
         Dpz += signs_z[cnt] * p[index]
         cnt += 1
 
-    Dpx *= 0.5 ** (ndim - 1) / dx
-    Dpy *= 0.5 ** (ndim - 1) / dy
-    Dpz *= 0.5 ** (ndim - 1) / dz
+    Dpx *= scale / dx
+    Dpy *= scale / dy
+    Dpz *= scale / dz
 
     return Dpx, Dpy, Dpz
