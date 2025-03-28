@@ -135,7 +135,7 @@ class Grid:
             raise ValueError("Number of ghost cells should at least be 2.")
 
         # Unifying lists of important properties for all dimensions
-        self.dxyz: List[float, ...] = [None] * 3  # Discretization fineness
+        self.dxyz: List[float] = [None] * 3  # Discretization fineness
         self.nc: List[int, ...] = [None] * 3  # Number of inner cells in all direction
 
         ################################
