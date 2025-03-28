@@ -68,7 +68,8 @@ def momenta_divergence(grid: "Grid", variables: "Variables") -> np.ndarray:
 def nodal_gradient(p: np.ndarray, ndim: int, dxyz: List[float]):
     """
     Taken from reference. See Notes.
-    Calculate the discrete gradient of a given scalar field in 1D, 2D, or 3D.
+    Calculate the discrete gradient of a given scalar field in 1D, 2D, or 3D. The algorithm mimics the calculation of
+    nodal pressure gradient specified in eq. (30a) in BK19 paper.
 
     Parameters
     ----------
