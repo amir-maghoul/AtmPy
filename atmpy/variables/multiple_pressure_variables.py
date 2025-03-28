@@ -88,13 +88,18 @@ class MPV:
 
         Returns
         -------
-        ndarray
-            The derivative of S with respect to the direction of gravity
+        ndarray of shape grid.cshape
+            The derivative of S with respect to the direction of gravity.
+
+        Notes
+        -----
+        This function computes the nodal derivative in the direction of gravity. Number of nodes in each direction are
+        equal to the number of cells plus one. The derivative reduces this shape in the direction of gravity to equal to
+        the number of cells. After that the resulting 1D array gets tiled to be of the same shape as the grid.cshape.
         """
-        ndim: int = self.grid.ndim  # Use the vertical spacing defined by the grid.
         dr: float = self.grid.dxyz[self.direction]
 
-        # Since variables in self.hydrostate are 1D, it suffices to calulate the convolotion in their only direction
+        # Since variables in self.hydrostate are 1D, it suffices to calculate the convolution in their only direction
         # and then divide the result be the correct dx, dy or dz to get the derivative.
         S0: np.ndarray = self.hydrostate.node_vars[..., HI.S0]
         dS: np.ndarray = np.diff(S0) / dr
