@@ -1,27 +1,38 @@
 """This module contains different time integrators"""
+
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
+    from atmpy.variables.variables import Variables
     from atmpy.grid.kgrid import Grid
     from atmpy.boundary_conditions.boundary_manager import BoundaryManager
 
 from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
-from atmpy.variables.variables import Variables
+import numpy as np
+import scipy.sparse.linalg
 
 
 class IMEXTimeIntegrator(AbstractTimeIntegrator):
-    def __init__(self, grid: "Grid", variables: "Variables", flux: "Flux", boundary_manager: "BoundaryManager",
-                 coriolis_operator: CoriolisOperator, pressure_solver: PressureSolver, dt: float):
+    def __init__(
+        self,
+        grid: "Grid",
+        variables: "Variables",
+        flux: "Flux",
+        boundary_manager: "BoundaryManager",
+        coriolis_operator: CoriolisOperator,
+        pressure_solver: PressureSolver,
+        dt: float,
+    ):
         # Inject dependencies
-        self.grid = grid
-        self.variables = variables
-        self.flux = flux
-        self.boundary_manager = boundary_manager
-        self.coriolis_operator = coriolis_operator
-        self.pressure_solver = pressure_solver
-        self.dt = dt
+        self.grid: "Grid" = grid
+        self.variables: "Variables" = variables
+        self.flux: "Flux" = flux
+        self.boundary_manager: "BoundaryManager" = boundary_manager
+        self.coriolis_operator: "CoriolisOperator" = coriolis_operator
+        self.pressure_solver: "PressureSolver" = pressure_solver
+        self.dt: float = dt
 
     def step(self):
         # 1. Explicit forward update (e.g. divergence, pressure gradient, momentum update)
@@ -73,6 +84,7 @@ class CoriolisOperator:
     Encapsulates the handling of coriolis operator in the implicit time update. This is a part of operator splitting
     for stiff coriolis operator.
     """
+
     def __init__(self, coriolis_strength, gravity_strength, Msq, nonhydro, get_strat):
         # coriolis_strength is a tuple (c1, c2, c3)
         # gravity_strength is a tuple, e.g. (0, g, 0)
@@ -88,7 +100,7 @@ class CoriolisOperator:
         # Obtain stratification (here, a dummy constant field)
         strat = self.get_strat(variables)
         Y = variables.rhoY / variables.rho
-        nu = -dt**2 * (self.gravity_strength[1] / self.Msq) * strat * Y
+        nu = -(dt**2) * (self.gravity_strength[1] / self.Msq) * strat * Y
 
         # Common denominator simulating inversion of (I+dt C)
         denom = 1.0 / (wh1**2 + wh2**2 + (nu + self.nonhydro) * (wv**2 + 1.0))
@@ -116,15 +128,17 @@ class CoriolisOperator:
             W_old = 0.0
 
         # Update momentum fields by “inverting” the Coriolis source.
-        variables.rhou[...] = denom * (coeff_uu * U_old + coeff_uv * V_old + (coeff_uw * W_old))
-        variables.rhov[...] = denom * (coeff_vu * U_old + coeff_vv * V_old + (coeff_vw * W_old))
+        variables.rhou[...] = denom * (
+            coeff_uu * U_old + coeff_uv * V_old + (coeff_uw * W_old)
+        )
+        variables.rhov[...] = denom * (
+            coeff_vu * U_old + coeff_vv * V_old + (coeff_vw * W_old)
+        )
         if variables.rhow is not None:
-            variables.rhow[...] = denom * (coeff_wu * U_old + coeff_wv * V_old + coeff_ww * W_old)
+            variables.rhow[...] = denom * (
+                coeff_wu * U_old + coeff_wv * V_old + coeff_ww * W_old
+            )
         print("Coriolis operator applied.")
-
-
-import numpy as np
-import scipy.sparse.linalg
 
 
 class PressureSolver:
@@ -153,7 +167,9 @@ class PressureSolver:
 
         For this simplified example we assume a 2D discrete Laplacian over the grid.
         """
-        shape = variables.rho.shape  # assume the same shape for the diagnostic pressure field
+        shape = (
+            variables.rho.shape
+        )  # assume the same shape for the diagnostic pressure field
         size = np.prod(shape)
 
         # Define the operator's action (a dummy Laplacian for illustration)
@@ -163,9 +179,10 @@ class PressureSolver:
             laplacian = np.zeros_like(u)
             # A simple finite-difference Laplacian for interior points:
             laplacian[1:-1, 1:-1] = (
-                    (u[:-2, 1:-1] - 2 * u[1:-1, 1:-1] + u[2:, 1:-1]) / grid.dx ** 2 +
-                    (u[1:-1, :-2] - 2 * u[1:-1, 1:-1] + u[1:-1, 2:]) / grid.dy ** 2
-            )
+                u[:-2, 1:-1] - 2 * u[1:-1, 1:-1] + u[2:, 1:-1]
+            ) / grid.dx**2 + (
+                u[1:-1, :-2] - 2 * u[1:-1, 1:-1] + u[1:-1, 2:]
+            ) / grid.dy**2
             # (In practice, ghost cells and boundary conditions are important.)
             return laplacian.ravel()
 
@@ -186,10 +203,9 @@ class PressureSolver:
 
         # For example, compute a simple discrete divergence based on momentum differences.
         # (Replace this with a proper discrete operator as needed.)
-        rhs[1:-1, 1:-1] = (
-                (variables.rhou[2:, 1:-1] - variables.rhou[:-2, 1:-1]) / (2 * grid.dx) +
-                (variables.rhov[1:-1, 2:] - variables.rhov[1:-1, :-2]) / (2 * grid.dy)
-        )
+        rhs[1:-1, 1:-1] = (variables.rhou[2:, 1:-1] - variables.rhou[:-2, 1:-1]) / (
+            2 * grid.dx
+        ) + (variables.rhov[1:-1, 2:] - variables.rhov[1:-1, :-2]) / (2 * grid.dy)
         # Additional modifications (e.g. compressibility weighting) may be applied.
 
         # Flatten rhs for the linear solver.
