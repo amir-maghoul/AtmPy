@@ -106,3 +106,16 @@ class AdvectionRoutines(Enum):
     """Map name to function for the advection solver"""
 
     STRANG_SPLIT = "strang_split"
+
+
+class LinearSolvers(Enum):
+    """Map name to function for the linear solver"""
+
+    BICGSTAB = "bicgstab"
+    GMRES = "gmres"
+
+
+class TimeIntegrators(Enum):
+    """Map name to function for the time integrator"""
+
+    IMEX = "imex"

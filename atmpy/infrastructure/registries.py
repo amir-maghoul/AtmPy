@@ -9,9 +9,13 @@ from atmpy.infrastructure.enums import (
     FluxReconstructions,
     BoundaryConditions,
     AdvectionRoutines,
+    LinearSolvers,
+    TimeIntegrators,
 )
 from atmpy.boundary_conditions.boundary_conditions import *
 from atmpy.solver.advection_routines import *
+from atmpy.time_integrators.linear_solvers import *
+from atmpy.time_integrators.imex_operator_splitting import IMEXTimeIntegrator
 
 SLOPE_LIMITERS = {
     SlopeLimiters.MINMOD: minmod,
@@ -45,4 +49,13 @@ BOUNDARY_CONDITIONS = {
 
 ADVECTION_ROUTINES = {
     AdvectionRoutines.STRANG_SPLIT: upwind_strang_split_advection,
+}
+
+LINEAR_SOLVERS = {
+    LinearSolvers.BICGSTAB: BiCGStabSolver,
+    LinearSolvers.GMRES: GMRESSolver,
+}
+
+TIME_INTEGRATORS = {
+    TimeIntegrators.IMEX: IMEXTimeIntegrator,
 }

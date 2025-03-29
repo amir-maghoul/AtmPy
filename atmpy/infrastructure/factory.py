@@ -2,25 +2,33 @@
 
 # factories.py
 
-from atmpy.infrastructure.enums import (
-    SlopeLimiters,
-    RiemannSolvers,
-    FluxReconstructions,
-    BoundaryConditions,
-    AdvectionRoutines,
-)
 from atmpy.infrastructure.registries import (
     SLOPE_LIMITERS,
     RIEMANN_SOLVERS,
     FLUX_RECONSTRUCTION,
     BOUNDARY_CONDITIONS,
     ADVECTION_ROUTINES,
+    LINEAR_SOLVERS,
+    TIME_INTEGRATORS,
 )
+from typing import TYPE_CHECKING
 
-from atmpy.boundary_conditions.boundary_conditions import BaseBoundaryCondition
+if TYPE_CHECKING:
+    from atmpy.boundary_conditions.boundary_conditions import BaseBoundaryCondition
+    from atmpy.time_integrators.linear_solvers import ILinearSolver
+    from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
+    from atmpy.infrastructure.enums import (
+        SlopeLimiters,
+        RiemannSolvers,
+        FluxReconstructions,
+        BoundaryConditions,
+        AdvectionRoutines,
+        LinearSolvers,
+        TimeIntegrators,
+    )
 
 
-def get_slope_limiter(name: SlopeLimiters) -> callable:
+def get_slope_limiter(name: "SlopeLimiters") -> callable:
     """
 
     Parameters
@@ -33,13 +41,15 @@ def get_slope_limiter(name: SlopeLimiters) -> callable:
         Callable: The corresponding slope limiter function.
 
     """
-    try:
-        return SLOPE_LIMITERS[name]
-    except KeyError:
+    slope_limiter = SLOPE_LIMITERS.get(name)
+
+    if slope_limiter is None:
         raise ValueError(f"Unknown slope limiter: {name}")
 
+    return slope_limiter
 
-def get_riemann_solver(name: RiemannSolvers) -> callable:
+
+def get_riemann_solver(name: "RiemannSolvers") -> callable:
     """
     Retrieves the Riemann solver function based on the provided enum member.
 
@@ -54,13 +64,15 @@ def get_riemann_solver(name: RiemannSolvers) -> callable:
 
     """
 
-    try:
-        return RIEMANN_SOLVERS[name]
-    except KeyError:
+    riemann_solver = RIEMANN_SOLVERS.get(name)
+
+    if riemann_solver is None:
         raise ValueError(f"Unknown Riemann solver: {name}")
 
+    return riemann_solver
 
-def get_reconstruction_method(name: FluxReconstructions) -> callable:
+
+def get_reconstruction_method(name: "FluxReconstructions") -> callable:
     """
     Retrieves the flux reconstruction method based on the provided enum member.
 
@@ -73,21 +85,24 @@ def get_reconstruction_method(name: FluxReconstructions) -> callable:
     -------
     Callable: The corresponding flux reconstruction method.
     """
-    try:
-        return FLUX_RECONSTRUCTION[name]
-    except KeyError:
+
+    flux_reconstruction = FLUX_RECONSTRUCTION.get(name)
+
+    if flux_reconstruction is None:
         raise ValueError(f"Unknown reconstruction method: {name}")
+
+    return flux_reconstruction
 
 
 def get_boundary_conditions(
-    name: BoundaryConditions, **params
-) -> BaseBoundaryCondition:
+    name: "BoundaryConditions", **params
+) -> "BaseBoundaryCondition":
     """
     Retrieves the boundary condition class based on the provided enum member.
 
     Parameters
     ----------
-    name: BoundaryConditions
+    name: BoundaryConditions (enum)
         The enum member specifying the desired boundary condition.
     params: dict
         The parameters for the boundary condition class.
@@ -97,29 +112,75 @@ def get_boundary_conditions(
     BaseBoundaryCondition: The corresponding boundary condition class.
 
     """
-    try:
-        boundary_condition_class = BOUNDARY_CONDITIONS[name]
-
-    except KeyError:
+    boundary_condition_class = BOUNDARY_CONDITIONS.get(name)
+    if boundary_condition_class is None:
         raise ValueError(f"Unknown boundary conditions: {name}")
 
     return boundary_condition_class(**params)
 
 
-def get_advection_routines(name: AdvectionRoutines) -> callable:
+def get_advection_routines(name: "AdvectionRoutines") -> callable:
     """
     Retrieves the advection routine based on the provided enum member.
 
     Parameters
     ----------
-    name: AdvectionRoutines
+    name: AdvectionRoutines (enum)
         The enum member specifying the desired advection routine.
 
     Returns
     -------
     Callable: The corresponding advection function.
     """
-    try:
-        return ADVECTION_ROUTINES[name]
-    except KeyError:
+    advection_routine = ADVECTION_ROUTINES.get(name)
+
+    if advection_routine is None:
         raise ValueError(f"Unknown advection routine: {name}")
+
+    return advection_routine
+
+
+def get_linear_solver(name: "LinearSolvers") -> "ILinearSolver":
+    """
+    Retrieves the linear solver class based on the provided enum member.
+
+    Parameters
+    ----------
+    name: LinearSolvers (enum)
+        The enum member specifying the desired linear solver.
+
+    Returns
+    -------
+    ILinearSolver: The corresponding linear solver class.
+
+    """
+    linear_solver_class = LINEAR_SOLVERS.get(name)
+
+    if linear_solver_class is None:
+        raise ValueError(f"Unknown boundary conditions: {name}")
+
+    return linear_solver_class()
+
+
+def create_time_integrator(
+    name: "TimeIntegrators", **dependencies
+) -> "AbstractTimeIntegrator":
+    """
+    Retrieves the time integrator class based on the provided enum member.
+
+    Parameters
+    ----------
+    name: TimeIntegrators (enum)
+        The enum member specifying the desired time integrator.
+
+    Returns
+    -------
+    AbstractTimeIntegrator: The corresponding time integrator class.
+
+    """
+    integrator_class = TIME_INTEGRATORS.get(name)
+
+    if integrator_class is None:
+        raise ValueError(f"Unknown time integrator type: {name}")
+
+    return integrator_class(**dependencies)
