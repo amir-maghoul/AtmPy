@@ -1,7 +1,7 @@
 """This module contains different time integrators"""
 
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union, List
 
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
@@ -10,8 +10,8 @@ if TYPE_CHECKING:
     from atmpy.boundary_conditions.boundary_manager import BoundaryManager
 
 from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
-import numpy as np
 import scipy.sparse.linalg
+from atmpy.time_integrators.utility import *
 
 
 class IMEXTimeIntegrator(AbstractTimeIntegrator):
@@ -85,16 +85,37 @@ class CoriolisOperator:
     for stiff coriolis operator.
     """
 
-    def __init__(self, coriolis_strength, gravity_strength, Msq, nonhydro, get_strat):
-        # coriolis_strength is a tuple (c1, c2, c3)
-        # gravity_strength is a tuple, e.g. (0, g, 0)
-        self.coriolis_strength = coriolis_strength
-        self.gravity_strength = gravity_strength
-        self.Msq = Msq
-        self.nonhydro = nonhydro
-        self.get_strat = get_strat  # callable that returns stratification
+    def __init__(
+        self,
+        coriolis_strength: Union[np.ndarray, list],
+        gravity_strength: Union[np.ndarray, list],
+        Msq: float,
+        nonhydro: bool,
+        get_strat: callable,
+    ):
+        self.coriolis_strength: Union[np.ndarray, list] = coriolis_strength
+        self.gravity_strength: Union[np.ndarray, list] = gravity_strength
+        self.Msq: float = Msq
+        self.nonhydro: bool = nonhydro
+        self.get_strat: callable = get_strat  # callable that returns stratification
 
-    def apply(self, variables: Variables, dt: float):
+    def apply(self, variables: "Variables", dt: float) -> None:
+        """ Apply correction to momenta due to the coriolis effect. If there are no coriolis forces in any direction,
+        do nothing.
+
+        Parameters
+        ----------
+        variables : Variables
+            The variable container containing the momenta.
+        dt : float
+            The time step.
+        """
+        if self.coriolis_strength is None or np.all(self.coriolis_strength == 0):
+            pass
+        else:
+            self._apply(variables, dt)
+
+    def _apply(self, variables: "Variables", dt: float):
         # dt-scaled Coriolis parameters
         wh1, wv, wh2 = dt * np.array(self.coriolis_strength)
         # Obtain stratification (here, a dummy constant field)

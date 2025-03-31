@@ -428,6 +428,8 @@ class Wall(BaseBoundaryCondition):
             mode=mode,
         )
 
+        # TODO: integrate the scale_wall_factor into this function.
+
 
     @property
     def pad_width(self) -> list:
