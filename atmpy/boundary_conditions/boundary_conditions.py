@@ -29,6 +29,7 @@ from atmpy.infrastructure.enums import (
     BoundarySide,
     VariableIndices as VI,
 )
+from atmpy.physics.gravity import Gravity
 
 
 class KwargsTypes(TypedDict):
@@ -207,22 +208,10 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         super().__init__(**kwargs)
         self.type = BdryType.REFLECTIVE_GRAVITY
         self.th: "Thermodynamics" = kwargs["thermodynamics"]
-        self.gravity: Union[List[float], np.ndarray] = kwargs["gravity"]
-        if len(np.nonzero(self.gravity)[0]) > 1:
-            raise ValueError("Only one axis can have gravity strength.")
-        if np.isclose(self.gravity[self.direction], 0):
+        self.gravity: Gravity = Gravity(kwargs["gravity"], self.ndim)
+        if np.isclose(self.gravity.vector[self.direction], 0):
             raise ValueError(
                 "There is no gravity strength in the specified direction. Wrong boundary conditions."
-            )
-        self.gravity_axis: int = cast(int, np.nonzero(self.gravity)[0][0])
-        if self.gravity_axis >= self.ndim:
-            raise ValueError(
-                f"An {self.ndim}-dimensional problem cannot have gravity on axis {self.gravity_axis}."
-            )
-
-        if self.gravity_axis == 0:
-            raise ValueError(
-                "In reflective gravity boundary condition, the first axis is reserved for horizontal velocity. It cannot have gravity."
             )
         self.stratification: Callable[[Any], Any] = kwargs["stratification"]
         self.facet: str = self._find_facet()
@@ -243,17 +232,17 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         Y_last = cell_vars[nlast + (VI.RHOY,)] / cell_vars[nlast + (VI.RHO,)]
 
         # get the coordinate values of the grid in the direction of gravity
-        axis_coordinate_cells = self.grid.get_cell_coordinates(self.gravity_axis)
+        axis_coordinate_cells = self.gravity.get_coordinate_cells(self.grid)
 
         # calculate the stratification function on the ghost cells
         strat = 1.0 / self.stratification(
-            axis_coordinate_cells[nimage[self.gravity_axis]]
+            axis_coordinate_cells[nimage[self.gravity.axis]]
         )
 
         # sign to calculate the derivative of Pi. -1 if on the topside boundary and 1 if on the downside
         sign = -1 if self.facet == "end" else 1
         dr = self.grid.dxyz[
-            self.gravity_axis
+            self.gravity.axis
         ]  # discretization fineness in the gravity direction
 
         # Calculate the derivative of Pi (Exner pressure) in existence/nonexistence of lamb boundary
@@ -275,7 +264,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             )
 
         # Get the index of the velocities in cell_vars for the gravity and nongravity directions
-        momentum_index = self._get_gravity_momentum_index()
+        momentum_index = self.gravity.momentum_index
         # calculate the Pv for the ghost cells. "v" here is a placeholder for the velocity in the direction of gravity
         Pv = (
             -cell_vars[nsource + (momentum_index[0],)]
@@ -312,20 +301,6 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         X = cell_vars[nsource + (VI.RHOX,)] / cell_vars[nsource + (VI.RHO,)]
         cell_vars[nimage + (VI.RHOY,)] = rhoY
         cell_vars[nimage + (VI.RHOX,)] = rho * X
-
-    def _get_gravity_momentum_index(self) -> Tuple[int, int]:
-        """Helper method to get the momentum variable index in the direction of gravity as the first output and the
-        momentum in the nongravity direction as the second output. Notice since RHOU can never be the momentum in the
-        gravity axis (or more clearly, first axis can never be the gravity axis), it is not included in the array
-        """
-
-        if self.gravity_axis == 1:
-            gravity_index = VI.RHOV
-            non_gravity_index = VI.RHOW
-        elif self.gravity_axis == 2:
-            gravity_index = VI.RHOW
-            non_gravity_index = VI.RHOV
-        return gravity_index, non_gravity_index
 
     def _create_boundary_indices(
         self,
@@ -374,12 +349,12 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
 
         # Make the indices valid for multi-dimensional array
         nimage: list = [slice(None)] * self.ndim
-        nlast = [slice(None)] * self.ndim
-        nsource = [slice(None)] * self.ndim
+        nlast: list = [slice(None)] * self.ndim
+        nsource: list = [slice(None)] * self.ndim
 
-        nimage[self.gravity_axis] = image
-        nlast[self.gravity_axis] = last
-        nsource[self.gravity_axis] = source
+        nimage[self.gravity.axis] = image
+        nlast[self.gravity.axis] = last
+        nsource[self.gravity.axis] = source
 
         return tuple(nsource), tuple(nlast), tuple(nimage)
 
