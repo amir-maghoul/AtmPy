@@ -217,24 +217,24 @@ class Variables:
         if VI.RHOW < self.num_vars_cell:
             self.cell_vars[..., VI.RHOW] = rho * self.primitives[..., PVI.W]
 
-    def background_wind(
-        self, wind_speed: Union[np.ndarray, list], scale: float
+    def adjust_background_wind(
+        self, wind_speeds: Union[np.ndarray, list], scale: float
     ) -> None:
         """Modify the momenta using the background wind and the given factor
 
         Parameters
         ----------
-        wind_speed : Union[np.ndarray, list] of shape (3, 1)
+        wind_speeds : Union[np.ndarray, list] of shape (3, 1)
             The list or numpy array containing the wind velocities in each direction.
         scale : float
             The scaling factor
         """
         AXES: int = 3
-        for axis in range(AXES):
+        for wind_speed, axis in zip(wind_speeds, range(AXES)):
             momentum_idx = momentum_index(axis)
             try:
                 self.cell_vars[..., momentum_idx] += (
-                    wind_speed[axis] * scale * self.cell_vars[..., VI.RHO]
+                    wind_speed * scale * self.cell_vars[..., VI.RHO]
                 )
             except IndexError:
                 print("Calculating the background wind...")
