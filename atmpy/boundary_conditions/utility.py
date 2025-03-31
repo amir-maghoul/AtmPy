@@ -48,7 +48,6 @@ def create_params(bc_data: dict, side: BdrySide, condition: BdryType, **kwargs):
     th: Thermodynamics = (
         Thermodynamics() if kwargs.get("th") is None else kwargs.get("th")
     )
-    is_lamb: bool = False if kwargs.get("is_lamb") is None else kwargs.get("is_lamb")
     is_compressible: bool = (
         True if kwargs.get("is_compressible") is None else kwargs.get("is_compressible")
     )
@@ -59,7 +58,6 @@ def create_params(bc_data: dict, side: BdrySide, condition: BdryType, **kwargs):
         "gravity": gravity,
         "stratification": stratification,
         "thermodynamics": th,
-        "is_lamb": is_lamb,
         "is_compressible": is_compressible,
     }
 

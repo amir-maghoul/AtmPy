@@ -73,14 +73,20 @@ class BaseBoundaryCondition(ABC):
         """Apply the boundary condition on the cell variables"""
         pass
 
-    def apply_nodal(self, rhs, *args, **kwargs):
-        """Apply the boundary condition on a nodal variable. Original motivation is to apply the correction on the
-        right-hand side of the pressure equation."""
+    @abstractmethod
+    def apply_single_variable(self, variable: np.ndarray, is_nodal: bool):
+        """Apply the boundary condition on a variable. Original motivation is to apply the correction on the
+        right-hand side of the pressure equation.
+
+        Parameters
+        ----------
+        variable : np.ndarray
+            The variable to apply the boundary condition on.
+        is_nodal : bool
+            Whether the variable is nodal or not.
+        """
         pass
 
-    def apply_pressure(self, pressure, *args, **kwargs):
-        """Apply the boundary conditions on the pressure variable"""
-        pass
 
     def _find_side_axis(self):
         """Find the integer axis of the side on which the BC is applied in the given direction."""
@@ -125,7 +131,7 @@ class PeriodicBoundary(BaseBoundaryCondition):
             mode="wrap",
         )
 
-    def apply_pressure(self, pressure: np.ndarray, *args, **kwargs):
+    def apply_single_variable(self, pressure: np.ndarray, is_nodal: bool=None):
         """Apply the periodic boundary condition on the pressure variable."""
         inner_padded_slice = self.inner_and_padded_slices()
 
@@ -207,6 +213,8 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
     def __init__(self, **kwargs: Unpack[KwargsType]) -> None:
         super().__init__(**kwargs)
         self.type = BdryType.REFLECTIVE_GRAVITY
+        if self.ndim == 1:
+            raise ValueError("Reflective gravity is not implemented for 1 dimensional problem.")
         self.th: "Thermodynamics" = kwargs["thermodynamics"]
         self.gravity: Gravity = Gravity(kwargs["gravity"], self.ndim)
         if np.isclose(self.gravity.vector[self.direction], 0):
@@ -358,6 +366,9 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
 
         return tuple(nsource), tuple(nlast), tuple(nimage)
 
+    def apply_single_variable(self, variable: np.ndarray, is_nodal: bool=None):
+        pass
+
     def _find_facet(self):
         """Find which end of the array is the gravity being applied on"""
         if self.side == BoundarySide.TOP or self.side == BoundarySide.BACK:
@@ -401,31 +412,33 @@ class Wall(BaseBoundaryCondition):
 
         cell_vars[pad_slice + (normal_momentum_index,)] *= -1
 
-    def apply_nodal(self, node_vars, *args, **kwargs):
-        raise NotImplementedError(
-            "Method 'apply_nodal' is not implemented for class WALL yet."
-        )
+    def apply_single_variable(self, variable: np.ndarray, is_nodal: bool):
+        mode: Literal["symmetric", "edge", "reflect"] = "symmetric"
+        if is_nodal:
+            mode = "reflect"
 
-    def apply_pressure(self, pressure: np.ndarray, *args, **kwargs):
-        """Apply wall boundary condition on the pressure variable. The variables gets reflected on the ghost cells."""
-
-        mode: Literal["symmetric", "edge"] = "symmetric"
         if self.grid.nc[self.direction] == 1:
+            # Single cell case
+            # Apply np.pad with mode "edge" to copy the single cell to ghost cells
             mode = "edge"
 
-        pressure[...] = np.pad(
-            pressure[self.inner_slice[:-1]], self.pad_width[:-1], mode=mode
+        variable[...] = np.pad(
+            variable[self.inner_slice[:-1]],
+            self.pad_width[:-1],
+            mode=mode,
         )
 
+
     @property
-    def pad_width(self):
+    def pad_width(self) -> list:
         """Create the pad width for a single direction. The "ng" attribute contains a
         list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
         Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
         avoid padding the boundary in all direction with the same number of ghost cells, we need to create a
         pad width tuple containing zero tuples in the undesired directions, i.e.  for x direction padding
         [(ngx, ngx), (0, 0), (0, 0)]. For wall boundary, this is reduced to one-sided padding: for example for x direction
-        and the left side: [(ngx, 0), (0, 0), (0, 0)]"""
+        and the left side: [(ngx, 0), (0, 0), (0, 0)]
+        """
 
         side: int = self.side_axis
         # create (ng, 0) or (0, ng)
@@ -436,9 +449,10 @@ class Wall(BaseBoundaryCondition):
         return pad_width
 
     @property
-    def inner_slice(self):
+    def inner_slice(self) -> Tuple[slice, ...]:
         """Create the inner slice of the array from one side, i.e. either (0, -ng) or (ng, None) in the corresponding
         direction."""
+
         side: int = self.side_axis
         # create slice(ng, None) or slice(0, ng)
         slc = slice(self.ng[side], None) if side == 0 else slice(0, -self.ng[side])
@@ -460,13 +474,6 @@ class NonReflectiveOutlet(BaseBoundaryCondition):
     def apply(self, cell_vars, *args, **kwargs):
         # Characteristic-based extrapolation
         pass
-
-
-class WallBoundary(BaseBoundaryCondition):
-    def apply(self, cell_vars, *args, **kwargs):
-        # Implement wall BC logic (e.g., reflect normal velocity)
-        pass
-
 
 class InflowBoundary(BaseBoundaryCondition):
     def apply(self, cell_vars, *args, **kwargs):
