@@ -14,7 +14,11 @@ from atmpy.infrastructure.registries import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from atmpy.boundary_conditions.boundary_conditions import BaseBoundaryCondition
+    from atmpy.boundary_conditions.contexts import (
+        BaseBoundaryCondition,
+        BCApplicationContext,
+        BCInstantiationOptions,
+    )
     from atmpy.time_integrators.linear_solvers import ILinearSolver
     from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
     from atmpy.infrastructure.enums import (
@@ -95,7 +99,7 @@ def get_reconstruction_method(name: "FluxReconstructions") -> callable:
 
 
 def get_boundary_conditions(
-    name: "BoundaryConditions", **params
+    name: "BoundaryConditions", context: "BCInstantiationOptions"
 ) -> "BaseBoundaryCondition":
     """
     Retrieves the boundary condition class based on the provided enum member.
@@ -104,8 +108,8 @@ def get_boundary_conditions(
     ----------
     name: BoundaryConditions (enum)
         The enum member specifying the desired boundary condition.
-    params: dict
-        The parameters for the boundary condition class.
+    context: BCInstantiationOptions
+        The context object containing the boundary condition configuration.
 
     Returns
     -------
@@ -116,7 +120,7 @@ def get_boundary_conditions(
     if boundary_condition_class is None:
         raise ValueError(f"Unknown boundary conditions: {name}")
 
-    return boundary_condition_class(**params)
+    return boundary_condition_class(context)
 
 
 def get_advection_routines(name: "AdvectionRoutines") -> callable:

@@ -1,6 +1,7 @@
 """Module for boundary conditions handling"""
 
 import numpy as np
+from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from typing import (
     List,
@@ -30,14 +31,11 @@ from atmpy.infrastructure.enums import (
     VariableIndices as VI,
 )
 from atmpy.physics.gravity import Gravity
-
-
-class KwargsTypes(TypedDict):
-    """Constructor class for dictionary typing of kwargs"""
-
-    direction: str
-    grid: "Grid"
-    side: str
+from atmpy.boundary_conditions.contexts import (
+    BCApplicationContext,
+    BCInstantiationOptions,
+    ReflectiveGravityBCInstantiationOptions as RFBCInstantiationOptions,
+)
 
 
 class BaseBoundaryCondition(ABC):
@@ -58,35 +56,41 @@ class BaseBoundaryCondition(ABC):
     the "inner_slice" key of the params is the tuple of all inner slices in all directions.
     """
 
-    def __init__(self, **kwargs: Unpack[KwargsTypes]) -> None:
+    def __init__(self, inst_opts: BCInstantiationOptions) -> None:
+        """Constructor for boundary conditions.
 
-        self.direction_str = kwargs["direction"]
+        Parameters:
+        -----------
+        inst_opts : BCInstantiationOptions
+            The context object that contains information about the instantiation of the boundary conditions.
+        """
+
+        self.direction_str = inst_opts.direction
         self.direction: int = direction_axis(self.direction_str)
-        self.grid: "Grid" = kwargs["grid"]
+        self.grid: "Grid" = inst_opts.grid
         self.ndim: int = self.grid.ndim
         self.ng: Tuple[int, int] = self.grid.ng[self.direction]
-        self.type: BdryType = BdryType.ABSTRACT
-        self.side = kwargs["side"]
+        self.type: BdryType = inst_opts.type
+        self.side = inst_opts.side
 
     @abstractmethod
-    def apply(self, cell_vars, *args, **kwargs):
+    def apply(self, cell_vars, context: BCApplicationContext):
         """Apply the boundary condition on the cell variables"""
         pass
 
     @abstractmethod
-    def apply_single_variable(self, variable: np.ndarray, is_nodal: bool):
+    def apply_single_variable(
+        self, variable: np.ndarray, context: BCApplicationContext
+    ):
         """Apply the boundary condition on a variable. Original motivation is to apply the correction on the
         right-hand side of the pressure equation.
-
-        Parameters
-        ----------
-        variable : np.ndarray
-            The variable to apply the boundary condition on.
-        is_nodal : bool
-            Whether the variable is nodal or not.
         """
         pass
 
+    @abstractmethod
+    def apply_extra(self, variable: np.ndarray, context: BCApplicationContext) -> None:
+        """Optional extra update on variable, like scaling wall nodes."""
+        pass
 
     def _find_side_axis(self):
         """Find the integer axis of the side on which the BC is applied in the given direction."""
@@ -110,18 +114,19 @@ class PeriodicBoundary(BaseBoundaryCondition):
     directional_inner_slice : Tuple[slice,...]
         Create the tuple of inner slices for a single direction."""
 
-    def __init__(self, **kwargs: Unpack[KwargsTypes]):
-        super().__init__(**kwargs)
-        self.type = BdryType.PERIODIC
+    def __init__(self, inst_opts: BCInstantiationOptions) -> None:
+        super().__init__(inst_opts)
         self.side_axis: int = self._find_side_axis()
 
-    def apply(self, cell_vars: np.ndarray, *args, **kwargs):
+    def apply(self, cell_vars: np.ndarray, context: BCApplicationContext):
         """Apply periodic boundary condition to the cell_vars.
 
         Parameters
         ----------
         cell_vars : ndarray of shape (nx, [ny], [nz], num_vars)
             The array container for all the variables.
+        context: BCApplicationContext
+            The context object that contains information about the boundary conditions apply method.
         """
         inner_padded_slice = self.inner_and_padded_slices()
         # Apply np.pad with mode "wrap" on ALL variables for periodic BC.
@@ -131,15 +136,20 @@ class PeriodicBoundary(BaseBoundaryCondition):
             mode="wrap",
         )
 
-    def apply_single_variable(self, pressure: np.ndarray, is_nodal: bool=None):
+    def apply_single_variable(
+        self, variable: np.ndarray, context: BCApplicationContext
+    ):
         """Apply the periodic boundary condition on the pressure variable."""
         inner_padded_slice = self.inner_and_padded_slices()
 
-        pressure[inner_padded_slice[:-1]] = np.pad(
-            pressure[self.inner_slice[:-1]],
+        variable[inner_padded_slice[:-1]] = np.pad(
+            variable[self.inner_slice[:-1]],
             self.pad_width[:-1],
             mode="wrap",
         )
+
+    def apply_extra(self, variable: np.ndarray, context: BCApplicationContext) -> None:
+        pass
 
     @property
     def pad_width(self):
@@ -200,35 +210,26 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         Determines if we are in the compressible regime.
     """
 
-    class KwargsType(TypedDict):
-        """Constructor class for typing of kwargs dictionary"""
-
-        thermodynamics: "Thermodynamics"
-        gravity: Union[List[float], np.ndarray]
-        stratification: Callable[[Any], Any]
-        side: str
-        is_lamb: bool
-        is_compressible: bool
-
-    def __init__(self, **kwargs: Unpack[KwargsType]) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, inst_opts: RFBCInstantiationOptions) -> None:
+        super().__init__(inst_opts)
         self.type = BdryType.REFLECTIVE_GRAVITY
         if self.ndim == 1:
-            raise ValueError("Reflective gravity is not implemented for 1 dimensional problem.")
-        self.th: "Thermodynamics" = kwargs["thermodynamics"]
-        self.gravity: Gravity = Gravity(kwargs["gravity"], self.ndim)
+            raise ValueError(
+                "Reflective gravity is not implemented for 1 dimensional problem."
+            )
+        self.th: "Thermodynamics" = inst_opts.thermodynamics
+        self.gravity: Gravity = Gravity(inst_opts.gravity, self.ndim)
         if np.isclose(self.gravity.vector[self.direction], 0):
             raise ValueError(
                 "There is no gravity strength in the specified direction. Wrong boundary conditions."
             )
-        self.stratification: Callable[[Any], Any] = kwargs["stratification"]
+        self.stratification: Callable[[Any], Any] = inst_opts.stratification
         self.facet: str = self._find_facet()
         if self.facet not in ["begin", "end"]:
             raise ValueError("Facet must be either 'begin' or 'end'.")
-        self.is_lamb: bool = kwargs["is_lamb"]
-        self.is_compressible: bool = kwargs["is_compressible"]
+        self.is_compressible: bool = inst_opts.is_compressible
 
-    def apply(self, cell_vars: np.ndarray, *args, **kwargs):
+    def apply(self, cell_vars: np.ndarray, context: BCApplicationContext):
         """Apply the reflective boundary condition for the given side of the gravity axis. If self.side is top, this means
         that the boundary condition for the top side of the vertical axis is the 'Lid' boundary. The sponge BC should be
         implemented separately in another class."""
@@ -254,12 +255,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         ]  # discretization fineness in the gravity direction
 
         # Calculate the derivative of Pi (Exner pressure) in existence/nonexistence of lamb boundary
-        if not self.is_lamb:
-            dpi = sign * self.th.Gamma * 0.5 * dr * (1.0 / Y_last + strat)
-        else:
-            raise NotImplementedError(
-                "The lamb boundary condition is not implemented yet."
-            )
+        dpi = sign * self.th.Gamma * 0.5 * dr * (1.0 / Y_last + strat)
 
         # Calculate the P = rho Theta on the nlast indices in compressible or pseudo-incompressible regimes
         if self.is_compressible:
@@ -284,13 +280,10 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         rho = rhoY * strat
         cell_vars[nimage + (VI.RHO,)] = rho
 
-        if not self.is_lamb:
-            # Find velocity in the direction of gravity and update ghost cells.
-            v = Pv / rhoY
-            Th_slc = 1.0
-            cell_vars[nimage + (momentum_index[0],)] = rho * v
-        else:
-            raise ValueError("The lamb boundary condition is not implemented yet.")
+        # Find velocity in the direction of gravity and update ghost cells.
+        v = Pv / rhoY
+        Th_slc = 1.0
+        cell_vars[nimage + (momentum_index[0],)] = rho * v
 
         # This is the actual horizontal velocity, since the gravity axis can never be the first axis.
         u = cell_vars[nsource + (VI.RHOU,)] / cell_vars[nsource + (VI.RHO,)]
@@ -309,6 +302,14 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         X = cell_vars[nsource + (VI.RHOX,)] / cell_vars[nsource + (VI.RHO,)]
         cell_vars[nimage + (VI.RHOY,)] = rhoY
         cell_vars[nimage + (VI.RHOX,)] = rho * X
+
+    def apply_single_variable(
+        self, variable: np.ndarray, context: BCApplicationContext
+    ):
+        pass
+
+    def apply_extra(self, variable: np.ndarray, context: BCApplicationContext) -> None:
+        pass
 
     def _create_boundary_indices(
         self,
@@ -366,9 +367,6 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
 
         return tuple(nsource), tuple(nlast), tuple(nimage)
 
-    def apply_single_variable(self, variable: np.ndarray, is_nodal: bool=None):
-        pass
-
     def _find_facet(self):
         """Find which end of the array is the gravity being applied on"""
         if self.side == BoundarySide.TOP or self.side == BoundarySide.BACK:
@@ -380,12 +378,11 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
 
 
 class Wall(BaseBoundaryCondition):
-    def __init__(self, **kwargs: Unpack[KwargsTypes]):
-        super().__init__(**kwargs)
-        self.type = BdryType.WALL
+    def __init__(self, inst_opts: BCInstantiationOptions):
+        super().__init__(inst_opts)
         self.side_axis: int = self._find_side_axis()
 
-    def apply(self, cell_vars: np.ndarray, *args, **kwargs):
+    def apply(self, cell_vars: np.ndarray, context: BCApplicationContext):
         """Apply the wall boundary condition. All the variables get reflected by the boundary, the normal velocity gets
         reflected and negated.
 
@@ -412,8 +409,11 @@ class Wall(BaseBoundaryCondition):
 
         cell_vars[pad_slice + (normal_momentum_index,)] *= -1
 
-    def apply_single_variable(self, variable: np.ndarray, is_nodal: bool):
+    def apply_single_variable(
+        self, variable: np.ndarray, context: BCApplicationContext
+    ):
         mode: Literal["symmetric", "edge", "reflect"] = "symmetric"
+        is_nodal = context.is_nodal
         if is_nodal:
             mode = "reflect"
 
@@ -428,8 +428,9 @@ class Wall(BaseBoundaryCondition):
             mode=mode,
         )
 
-        # TODO: integrate the scale_wall_factor into this function.
-
+    def apply_extra(self, variable: np.ndarray, context: BCApplicationContext) -> None:
+        """This is applied on a nodal variable. Rescale nodes at the boundary by a factor."""
+        pass
 
     @property
     def pad_width(self) -> list:
@@ -476,6 +477,7 @@ class NonReflectiveOutlet(BaseBoundaryCondition):
     def apply(self, cell_vars, *args, **kwargs):
         # Characteristic-based extrapolation
         pass
+
 
 class InflowBoundary(BaseBoundaryCondition):
     def apply(self, cell_vars, *args, **kwargs):
