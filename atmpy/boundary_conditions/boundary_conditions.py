@@ -418,6 +418,24 @@ class Wall(BaseBoundaryCondition):
     def apply_single_variable(
         self, variable: np.ndarray, context: "BCApplicationContext"
     ):
+        """ Apply the wall boundary condition on a single variable. Used predominantly to apply BC on the second
+        asymptotics of the pressure variable.
+
+        Parameters
+        ----------
+        variable : np.ndarray
+            The node-centered or cell-centered variable.
+        context: BCApplicationContext
+            The context object of the method. It contains the flag 'is_nodal' to determine if the variable is defined
+            on nodes or cells.
+
+        Notes
+        -----
+        If the flag is_nodal is on, i.e. if the variable
+        is defined on nodes, the boundary node is not copied on ghost nodes. Therefore, the 'mode' will be set to
+        'reflect'. Otherwise, it will be 'symmetric' as usual for wall boundary conditions for cells.
+        """
+
         mode: Literal["symmetric", "edge", "reflect"] = "symmetric"
         is_nodal = context.is_nodal
         if is_nodal:
