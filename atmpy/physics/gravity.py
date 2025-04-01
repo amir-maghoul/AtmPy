@@ -12,6 +12,24 @@ from atmpy.infrastructure.enums import (
 
 
 class Gravity:
+    """ The Gravity container. Create the needed tool to work with gravity throughout the project.
+
+    Attributes
+    ----------
+    vector: np.ndarray
+        The gravity vector.
+    ndim: int
+        The dimension of the problem
+    axis: int
+        The axis on which the gravity force exists.
+    direction: str
+        The axis on which the gravity force exists but in string. Values can be "x", "y", "z".
+    strength: float
+        The gravity strength
+    momentum_index: Tuple[int, int]
+        The index of the momentum in the direction of gravity and in the direction of non-gravity
+
+    """
     def __init__(self, gravity_vector: Union[np.ndarray, list], ndim: int):
         self.vector: np.ndarray = np.array(gravity_vector)
         self.ndim = ndim
@@ -24,6 +42,8 @@ class Gravity:
                 f"""An {self.ndim}-dimensional problem cannot have gravity on axis {self.axis}. 
                 The gravity should exist on the highest dimension."""
             )
+        directions = ["x", "y", "z"]
+        self.direction: str = directions[self.axis]
         if self.axis == 0 and self.ndim != 1:
             raise ValueError(
                 """In reflective gravity boundary condition for problems of more than one dimension, 
