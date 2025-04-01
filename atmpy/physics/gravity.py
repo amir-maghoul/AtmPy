@@ -1,10 +1,14 @@
-""" This module handles basics regarding the gravity. Fingind the axis, coordinates, momenta indices and etc."""
+"""This module handles basics regarding the gravity. Fingind the axis, coordinates, momenta indices and etc."""
 
 import numpy as np
 from typing import Union, cast, Tuple, TYPE_CHECKING
+
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
-from atmpy.infrastructure.enums import VariableIndices as VI, VariableIndices  # assuming you have this enum
+from atmpy.infrastructure.enums import (
+    VariableIndices as VI,
+    VariableIndices,
+)  # assuming you have this enum
 
 
 class Gravity:
@@ -28,7 +32,7 @@ class Gravity:
         self.strength: float = abs(self.vector[self.axis])
 
     @property
-    def momentum_index(self)-> Tuple[int, int]:
+    def momentum_index(self) -> Tuple[int, int]:
         """Helper method to get the momentum variable index in the direction of gravity as the first output and the
         momentum in the nongravity direction as the second output. Notice since RHOU can never be the momentum in the
         gravity axis (or more clearly, first axis can never be the gravity axis), it is not included in the array
@@ -38,7 +42,9 @@ class Gravity:
         elif self.axis == 2:
             return (VI.RHOW, VI.RHOV)
         else:
-            raise ValueError("Invalid gravity axis. Gravity cannot be applied on axis 0.")
+            raise ValueError(
+                "Invalid gravity axis. Gravity cannot be applied on axis 0."
+            )
 
     def get_coordinate_cells(self, grid: "Grid"):
         """
