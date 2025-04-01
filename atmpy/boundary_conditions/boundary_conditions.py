@@ -1,7 +1,7 @@
 """Module for boundary conditions handling"""
 
 import numpy as np
-from dataclasses import dataclass, field
+import copy
 from abc import ABC, abstractmethod
 from typing import (
     List,
@@ -19,6 +19,11 @@ from typing import (
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
     from atmpy.physics.thermodynamics import Thermodynamics
+    from atmpy.boundary_conditions.contexts import (
+        BCApplicationContext,
+        BCInstantiationOptions,
+        ReflectiveGravityBCInstantiationOptions as RFBCInstantiationOptions,
+    )
 
 from atmpy.infrastructure.utility import (
     direction_axis,
@@ -31,12 +36,6 @@ from atmpy.infrastructure.enums import (
     VariableIndices as VI,
 )
 from atmpy.physics.gravity import Gravity
-from atmpy.boundary_conditions.contexts import (
-    BCApplicationContext,
-    BCInstantiationOptions,
-    ReflectiveGravityBCInstantiationOptions as RFBCInstantiationOptions,
-)
-
 
 class BaseBoundaryCondition(ABC):
     """Abstract base class for all boundary conditions.
@@ -47,6 +46,12 @@ class BaseBoundaryCondition(ABC):
         The direction of the boundary condition.
     side : BoundarySide
         The side in the direction for the boundary condition.
+    direction_str: str
+        The indicator that which axis is the boundary condition being applied on.
+    direction: int
+        The direction axis in integer
+    full_inner_slice: List[Tuple[Any, Any]]
+        The slice of full inner domain.
     ng : tuple
         The tuple of the number of ghost cells in each side of all directions.
 
@@ -56,7 +61,7 @@ class BaseBoundaryCondition(ABC):
     the "inner_slice" key of the params is the tuple of all inner slices in all directions.
     """
 
-    def __init__(self, inst_opts: BCInstantiationOptions) -> None:
+    def __init__(self, inst_opts: "BCInstantiationOptions") -> None:
         """Constructor for boundary conditions.
 
         Parameters:
@@ -70,17 +75,18 @@ class BaseBoundaryCondition(ABC):
         self.grid: "Grid" = inst_opts.grid
         self.ndim: int = self.grid.ndim
         self.ng: Tuple[int, int] = self.grid.ng[self.direction]
+        self.full_inner_slice: List[Tuple[int, int]] = self.grid.inner_slice
         self.type: BdryType = inst_opts.type
         self.side = inst_opts.side
 
     @abstractmethod
-    def apply(self, cell_vars, context: BCApplicationContext):
+    def apply(self, cell_vars, context: "BCApplicationContext"):
         """Apply the boundary condition on the cell variables"""
         pass
 
     @abstractmethod
     def apply_single_variable(
-        self, variable: np.ndarray, context: BCApplicationContext
+        self, variable: np.ndarray, context: "BCApplicationContext"
     ):
         """Apply the boundary condition on a variable. Original motivation is to apply the correction on the
         right-hand side of the pressure equation.
@@ -88,7 +94,7 @@ class BaseBoundaryCondition(ABC):
         pass
 
     @abstractmethod
-    def apply_extra(self, variable: np.ndarray, context: BCApplicationContext) -> None:
+    def apply_extra(self, variable: np.ndarray, context: "BCApplicationContext") -> None:
         """Optional extra update on variable, like scaling wall nodes."""
         pass
 
@@ -114,11 +120,11 @@ class PeriodicBoundary(BaseBoundaryCondition):
     directional_inner_slice : Tuple[slice,...]
         Create the tuple of inner slices for a single direction."""
 
-    def __init__(self, inst_opts: BCInstantiationOptions) -> None:
+    def __init__(self, inst_opts: "BCInstantiationOptions") -> None:
         super().__init__(inst_opts)
         self.side_axis: int = self._find_side_axis()
 
-    def apply(self, cell_vars: np.ndarray, context: BCApplicationContext):
+    def apply(self, cell_vars: np.ndarray, context: "BCApplicationContext"):
         """Apply periodic boundary condition to the cell_vars.
 
         Parameters
@@ -137,7 +143,7 @@ class PeriodicBoundary(BaseBoundaryCondition):
         )
 
     def apply_single_variable(
-        self, variable: np.ndarray, context: BCApplicationContext
+        self, variable: np.ndarray, context: "BCApplicationContext"
     ):
         """Apply the periodic boundary condition on the pressure variable."""
         inner_padded_slice = self.inner_and_padded_slices()
@@ -148,7 +154,7 @@ class PeriodicBoundary(BaseBoundaryCondition):
             mode="wrap",
         )
 
-    def apply_extra(self, variable: np.ndarray, context: BCApplicationContext) -> None:
+    def apply_extra(self, variable: np.ndarray, context: "BCApplicationContext") -> None:
         pass
 
     @property
@@ -210,9 +216,8 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         Determines if we are in the compressible regime.
     """
 
-    def __init__(self, inst_opts: RFBCInstantiationOptions) -> None:
+    def __init__(self, inst_opts: "RFBCInstantiationOptions") -> None:
         super().__init__(inst_opts)
-        self.type = BdryType.REFLECTIVE_GRAVITY
         if self.ndim == 1:
             raise ValueError(
                 "Reflective gravity is not implemented for 1 dimensional problem."
@@ -229,7 +234,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             raise ValueError("Facet must be either 'begin' or 'end'.")
         self.is_compressible: bool = inst_opts.is_compressible
 
-    def apply(self, cell_vars: np.ndarray, context: BCApplicationContext):
+    def apply(self, cell_vars: np.ndarray, context: "BCApplicationContext"):
         """Apply the reflective boundary condition for the given side of the gravity axis. If self.side is top, this means
         that the boundary condition for the top side of the vertical axis is the 'Lid' boundary. The sponge BC should be
         implemented separately in another class."""
@@ -304,12 +309,13 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         cell_vars[nimage + (VI.RHOX,)] = rho * X
 
     def apply_single_variable(
-        self, variable: np.ndarray, context: BCApplicationContext
+        self, variable: np.ndarray, context: "BCApplicationContext"
     ):
         pass
 
-    def apply_extra(self, variable: np.ndarray, context: BCApplicationContext) -> None:
+    def apply_extra(self, variable: np.ndarray, context: "BCApplicationContext") -> None:
         pass
+
 
     def _create_boundary_indices(
         self,
@@ -378,11 +384,11 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
 
 
 class Wall(BaseBoundaryCondition):
-    def __init__(self, inst_opts: BCInstantiationOptions):
+    def __init__(self, inst_opts: "BCInstantiationOptions"):
         super().__init__(inst_opts)
         self.side_axis: int = self._find_side_axis()
 
-    def apply(self, cell_vars: np.ndarray, context: BCApplicationContext):
+    def apply(self, cell_vars: np.ndarray, context: "BCApplicationContext"):
         """Apply the wall boundary condition. All the variables get reflected by the boundary, the normal velocity gets
         reflected and negated.
 
@@ -410,7 +416,7 @@ class Wall(BaseBoundaryCondition):
         cell_vars[pad_slice + (normal_momentum_index,)] *= -1
 
     def apply_single_variable(
-        self, variable: np.ndarray, context: BCApplicationContext
+        self, variable: np.ndarray, context: "BCApplicationContext"
     ):
         mode: Literal["symmetric", "edge", "reflect"] = "symmetric"
         is_nodal = context.is_nodal
@@ -428,9 +434,21 @@ class Wall(BaseBoundaryCondition):
             mode=mode,
         )
 
-    def apply_extra(self, variable: np.ndarray, context: BCApplicationContext) -> None:
-        """This is applied on a nodal variable. Rescale nodes at the boundary by a factor."""
-        pass
+    def apply_extra(self, variable: np.ndarray, context: "BCApplicationContext") -> None:
+        """This is applied on a nodal variable. Rescale nodes at the boundary by a factor.
+
+        Parameters
+        ----------
+        variable : np.ndarray
+            The nodal variable to apply the extra boundary condition on.
+        context : BCApplicationContext
+            The context object for the method
+        """
+
+        factor = context.scale_factor
+        boundary_nodes_slice = self._boundary_nodes()
+        variable[boundary_nodes_slice] *= factor
+        print(variable)
 
     @property
     def pad_width(self) -> list:
@@ -463,6 +481,15 @@ class Wall(BaseBoundaryCondition):
         inner_slice = [slice(None)] * (self.ndim + 1)
         inner_slice[self.direction] = slc
         return tuple(inner_slice)
+
+    def _boundary_nodes(self) -> Tuple[slice, ...]:
+        """ Create the slice for the nodes at the boundary. This is used to rescale those nodes."""
+        # Notice in backward indexing, the third to last element in the last inner node (boundary node).
+        # Therefore, in backward indexing -ig - 1 is the correct index of the last inner node.
+        idx = self.ng[self.side_axis] if self.side_axis == 0 else -self.ng[self.side_axis]-1
+        boundary_nodes_slice = copy.deepcopy(self.full_inner_slice)
+        boundary_nodes_slice[self.direction] = idx
+        return tuple(boundary_nodes_slice)
 
     def padded_slices(self) -> Tuple[slice, ...]:
         """Returns the slice of the padded part."""

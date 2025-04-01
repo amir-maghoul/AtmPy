@@ -1,7 +1,7 @@
 """This module holds contexts data classes for instantiation and application of boundary conditions"""
 
 from dataclasses import dataclass, field
-from typing import List, Union, TYPE_CHECKING
+from typing import List, Tuple, TYPE_CHECKING
 from atmpy.physics.thermodynamics import Thermodynamics
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ class BCInstantiationOptions:
 class ReflectiveGravityBCInstantiationOptions(BCInstantiationOptions):
     """Data class to contain the boundary condition instantiation parameters for the reflective gravity boundary condition."""
 
-    gravity: Union["np.ndarray", list] = (0.0, 1.0, 0.0)
+    gravity: Tuple[float] = (0.0, 1.0, 0.0)
     stratification: callable = lambda x: x
     thermodynamics: Thermodynamics = field(default_factory=Thermodynamics)
     is_compressible: bool = field(default=True)
