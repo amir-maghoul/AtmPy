@@ -6,12 +6,17 @@ from typing import TYPE_CHECKING, Union, List
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
     from atmpy.variables.variables import Variables
+    from atmpy.variables.multiple_pressure_variables import MPV
     from atmpy.grid.kgrid import Grid
     from atmpy.boundary_conditions.boundary_manager import BoundaryManager
+    from atmpy.physics.gravity import Gravity
+    from atmpy.physics.thermodynamics import Thermodynamics
 
 from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
+from atmpy.time_integrators.utility import nodal_derivative, nodal_gradient, pressured_momenta_divergence
 import scipy.sparse.linalg
 from atmpy.time_integrators.utility import *
+
 
 
 class IMEXTimeIntegrator(AbstractTimeIntegrator):
@@ -19,20 +24,28 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self,
         grid: "Grid",
         variables: "Variables",
+        mpv: "MPV",
         flux: "Flux",
         boundary_manager: "BoundaryManager",
         coriolis_operator: CoriolisOperator,
         pressure_solver: PressureSolver,
+        thermodynamics: "Thermodynamics",
         dt: float,
+        **kwargs
     ):
         # Inject dependencies
         self.grid: "Grid" = grid
         self.variables: "Variables" = variables
+        self.mpv: "MPV" = mpv
         self.flux: "Flux" = flux
         self.boundary_manager: "BoundaryManager" = boundary_manager
-        self.coriolis_operator: "CoriolisOperator" = coriolis_operator
+        self.coriolis: "CoriolisOperator" = coriolis_operator
+        self.gravity: "Gravity" = self.coriolis.gravity
         self.pressure_solver: "PressureSolver" = pressure_solver
+        self.th: "Thermodynamics" = thermodynamics
         self.dt: float = dt
+        self.wind_speed: Union[list, np.ndarray] = kwargs.get("wind_speed")
+
 
     def step(self):
         # 1. Explicit forward update (e.g. divergence, pressure gradient, momentum update)
@@ -51,14 +64,33 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.boundary_manager.apply_all(self.variables)
 
     def forward_update(self):
-        # Encapsulate what euler_forward_non_advective did.
-        # For instance: compute divergence, update momentum with pressure gradient,
-        # update a pressure diagnostic field, etc.
-        # Example:
-        self.variables.rhou += self.dt * self.compute_pressure_gradient("x")
-        self.variables.rhov += self.dt * self.compute_pressure_gradient("y")
-        # ... other explicit updates.
-        print("Forward update complete.")
+        """ Integrates the problem on time step using the explicit euler for non-advective terms."""
+        g = self.gravity.strength
+        if self.wind_speed:
+            self.variables.adjust_background_wind(self.wind_speed, -1.0)
+
+        # second pressure asymptotics on nodes
+        p2n = np.copy(self.mpv.p2_nodes)
+
+        # container for the derivative of p2 on nodes.
+        dp2n = np.zeros_like(p2n)
+
+        # get Chi variable
+        S0c = self.mpv.get_S0c_on_cells()
+        dSdy = self.mpv.compute_dS_on_nodes(self.gravity.direction)
+
+        # Calculate the divergence of momenta on the NODES. This is the right hand side of the pressure equation
+        self.mpv.rhs[...] = pressured_momenta_divergence(self.grid, self.variables)
+
+        # self.boundary_manager.apply_extra_all_sides(self.mpv.rhs, )
+
+        # index 0: momentum in the direction of gravity. index 1: momentum in the direction of non-gravity.
+        momentum_index = self.gravity.momentum_index
+
+        #
+
+
+
 
     def backward_update_implicit(self):
         # Encapsulate the pressure solve (euler_backward_non_advective_impl_part)
@@ -88,19 +120,19 @@ class CoriolisOperator:
     def __init__(
         self,
         coriolis_strength: Union[np.ndarray, list],
-        gravity_strength: Union[np.ndarray, list],
+        gravity: "Gravity",
         Msq: float,
         nonhydro: bool,
         get_strat: callable,
     ):
         self.coriolis_strength: Union[np.ndarray, list] = coriolis_strength
-        self.gravity_strength: Union[np.ndarray, list] = gravity_strength
+        self.gravity: "Gravity" = gravity
         self.Msq: float = Msq
         self.nonhydro: bool = nonhydro
         self.get_strat: callable = get_strat  # callable that returns stratification
 
     def apply(self, variables: "Variables", dt: float) -> None:
-        """ Apply correction to momenta due to the coriolis effect. If there are no coriolis forces in any direction,
+        """Apply correction to momenta due to the coriolis effect. If there are no coriolis forces in any direction,
         do nothing.
 
         Parameters

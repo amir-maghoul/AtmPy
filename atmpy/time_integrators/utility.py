@@ -12,7 +12,7 @@ from atmpy.infrastructure.enums import VariableIndices as VI
 from atmpy.grid.utility import nodal_derivative
 
 
-def momenta_divergence(grid: "Grid", variables: "Variables") -> np.ndarray:
+def pressured_momenta_divergence(grid: "Grid", variables: "Variables") -> np.ndarray:
     """Calculates the divergence of the pressured-momenta vector (Pu, Pv, Pw). This works as the right hand side
     of the pressure equation in the euler steps.
 
