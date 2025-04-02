@@ -370,6 +370,8 @@ def main():
     print(flux.variables.cell_vars[..., VI.RHOU])
     u = variables.cell_vars[..., VI.RHOW]
 
+    print(int(2) + True)
+
 
 if __name__ == "__main__":
     main()

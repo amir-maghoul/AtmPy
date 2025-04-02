@@ -24,7 +24,9 @@ if TYPE_CHECKING:
         BCInstantiationOptions,
         ReflectiveGravityBCInstantiationOptions as RFBCInstantiationOptions,
     )
+    from atmpy.boundary_conditions.bc_extra_operations import ExtraBCOperation
 
+from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.infrastructure.utility import (
     direction_axis,
     momentum_index,
@@ -78,6 +80,7 @@ class BaseBoundaryCondition(ABC):
         self.full_inner_slice: List[Tuple[int, int]] = self.grid.inner_slice
         self.type: BdryType = inst_opts.type
         self.side = inst_opts.side
+        self.side_axis: int = self._find_side_axis()
 
     @abstractmethod
     def apply(self, cell_vars, context: "BCApplicationContext"):
@@ -94,9 +97,29 @@ class BaseBoundaryCondition(ABC):
         pass
 
     @abstractmethod
-    def apply_extra(self, variable: np.ndarray, context: "BCApplicationContext") -> None:
-        """Optional extra update on variable, like scaling wall nodes."""
+    def apply_extra(self, variable: np.ndarray, operation: "ExtraBCOperation") -> None:
+        """Optional extra update on variable, like scaling wall nodes. This function should be considered as a
+        refinement of the boundary condition. It should be called in the euler steps (explicit and implicit) to
+        refine the already applied boundary conditions."""
         pass
+
+    @property
+    def pad_width(self):
+        """ Create the pad width for a single direction. The "ng" attribute contains a
+        list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
+        Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
+        avoid padding the boundary in all direction with the same number of ghost cells, we need to create a
+        pad width tuple containing zero tuples in the undesired directions, i.e.  for x direction padding
+        [(ngx, ngx), (0, 0), (0, 0)]. For wall boundary, this is reduced to one-sided padding: for example for x direction
+        and the left side: [(ngx, 0), (0, 0), (0, 0)]"""
+
+        side: int = self.side_axis
+        # create (ng, 0) or (0, ng)
+        ng: List[int] = [0 if i != side else self.ng[side] for i in range(2)]
+        # create the pad width
+        pad_width = [(0, 0)] * (self.ndim + 1)
+        pad_width[self.direction] = ng
+        return pad_width
 
     def _find_side_axis(self):
         """Find the integer axis of the side on which the BC is applied in the given direction."""
@@ -122,7 +145,6 @@ class PeriodicBoundary(BaseBoundaryCondition):
 
     def __init__(self, inst_opts: "BCInstantiationOptions") -> None:
         super().__init__(inst_opts)
-        self.side_axis: int = self._find_side_axis()
 
     def apply(self, cell_vars: np.ndarray, context: "BCApplicationContext"):
         """Apply periodic boundary condition to the cell_vars.
@@ -154,26 +176,8 @@ class PeriodicBoundary(BaseBoundaryCondition):
             mode="wrap",
         )
 
-    def apply_extra(self, variable: np.ndarray, context: "BCApplicationContext") -> None:
+    def apply_extra(self, variable: np.ndarray, operation: "ExtraBCOperation") -> None:
         pass
-
-    @property
-    def pad_width(self):
-        """Create the pad width for a single direction. The "ng" attribute contains a
-        list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
-        Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
-        avoid padding the boundary in all direction with the same number of ghost cells, we need to create a
-        pad width tuple containing zero tuples in the undesired directions, i.e.  for x direction padding
-        [(ngx, ngx), (0, 0), (0, 0)]. For wall boundary, this is reduced to one-sided padding: for example for x direction
-        and the left side: [(ngx, 0), (0, 0), (0, 0)]"""
-
-        side: int = self.side_axis
-        # create (ng, 0) or (0, ng)
-        ng: List[int] = [0 if i != side else self.ng[side] for i in range(2)]
-        # create the pad width
-        pad_width = [(0, 0)] * (self.ndim + 1)
-        pad_width[self.direction] = ng
-        return pad_width
 
     @property
     def inner_slice(self) -> Tuple[slice, ...]:
@@ -386,7 +390,6 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
 class Wall(BaseBoundaryCondition):
     def __init__(self, inst_opts: "BCInstantiationOptions"):
         super().__init__(inst_opts)
-        self.side_axis: int = self._find_side_axis()
 
     def apply(self, cell_vars: np.ndarray, context: "BCApplicationContext"):
         """Apply the wall boundary condition. All the variables get reflected by the boundary, the normal velocity gets
@@ -452,40 +455,23 @@ class Wall(BaseBoundaryCondition):
             mode=mode,
         )
 
-    def apply_extra(self, variable: np.ndarray, context: "BCApplicationContext") -> None:
+    def apply_extra(self, variable: np.ndarray, operation: "ExtraBCOperation") -> None:
         """This is applied on a nodal variable. Rescale nodes at the boundary by a factor.
 
         Parameters
         ----------
         variable : np.ndarray
             The nodal variable to apply the extra boundary condition on.
-        context : BCApplicationContext
-            The context object for the method
+        operation: ExtraBCOperation
+            The ExtraBCOperation object to be applied.
         """
 
-        factor = context.scale_factor
-        boundary_nodes_slice = self._boundary_nodes()
-        variable[boundary_nodes_slice] *= factor
-        print(variable)
-
-    @property
-    def pad_width(self) -> list:
-        """Create the pad width for a single direction. The "ng" attribute contains a
-        list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
-        Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
-        avoid padding the boundary in all direction with the same number of ghost cells, we need to create a
-        pad width tuple containing zero tuples in the undesired directions, i.e.  for x direction padding
-        [(ngx, ngx), (0, 0), (0, 0)]. For wall boundary, this is reduced to one-sided padding: for example for x direction
-        and the left side: [(ngx, 0), (0, 0), (0, 0)]
-        """
-
-        side: int = self.side_axis
-        # create (ng, 0) or (0, ng)
-        ng: List[int] = [0 if i != side else self.ng[side] for i in range(2)]
-        # create the pad width
-        pad_width = [(0, 0)] * (self.ndim + 1)
-        pad_width[self.direction] = ng
-        return pad_width
+        if isinstance(operation, WallAdjustment):
+            factor = operation.factor
+            boundary_nodes_slice = self._boundary_nodes()
+            variable[boundary_nodes_slice] *= factor
+        else:
+            pass
 
     @property
     def inner_slice(self) -> Tuple[slice, ...]:

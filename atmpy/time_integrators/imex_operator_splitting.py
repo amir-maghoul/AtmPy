@@ -75,14 +75,14 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # container for the derivative of p2 on nodes.
         dp2n = np.zeros_like(p2n)
 
-        # get Chi variable
+        # get Chi variable and the derivative
         S0c = self.mpv.get_S0c_on_cells()
         dSdy = self.mpv.compute_dS_on_nodes(self.gravity.direction)
 
         # Calculate the divergence of momenta on the NODES. This is the right hand side of the pressure equation
         self.mpv.rhs[...] = pressured_momenta_divergence(self.grid, self.variables)
 
-        # self.boundary_manager.apply_extra_all_sides(self.mpv.rhs, )
+        self.boundary_manager.apply_extra_all_sides(self.mpv.rhs, )
 
         # index 0: momentum in the direction of gravity. index 1: momentum in the direction of non-gravity.
         momentum_index = self.gravity.momentum_index

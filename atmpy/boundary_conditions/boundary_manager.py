@@ -11,6 +11,7 @@ if TYPE_CHECKING:
         BoundaryConditionsConfiguration,
         BCApplicationContext,
     )
+    from atmpy.boundary_conditions.bc_extra_operations import ExtraBCOperation
 from atmpy.infrastructure.factory import get_boundary_conditions
 from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
@@ -53,7 +54,7 @@ class BoundaryManager:
         self,
         cells: "np.ndarray",
         side: BdrySide,
-        context: "BCApplicationContext" = None,
+        contexts: List["BCApplicationContext"] = [None],
     ):
         """Apply the boundary conditions on a single side.
 
@@ -73,7 +74,7 @@ class BoundaryManager:
                 f"The side {side} does not exist in the list of given sides: {self.boundary_conditions.keys()}."
             )
         condition = self.boundary_conditions[side]
-        condition.apply(cells, context)
+        condition.apply(cells, contexts[0])
 
     def apply_boundary_on_direction(
         self,
@@ -112,7 +113,7 @@ class BoundaryManager:
         self,
         variable: "np.ndarray",
         side: "BdrySide",
-        context: "BCApplicationContext" = None,
+        contexts: List["BCApplicationContext"] = [None],
     ):
         """Apply the boundary for a single variable on one side.
 
@@ -134,13 +135,13 @@ class BoundaryManager:
                 f"The side {side} does not exist in the list of given sides: {self.boundary_conditions.keys()}."
             )
         condition = self.boundary_conditions[side]
-        condition.apply_single_variable(variable, context)
+        condition.apply_single_variable(variable, contexts[0])
 
     def apply_boundary_on_single_var_direction(
         self,
         variable: "np.ndarray",
         direction: str,
-        contexts: List["BCApplicationContext"] = None,
+        contexts: List["BCApplicationContext"] = [None],
     ):
         """Apply the boundary for a single variable on a single direction consisting of two sides.
 
@@ -161,7 +162,7 @@ class BoundaryManager:
             condition.apply_single_variable(variable, context)
 
     def apply_boundary_on_single_var_all_sides(
-        self, variable: "np.ndarray", contexts: List["BCApplicationContext"]
+        self, variable: "np.ndarray", contexts: List["BCApplicationContext"]=[None]
     ):
         """Apply the boundary conditions on all sides and directions for the input variable.
 
@@ -176,7 +177,7 @@ class BoundaryManager:
         for (side, condition), context in zip(self.boundary_conditions.items(), contexts):
             condition.apply_single_variable(variable, context)
 
-    def apply_extra(self, variable: "np.ndarray", side: "BdrySide", context: "BCApplicationContext") -> None:
+    def apply_extra(self, variable: "np.ndarray", side: "BdrySide", operations: List["ExtraBCOperation"]) -> None:
         """ Apply the extra conditions on the given single variable for a single side.
 
         Parameters
@@ -185,6 +186,8 @@ class BoundaryManager:
             The variable array
         side: BdrySide
             The side to apply the boundary condition on.
+        operations: List["ExtraBCOperation"]
+            The operations for the extra conditions.
         context: BCApplicationContext
             The context object containing the apply method information.
         """
@@ -197,25 +200,34 @@ class BoundaryManager:
                 f"The side {side} does not exist in the list of given sides: {self.boundary_conditions.keys()}."
             )
         condition = self.boundary_conditions[side]
-        condition.apply_extra(variable, context)
+        condition.apply_extra(variable, operations[0])
 
-    def apply_extra_all_sides(self, variable: "np.ndarray", contexts: List["BCApplicationContext"]) -> None:
-        """ Apply the extra conditions on the given variable on all sides.
+    def apply_extra_all_sides(self, variable: "np.ndarray", operations: List["ExtraBCOperation"]) -> None:
+        """ Applies a batch of potentially targeted operations.
 
         Parameters
         ----------
         variable: np.ndarray
             The variable array
-        contexts: List[BCApplicationContext]
-            The context object containing the apply method information."""
+        operations: List["ExtraBCOperation"]
+            The operations for the extra conditions.
 
-        print(
-            f"Apply EXTRA boundary conditions on all sides"
-        )
-        print(self.boundary_conditions.items())
-        for (side, condition), context in zip(self.boundary_conditions.items(), contexts):
-            condition = self.boundary_conditions[side]
-            condition.apply_extra(variable, context)
+        Notes
+        -----
+        Call to this function happens in time integration, both in the implicit and explicit part.
+        """
+
+        if not operations: return
+        print(f"\n--- Applying Batch of {len(operations)} Specific Operations ---")
+
+        # Iterate through managed BCs first
+        for (side, condition) in self.boundary_conditions.items():
+            for operation in operations:
+                if operation.target_type == condition.type and operation.target_side == side:
+                    condition.apply_extra(variable, operation)
+                    break
+
+
 
 
 import numpy as np
@@ -227,6 +239,7 @@ def boundary_manager_2d():
     from atmpy.variables.variables import Variables
     from atmpy.infrastructure.enums import VariableIndices as VI
     from atmpy.boundary_conditions.utility import create_params
+    from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 
     np.set_printoptions(linewidth=100)
     np.set_printoptions(suppress=True)
@@ -286,14 +299,16 @@ def boundary_manager_2d():
     print("Applying boundary conditions for 2D test:")
     print(variables.cell_vars[..., VI.RHOU])
     x = variables.cell_vars[..., VI.RHOV]
-    context = [BCApplicationContext(scale_factor=10), BCApplicationContext(scale_factor=10)]
-    manager.apply_boundary_on_all_sides(variables.cell_vars, context)
+    # context = [BCApplicationContext(scale_factor=10), BCApplicationContext(scale_factor=10)]
+
+    operations = [WallAdjustment(target_side=BdrySide.BOTTOM, target_type=BdryType.WALL, factor=100)]
+    # manager.apply_boundary_on_all_sides(variables.cell_vars, operations)
     # manager.apply_boundary_on_single_var_direction(
     #     variables.cell_vars[..., VI.RHOU], direction=direction, contexts=context
     # )
     # for side in [BdrySide.TOP, BdrySide.LEFT, BdrySide.RIGHT, BdrySide.BOTTOM]:
         # manager.apply_extra(variables.cell_vars[..., VI.RHOU], side, context)
-    # manager.apply_extra_all_sides(x, context)
+    manager.apply_extra_all_sides(variables.cell_vars[..., VI.RHOU], operations)
     # manager.apply_boundary_on_all_sides(variables.cell_vars)
     print(variables.cell_vars[..., VI.RHOU])
 
