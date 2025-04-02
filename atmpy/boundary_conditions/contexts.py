@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 @dataclass
 class BCApplicationContext:
     """Data class to contain the boundary condition application context."""
-
-    scale_factor: float = 1.0  # A factor to scale the boundary nodes.
     is_nodal: bool = False
 
 

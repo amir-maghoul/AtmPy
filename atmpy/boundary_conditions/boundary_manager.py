@@ -11,7 +11,7 @@ if TYPE_CHECKING:
         BoundaryConditionsConfiguration,
         BCApplicationContext,
     )
-    from atmpy.boundary_conditions.bc_extra_operations import ExtraBCOperation
+    from atmpy.boundary_conditions.bc_extra_operations import ExtraBCOperation, PeriodicAdjustment
 from atmpy.infrastructure.factory import get_boundary_conditions
 from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
@@ -219,19 +219,35 @@ class BoundaryManager:
 
         if not operations: return
         print(f"\n--- Applying Batch of {len(operations)} Specific Operations ---")
+        #
+        # # This for-loop forces to apply a single operation to all boundaries, provided the type of boundary on sides
+        # # match the target boundary type of the operation.
+        # for operation in operations:
+        #     if operation.target_side == BdrySide.ALL:
+        #         for (side, condition) in self.boundary_conditions.items():
+        #             if condition.type == operation.target_type:
+        #                 condition.apply_extra(variable, operation)
+        #         break
+        #
+        # # This for-loop apply each operation to its corresponding side
+        # for (side, condition) in self.boundary_conditions.items():
+        #     for operation in operations:
+        #         if operation.target_type == condition.type and operation.target_side == side:
+        #             condition.apply_extra(variable, operation)
+        #             break
 
         for operation in operations:
+            # Handle operations targeting ALL sides
             if operation.target_side == BdrySide.ALL:
-                for (side, condition) in self.boundary_conditions.items():
+                for condition in self.boundary_conditions.values():
+                    if condition.type == operation.target_type:
+                        condition.apply_extra(variable, operation)
+            # Handle operations targeting specific sides
+            else:
+                print(f"Applying extra BC on side {operation.target_side}")
+                condition = self.boundary_conditions.get(operation.target_side)
+                if condition and condition.type == operation.target_type:
                     condition.apply_extra(variable, operation)
-                break
-
-        # Iterate through managed BCs first
-        for (side, condition) in self.boundary_conditions.items():
-            for operation in operations:
-                if operation.target_type == condition.type and operation.target_side == side:
-                    condition.apply_extra(variable, operation)
-                    break
 
 
 
@@ -244,8 +260,7 @@ def boundary_manager_2d():
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.variables.variables import Variables
     from atmpy.infrastructure.enums import VariableIndices as VI
-    from atmpy.boundary_conditions.utility import create_params
-    from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
+    from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment, PeriodicAdjustment
 
     np.set_printoptions(linewidth=100)
     np.set_printoptions(suppress=True)
@@ -294,7 +309,7 @@ def boundary_manager_2d():
     )
     bc2 = RFBCInstantiationOptions(side=BdrySide.TOP, type=BdryType.WALL, direction=direction, grid=grid)
     bc3 = RFBCInstantiationOptions(side=BdrySide.LEFT, type=BdryType.WALL, direction="x", grid=grid)
-    bc4 = RFBCInstantiationOptions(side=BdrySide.RIGHT, type=BdryType.WALL, direction="x", grid=grid)
+    bc4 = RFBCInstantiationOptions(side=BdrySide.RIGHT, type=BdryType.PERIODIC, direction="x", grid=grid)
     options = [bc, bc2, bc3, bc4]
     # options = [bc, bc2]
     bc_conditions = BoundaryConditionsConfiguration(options)
@@ -307,7 +322,7 @@ def boundary_manager_2d():
     x = variables.cell_vars[..., VI.RHOV]
     # context = [BCApplicationContext(scale_factor=10), BCApplicationContext(scale_factor=10)]
 
-    operations = [WallAdjustment(target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=100)]
+    operations = [WallAdjustment(target_side=BdrySide.ALL, factor=100), PeriodicAdjustment(target_side=BdrySide.RIGHT, factor=100)]
     # manager.apply_boundary_on_all_sides(variables.cell_vars, operations)
     # manager.apply_boundary_on_single_var_direction(
     #     variables.cell_vars[..., VI.RHOU], direction=direction, contexts=context

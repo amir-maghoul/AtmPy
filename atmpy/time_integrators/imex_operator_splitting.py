@@ -3,6 +3,8 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Union, List
 
+from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
+
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
     from atmpy.variables.variables import Variables
@@ -15,6 +17,7 @@ if TYPE_CHECKING:
 from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
 from atmpy.time_integrators.utility import nodal_derivative, nodal_gradient, pressured_momenta_divergence
 import scipy.sparse.linalg
+from atmpy.infrastructure.enums import BoundarySide as BdrySide, BoundaryConditions as BdryType
 from atmpy.time_integrators.utility import *
 
 
@@ -82,13 +85,15 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Calculate the divergence of momenta on the NODES. This is the right hand side of the pressure equation
         self.mpv.rhs[...] = pressured_momenta_divergence(self.grid, self.variables)
 
-        self.boundary_manager.apply_extra_all_sides(self.mpv.rhs, )
+        # Adjust wall boundary nodes (scale). Notice the side is set to be BdrySide.ALL.
+        # This will apply the extra method whenever the boundary is defined to be WALL.
+        boundary_operation = [WallAdjustment(target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=2.0)]
+        self.boundary_manager.apply_extra_all_sides(self.mpv.rhs, boundary_operation)
 
         # index 0: momentum in the direction of gravity. index 1: momentum in the direction of non-gravity.
         momentum_index = self.gravity.momentum_index
 
         #
-
 
 
 
@@ -295,3 +300,6 @@ class PressureSolver:
         # One might update boundary ghost values here as well,
         # e.g., boundary_manager.set_ghostnodes_pressure(variables.pressure, node, user_data)
         print("Pressure solve complete and pressure field updated.")
+
+if __name__ == '__main__':
+    pass

@@ -8,7 +8,7 @@ class ExtraBCOperation(ABC):
     """Abstract base class for an extra operation, potentially targeted."""
     def __init__(self,
                  target_side: BdrySide,
-                 target_type: BdryType):
+                 target_type: BdryType = None):
         """
         Initializes the operation with optional targeting.
 
@@ -49,10 +49,23 @@ class ExtraBCOperation(ABC):
 class WallAdjustment(ExtraBCOperation):
     def __init__(self, factor: float, **kwargs): # Use kwargs for base init
         super().__init__(**kwargs)
+        self.target_type = BdryType.WALL
         self.factor = factor
 
     def get_identifier(self) -> str:
         return f"WallAdjustment(factor={self.factor}, target={self.get_target_description()})"
+
+######################################
+# Operation for PERIODIC BCs
+######################################
+class PeriodicAdjustment(ExtraBCOperation):
+    def __init__(self, factor: float, **kwargs): # Use kwargs for base init
+        super().__init__(**kwargs)
+        self.target_type = BdryType.PERIODIC
+        self.factor = factor
+
+    def get_identifier(self) -> str:
+        return f"PeriodicAdjustment(factor={self.factor}, target={self.get_target_description()})"
 
 ######################################
 # Operation for Inlet BCs
