@@ -88,6 +88,7 @@ class BoundarySide(Enum):
     TOP = "top"  # End of the array in y-axis
     FRONT = "front"  # Beginning of the array in z-axis
     BACK = "back"  # End of the array in z-axis
+    ALL = "all"
 
     @property
     def opposite(self):
@@ -98,6 +99,7 @@ class BoundarySide(Enum):
             BoundarySide.TOP: BoundarySide.BOTTOM,
             BoundarySide.FRONT: BoundarySide.BACK,
             BoundarySide.BACK: BoundarySide.FRONT,
+            BoundarySide.ALL: BoundarySide.ALL,
         }
         return opposites[self]
 

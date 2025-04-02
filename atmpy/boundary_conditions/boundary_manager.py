@@ -220,6 +220,12 @@ class BoundaryManager:
         if not operations: return
         print(f"\n--- Applying Batch of {len(operations)} Specific Operations ---")
 
+        for operation in operations:
+            if operation.target_side == BdrySide.ALL:
+                for (side, condition) in self.boundary_conditions.items():
+                    condition.apply_extra(variable, operation)
+                break
+
         # Iterate through managed BCs first
         for (side, condition) in self.boundary_conditions.items():
             for operation in operations:
@@ -287,10 +293,10 @@ def boundary_manager_2d():
         side=BdrySide.BOTTOM, type=BdryType.WALL, direction=direction, grid=grid
     )
     bc2 = RFBCInstantiationOptions(side=BdrySide.TOP, type=BdryType.WALL, direction=direction, grid=grid)
-    # bc3 = RFBCInstantiationOptions(side=BdrySide.LEFT, type=BdryType.WALL, direction="x", grid=grid)
-    # bc4 = RFBCInstantiationOptions(side=BdrySide.RIGHT, type=BdryType.WALL, direction="x", grid=grid)
-    # options = [bc, bc2, bc3, bc4]
-    options = [bc, bc2]
+    bc3 = RFBCInstantiationOptions(side=BdrySide.LEFT, type=BdryType.WALL, direction="x", grid=grid)
+    bc4 = RFBCInstantiationOptions(side=BdrySide.RIGHT, type=BdryType.WALL, direction="x", grid=grid)
+    options = [bc, bc2, bc3, bc4]
+    # options = [bc, bc2]
     bc_conditions = BoundaryConditionsConfiguration(options)
 
     manager = BoundaryManager(bc_conditions)
@@ -301,7 +307,7 @@ def boundary_manager_2d():
     x = variables.cell_vars[..., VI.RHOV]
     # context = [BCApplicationContext(scale_factor=10), BCApplicationContext(scale_factor=10)]
 
-    operations = [WallAdjustment(target_side=BdrySide.BOTTOM, target_type=BdryType.WALL, factor=100)]
+    operations = [WallAdjustment(target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=100)]
     # manager.apply_boundary_on_all_sides(variables.cell_vars, operations)
     # manager.apply_boundary_on_single_var_direction(
     #     variables.cell_vars[..., VI.RHOU], direction=direction, contexts=context
