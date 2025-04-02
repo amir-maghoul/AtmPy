@@ -51,13 +51,13 @@ def upwind_strang_split_advection(
 
     # First round of strang splitting. Forward: x-y-z
     for direction in directions:
-        boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
+        boundary_manager.apply_boundary_on_direction(variables.cell_vars, direction)
         first_order_directional_rk(grid, variables, flux, direction, dt / 2)
         # boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
 
     # Second round of strang splitting. Backward: z-y-x
     for direction in directions[::-1]:
-        boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
+        boundary_manager.apply_boundary_on_direction(variables.cell_vars, direction)
         first_order_directional_rk(grid, variables, flux, direction, dt / 2)
         # boundary_manager.apply_single_boundary_condition(variables.cell_vars, direction)
 
