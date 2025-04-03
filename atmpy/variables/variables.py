@@ -219,7 +219,7 @@ class Variables:
 
     def adjust_background_wind(
         self, wind_speeds: Union[np.ndarray, list], scale: float
-    ) -> None:
+    ) -> np.ndarray:
         """Modify the momenta using the background wind and the given factor
 
         Parameters
@@ -228,12 +228,17 @@ class Variables:
             The list or numpy array containing the wind velocities in each direction.
         scale : float
             The scaling factor
+
+        Returns
+        -------
+        np.ndarray
         """
         AXES: int = 3
+        adjusted_momenta = np.zeros_like((self.grid.cshape) + (3,))
         for wind_speed, axis in zip(wind_speeds, range(AXES)):
             momentum_idx = momentum_index(axis)
             try:
-                self.cell_vars[..., momentum_idx] += (
+                adjusted_momenta[..., axis] = self.cell_vars[..., momentum_idx] +(
                     wind_speed * scale * self.cell_vars[..., VI.RHO]
                 )
             except IndexError:
@@ -241,6 +246,7 @@ class Variables:
                 print(
                     f"The cell variables container does not have enough variables. Index {momentum_idx} is missing."
                 )
+        return adjusted_momenta
 
     # -------------------
     # Node-Based Methods

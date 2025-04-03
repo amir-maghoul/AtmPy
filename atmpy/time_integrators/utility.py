@@ -4,6 +4,10 @@ import numpy as np
 from typing import TYPE_CHECKING, List, Tuple
 import itertools as it
 
+import scipy as sp
+
+from atmpy.physics.thermodynamics import Thermodynamics
+
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
     from atmpy.variables.variables import Variables
@@ -65,16 +69,17 @@ def pressured_momenta_divergence(grid: "Grid", variables: "Variables") -> np.nda
         raise ValueError("Unsupported dimension {}".format(ndim))
 
 
-def nodal_gradient(p: np.ndarray, ndim: int, dxyz: List[float]):
+def nodal_variable_gradient(p: np.ndarray, ndim: int, dxyz: List[float]):
     """
     Taken from reference. See Notes.
     Calculate the discrete gradient of a given scalar field in 1D, 2D, or 3D. The algorithm mimics the calculation of
     nodal pressure gradient specified in eq. (30a) in BK19 paper.
 
+
     Parameters
     ----------
-    p : np.ndarray
-        The scalar field on which the gradient is applied.
+    p : np.ndarray of shape (nx+1, [ny+1], [nz+1])
+        The nodal scalar field on which the gradient is applied.
     ndim : int
         The number of dimensions of the scalar field (1, 2, or 3).
     dxyz : List[float]
@@ -82,8 +87,9 @@ def nodal_gradient(p: np.ndarray, ndim: int, dxyz: List[float]):
 
     Returns
     -------
-    Tuple[np.ndarray, ...]
+    Tuple[np.ndarray, ...] of shape (nx, ny, nz)
         The gradient components (Dpx, Dpy, Dpz). For ndim < 3, unused components are zero.
+        The gradient is defined on cells.
 
     Notes
     -----
@@ -131,3 +137,34 @@ def nodal_gradient(p: np.ndarray, ndim: int, dxyz: List[float]):
     Dpz *= scale / dz
 
     return Dpx, Dpy, Dpz
+
+
+def calculate_dpi_dp(P: np.ndarray, Msq: float) -> float:
+    """ Calculate the derivative of the Exner pressure (Pi) with respect to the P = rho Theta. This is the left hand side of
+    the pressure equation.
+
+    Parameters
+    ----------
+    P : np.ndarray
+        The unphysical pressure variables. P = rho Theta.
+    Msq : float
+        The mach number squared
+
+    Notes
+    -----
+    Pi and P are connected via the formula (in the non-dimensionalized equation) Pi = (1/Msq) * P^(gamma - 1) we can
+    analytically calculate the derivative of Pi with respect to the P: dpidP = (gamma - 1) * (1/Msq) * P^(gamma - 2).
+    This analytical derivative is then passed to the convolution function for averaging.
+    """
+    th: Thermodynamics = Thermodynamics()
+    ndim = P.ndim
+    dpi_temp = (1/Msq) * th.gm1 * (P**(th.gamma - 2.0))
+    averaging_kernel = np.ones([2]*ndim)
+    return sp.signal.fftconvolve(dpi_temp, averaging_kernel, mode="valid") / dpi_temp.sum()
+
+
+if __name__ == "__main__":
+    x = np.arange(30).reshape((5, 6))
+    print(x)
+    dx, dy, dz = nodal_variable_gradient(x, ndim=2, dxyz = [0.1]*3)
+    print(dx.shape, dy.shape, dz.shape)

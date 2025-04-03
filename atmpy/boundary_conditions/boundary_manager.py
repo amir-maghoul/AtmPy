@@ -123,7 +123,7 @@ class BoundaryManager:
             The variable array
         side: BdrySide
             The side to apply the boundary condition on.
-        context: BCApplicationContext
+        contexts: BCApplicationContext
             The context object containing the apply method information.
         """
 
@@ -219,22 +219,6 @@ class BoundaryManager:
 
         if not operations: return
         print(f"\n--- Applying Batch of {len(operations)} Specific Operations ---")
-        #
-        # # This for-loop forces to apply a single operation to all boundaries, provided the type of boundary on sides
-        # # match the target boundary type of the operation.
-        # for operation in operations:
-        #     if operation.target_side == BdrySide.ALL:
-        #         for (side, condition) in self.boundary_conditions.items():
-        #             if condition.type == operation.target_type:
-        #                 condition.apply_extra(variable, operation)
-        #         break
-        #
-        # # This for-loop apply each operation to its corresponding side
-        # for (side, condition) in self.boundary_conditions.items():
-        #     for operation in operations:
-        #         if operation.target_type == condition.type and operation.target_side == side:
-        #             condition.apply_extra(variable, operation)
-        #             break
 
         for operation in operations:
             # Handle operations targeting ALL sides

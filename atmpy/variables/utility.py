@@ -1,41 +1,16 @@
 """Utility module for variables"""
 
 import numpy as np
-from typing import Union, List, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING
 from atmpy.physics.thermodynamics import Thermodynamics
 if TYPE_CHECKING:
-    from atmpy.grid.kgrid import Grid
     from atmpy.variables.variables import Variables
 from atmpy.infrastructure.enums import HydrostateIndices as HI
-import scipy as sp
 
 
 def get_left_index_in_all_directions(ndim):
     """ Return the slices for left indices in all dimensions."""
     return [slice(0, -1)] * ndim
-
-def calculate_dpi_dp(P: np.ndarray, Msq: float) -> float:
-    """ Calculate the derivative of the Exner pressure (Pi) with respect to the P = rho Theta. This is the left hand side of
-    the pressure equation.
-
-    Parameters
-    ----------
-    P : np.ndarray
-        The unphysical pressure variables. P = rho Theta.
-    Msq : float
-        The mach number squared
-
-    Notes
-    -----
-    Pi and P are connected via the formula (in the non-dimensionalized equation) Pi = (1/Msq) * P^(gamma - 1) we can
-    analytically calculate the derivative of Pi with respect to the P: dpidP = (gamma - 1) * (1/Msq) * P^(gamma - 2).
-    This analytical derivative is then passed to the convolution function for averaging.
-    """
-    th: Thermodynamics = Thermodynamics()
-    ndim = P.ndim
-    dpi_temp = (1/Msq) * th.gm1 * (P**(th.gamma - 2.0))
-    averaging_kernel = np.ones([2]*ndim)
-    return sp.signal.fftconvolve(dpi_temp, averaging_kernel, mode="valid") / dpi_temp.sum()
 
 
 def _cumulative_integral(arr: np.ndarray, ghost_idx: int) -> np.ndarray:
