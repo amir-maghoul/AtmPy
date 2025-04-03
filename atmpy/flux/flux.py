@@ -353,9 +353,7 @@ def main():
         slopes, np.arange(nnx * nny).reshape(nnx, nny), 1, True
     )
 
-    lefts_idx, rights_idx, directional_inner_idx = directional_indices(
-        2, direction
-    )
+    lefts_idx, rights_idx, directional_inner_idx = directional_indices(2, direction)
 
     cell_vars = variables.cell_vars
     iflux = flux.iflux

@@ -3,13 +3,14 @@
 import numpy as np
 from typing import Union, TYPE_CHECKING
 from atmpy.physics.thermodynamics import Thermodynamics
+
 if TYPE_CHECKING:
     from atmpy.variables.variables import Variables
 from atmpy.infrastructure.enums import HydrostateIndices as HI
 
 
 def get_left_index_in_all_directions(ndim):
-    """ Return the slices for left indices in all dimensions."""
+    """Return the slices for left indices in all dimensions."""
     return [slice(0, -1)] * ndim
 
 

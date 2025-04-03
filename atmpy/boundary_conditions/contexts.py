@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 @dataclass
 class BCApplicationContext:
     """Data class to contain the boundary condition application context."""
+
     is_nodal: bool = False
 
 

@@ -39,6 +39,7 @@ from atmpy.infrastructure.enums import (
 )
 from atmpy.physics.gravity import Gravity
 
+
 class BaseBoundaryCondition(ABC):
     """Abstract base class for all boundary conditions.
 
@@ -105,7 +106,7 @@ class BaseBoundaryCondition(ABC):
 
     @property
     def pad_width(self):
-        """ Create the pad width for a single direction. The "ng" attribute contains a
+        """Create the pad width for a single direction. The "ng" attribute contains a
         list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
         Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
         avoid padding the boundary in all direction with the same number of ghost cells, we need to create a
@@ -317,9 +318,10 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
     ):
         pass
 
-    def apply_extra(self, variable: np.ndarray, context: "BCApplicationContext") -> None:
+    def apply_extra(
+        self, variable: np.ndarray, context: "BCApplicationContext"
+    ) -> None:
         pass
-
 
     def _create_boundary_indices(
         self,
@@ -421,7 +423,7 @@ class Wall(BaseBoundaryCondition):
     def apply_single_variable(
         self, variable: np.ndarray, context: "BCApplicationContext"
     ):
-        """ Apply the wall boundary condition on a single variable. Used predominantly to apply BC on the second
+        """Apply the wall boundary condition on a single variable. Used predominantly to apply BC on the second
         asymptotics of the pressure variable.
 
         Parameters
@@ -487,10 +489,14 @@ class Wall(BaseBoundaryCondition):
         return tuple(inner_slice)
 
     def _boundary_nodes(self) -> Tuple[slice, ...]:
-        """ Create the slice for the nodes at the boundary. This is used to rescale those nodes."""
+        """Create the slice for the nodes at the boundary. This is used to rescale those nodes."""
         # Notice in backward indexing, the third to last element in the last inner node (boundary node).
         # Therefore, in backward indexing -ig - 1 is the correct index of the last inner node.
-        idx = self.ng[self.side_axis] if self.side_axis == 0 else -self.ng[self.side_axis]-1
+        idx = (
+            self.ng[self.side_axis]
+            if self.side_axis == 0
+            else -self.ng[self.side_axis] - 1
+        )
         boundary_nodes_slice = copy.deepcopy(self.full_inner_slice)
         boundary_nodes_slice[self.direction] = idx
         return tuple(boundary_nodes_slice)

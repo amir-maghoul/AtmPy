@@ -238,7 +238,7 @@ class Variables:
         for wind_speed, axis in zip(wind_speeds, range(AXES)):
             momentum_idx = momentum_index(axis)
             try:
-                adjusted_momenta[..., axis] = self.cell_vars[..., momentum_idx] +(
+                adjusted_momenta[..., axis] = self.cell_vars[..., momentum_idx] + (
                     wind_speed * scale * self.cell_vars[..., VI.RHO]
                 )
             except IndexError:

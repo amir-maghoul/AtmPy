@@ -74,6 +74,7 @@ def directional_indices(
             tuple(directional_inner_idx)[:-1],
         )
 
+
 def one_element_inner_slice(ndim: int, full: bool = True) -> Tuple[slice, ...]:
     inner_idx = [slice(1, -1)] * (ndim + 1)
     if full:

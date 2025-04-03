@@ -1,14 +1,17 @@
-""" This module encapsulates how extra conditions are defined for each BC class. """
+"""This module encapsulates how extra conditions are defined for each BC class."""
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
-from atmpy.infrastructure.enums import BoundarySide as BdrySide, BoundaryConditions as BdryType
+from atmpy.infrastructure.enums import (
+    BoundarySide as BdrySide,
+    BoundaryConditions as BdryType,
+)
+
 
 class ExtraBCOperation(ABC):
     """Abstract base class for an extra operation, potentially targeted."""
-    def __init__(self,
-                 target_side: BdrySide,
-                 target_type: BdryType = None):
+
+    def __init__(self, target_side: BdrySide, target_type: BdryType = None):
         """
         Initializes the operation with optional targeting.
 
@@ -32,22 +35,23 @@ class ExtraBCOperation(ABC):
 
     @abstractmethod
     def get_identifier(self) -> str:
-        """ Get the name of the operation."""
+        """Get the name of the operation."""
         pass
 
     def get_target_description(self) -> str:
-        """ Get the description of the operation."""
+        """Get the description of the operation."""
         if self.target_side:
             return f"side='{self.target_side}'"
         if self.target_type:
             return f"type={self.target_type.__name__}"
         return "all (broadcast)"
 
+
 ######################################
 # Operation for Wall BCs
 ######################################
 class WallAdjustment(ExtraBCOperation):
-    def __init__(self, factor: float, **kwargs): # Use kwargs for base init
+    def __init__(self, factor: float, **kwargs):  # Use kwargs for base init
         super().__init__(**kwargs)
         self.target_type = BdryType.WALL
         self.factor = factor
@@ -55,17 +59,19 @@ class WallAdjustment(ExtraBCOperation):
     def get_identifier(self) -> str:
         return f"WallAdjustment(factor={self.factor}, target={self.get_target_description()})"
 
+
 ######################################
 # Operation for PERIODIC BCs
 ######################################
 class PeriodicAdjustment(ExtraBCOperation):
-    def __init__(self, factor: float, **kwargs): # Use kwargs for base init
+    def __init__(self, factor: float, **kwargs):  # Use kwargs for base init
         super().__init__(**kwargs)
         self.target_type = BdryType.PERIODIC
         self.factor = factor
 
     def get_identifier(self) -> str:
         return f"PeriodicAdjustment(factor={self.factor}, target={self.get_target_description()})"
+
 
 ######################################
 # Operation for Inlet BCs
@@ -77,4 +83,4 @@ class InletMassFlowCorrection(ExtraBCOperation):
         self.relaxation = relaxation
 
     def get_identifier(self) -> str:
-         return f"InletMassFlowCorrection(target={self.target_mass_flow}, relax={self.relaxation}, target={self.get_target_description()})"
+        return f"InletMassFlowCorrection(target={self.target_mass_flow}, relax={self.relaxation}, target={self.get_target_description()})"

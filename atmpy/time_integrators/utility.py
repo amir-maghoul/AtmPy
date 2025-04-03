@@ -140,7 +140,7 @@ def nodal_variable_gradient(p: np.ndarray, ndim: int, dxyz: List[float]):
 
 
 def calculate_dpi_dp(P: np.ndarray, Msq: float) -> float:
-    """ Calculate the derivative of the Exner pressure (Pi) with respect to the P = rho Theta. This is the left hand side of
+    """Calculate the derivative of the Exner pressure (Pi) with respect to the P = rho Theta. This is the left hand side of
     the pressure equation.
 
     Parameters
@@ -158,13 +158,15 @@ def calculate_dpi_dp(P: np.ndarray, Msq: float) -> float:
     """
     th: Thermodynamics = Thermodynamics()
     ndim = P.ndim
-    dpi_temp = (1/Msq) * th.gm1 * (P**(th.gamma - 2.0))
-    averaging_kernel = np.ones([2]*ndim)
-    return sp.signal.fftconvolve(dpi_temp, averaging_kernel, mode="valid") / dpi_temp.sum()
+    dpi_temp = (1 / Msq) * th.gm1 * (P ** (th.gamma - 2.0))
+    averaging_kernel = np.ones([2] * ndim)
+    return (
+        sp.signal.fftconvolve(dpi_temp, averaging_kernel, mode="valid") / dpi_temp.sum()
+    )
 
 
 if __name__ == "__main__":
     x = np.arange(30).reshape((5, 6))
     print(x)
-    dx, dy, dz = nodal_variable_gradient(x, ndim=2, dxyz = [0.1]*3)
+    dx, dy, dz = nodal_variable_gradient(x, ndim=2, dxyz=[0.1] * 3)
     print(dx.shape, dy.shape, dz.shape)

@@ -10,14 +10,15 @@ from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
 )
 
+
 def create_instatiation_context():
     pass
+
 
 def create_application_context():
     pass
 
+
 def create_operations_context(ndim: int):
 
-
     pass
-

@@ -12,7 +12,7 @@ from atmpy.infrastructure.enums import (
 
 
 class Gravity:
-    """ The Gravity container. Create the needed tool to work with gravity throughout the project.
+    """The Gravity container. Create the needed tool to work with gravity throughout the project.
 
     Attributes
     ----------
@@ -30,6 +30,7 @@ class Gravity:
         The index of the momentum in the direction of gravity and in the direction of non-gravity
 
     """
+
     def __init__(self, gravity_vector: Union[np.ndarray, list], ndim: int):
         self.vector: np.ndarray = np.array(gravity_vector)
         self.ndim = ndim
