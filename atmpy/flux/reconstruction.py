@@ -2,7 +2,7 @@
 
 import numpy as np
 from typing import Callable, List, TYPE_CHECKING
-from atmpy.infrastructure.utility import directional_indices, direction_axis, one_element_inner_slice
+from atmpy.infrastructure.utility import directional_indices, one_element_inner_slice
 from atmpy.physics.eos import EOS
 
 if TYPE_CHECKING:
@@ -13,7 +13,6 @@ from atmpy.flux.reconstruction_utility import (
     calculate_variable_differences,
 )
 from atmpy.infrastructure.enums import (
-    PrimitiveVariableIndices as PVI,
     VariableIndices as VI,
 )
 
