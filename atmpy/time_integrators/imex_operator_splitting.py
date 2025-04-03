@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Union, List
 
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.boundary_conditions.contexts import BCApplicationContext
+from atmpy.infrastructure.utility import directional_indices, one_element_inner_slice
 
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
@@ -86,6 +87,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # index 0: momentum in the direction of gravity. index 1: momentum in the direction of non-gravity.
         vertical_momentum_index, _ = self.gravity.momentum_index
 
+        ###################### Update variables
         self._forward_momenta_update(cellvars, p2n, dbuoy, g, vertical_momentum_index)
         self._forward_buoyancy_update(cellvars, vertical_momentum_index)
         self._forward_pressure_update(cellvars, p2n)
@@ -156,9 +158,12 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Calculate the derivative of the Exner pressure with respect to P
         dpidP = calculate_dpi_dp(cellvars[..., VI.RHOY], self.Msq)
 
+        # Create node-to-cell index (slice(1, -1) in all directions)
+        inner_idx = one_element_inner_slice(self.grid.ndim, full=False)
+
         # Create a nodal variable to store the intermediate updates
         dp2n = np.zeros_like(p2n)
-        dp2n[...] -= self.dt * dpidP * self.mpv.rhs
+        dp2n[inner_idx] -= self.dt * dpidP * self.mpv.rhs
         self.mpv.p2_nodes[...] += self.is_compressible * dp2n
 
     def _forward_buoyancy_update(self, cellvars: np.ndarray, vertical_momentum_index: int):
