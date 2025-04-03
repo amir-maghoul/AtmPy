@@ -25,7 +25,7 @@ def dimension_directions(ndim: int):
 
 def directional_indices(
     ndim: int, direction_string: str, full: bool = True
-) -> Tuple[Tuple[slice, ...], Tuple[slice, ...], Tuple[slice, ...], Tuple[slice, ...]]:
+) -> Tuple[Tuple[slice, ...], Tuple[slice, ...], Tuple[slice, ...]]:
     """Compute the correct indexing of the flux vs. variable for the hll solvers and reconstruction.
 
     Parameters
@@ -46,7 +46,6 @@ def directional_indices(
         left state indices
         right state indices
         the inner indices in the direction of the flow
-        the full inner indices of the whole array
     """
     # use ndim+1 to include the slices for the axis which corresponds to the number of variables in our cell_vars
     left_idx, right_idx, directional_inner_idx = (
@@ -61,22 +60,26 @@ def directional_indices(
         directional_inner_idx[direction] = slice(1, -1)
     else:
         raise ValueError("Invalid direction string")
-    inner_idx = [slice(1, -1)] * (ndim + 1)
 
     if full:
         return (
             tuple(left_idx),
             tuple(right_idx),
             tuple(directional_inner_idx),
-            tuple(inner_idx),
         )
     else:
         return (
             tuple(left_idx)[:-1],
             tuple(right_idx)[:-1],
             tuple(directional_inner_idx)[:-1],
-            tuple(inner_idx)[:-1],
         )
+
+def one_element_inner_slice(ndim: int, full: bool = True) -> Tuple[slice, ...]:
+    inner_idx = [slice(1, -1)] * (ndim + 1)
+    if full:
+        return tuple(inner_idx)
+    else:
+        return tuple(inner_idx[:-1])
 
 
 def direction_axis(direction: str) -> int:

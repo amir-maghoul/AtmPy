@@ -52,7 +52,7 @@ def calculate_variable_differences(
     # )
 
     # Set the difference slice (one fewer element than the original array) in the corresponding direction
-    left_idx, right_idx, _, _ = directional_indices(ndim, direction_str, full=True)
+    left_idx, right_idx, _ = directional_indices(ndim, direction_str, full=True)
 
     # Apply np.diff in the direction which results in one less element
     # diffs[...][left_idx] = np.diff(primitives, axis=direction)
@@ -90,7 +90,7 @@ def calculate_slopes(
     -----
     The limited slope has two fewer rows/columns in the direction of calculation than the original variables.
     """
-    left_idx, right_idx, directional_inner_idx, _ = directional_indices(
+    left_idx, right_idx, directional_inner_idx = directional_indices(
         ndim, direction_str
     )
     # Use twice indexing: once to eliminate the extra zero due to the size difference between vars and differences

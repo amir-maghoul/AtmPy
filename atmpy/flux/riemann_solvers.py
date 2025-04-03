@@ -35,7 +35,7 @@ def modified_hll(
     flux, direction, ndim = args
 
     # Get left, right and directional inner slices for a single variable
-    left_idx, right_idx, directional_inner_idx, _ = directional_indices(
+    left_idx, right_idx, directional_inner_idx = directional_indices(
         ndim, direction, full=False
     )
 

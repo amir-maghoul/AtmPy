@@ -2,7 +2,7 @@
 
 import numpy as np
 from typing import Callable, List, TYPE_CHECKING
-from atmpy.infrastructure.utility import directional_indices, direction_axis
+from atmpy.infrastructure.utility import directional_indices, direction_axis, one_element_inner_slice
 from atmpy.physics.eos import EOS
 
 if TYPE_CHECKING:
@@ -51,9 +51,10 @@ def modified_muscl(
     primitives = variables.primitives
 
     # Left and right indices for single variables
-    lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
-        2, direction, full=False
+    lefts_idx, rights_idx, directional_inner_idx = directional_indices(
+        ndim, direction, full=False
     )
+    inner_idx = one_element_inner_slice(ndim, full=False)
 
     # Unphysical Pressure
     P = flux[direction][..., VI.RHOY]

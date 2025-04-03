@@ -26,6 +26,7 @@ from atmpy.infrastructure.utility import (
     directional_indices,
     direction_axis,
     velocity_index,
+    one_element_inner_slice,
 )
 from line_profiler import profile
 
@@ -223,7 +224,7 @@ class Flux:
             unphysical_fluxes.values(), self.kernels, directions
         ):
             self.iflux[direction] = sp.signal.fftconvolve(flux, kernel, mode=mode)
-            _, _, _, inner_index = directional_indices(self.ndim, direction, full=False)
+            inner_index = one_element_inner_slice(self.ndim, full=False)
             self.flux[direction][inner_index + (VI.RHOY,)] = self.iflux[direction]
 
     def apply_reconstruction(
@@ -253,7 +254,7 @@ class Flux:
         )
 
         # left and right indices
-        lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
+        lefts_idx, rights_idx, directional_inner_idx = directional_indices(
             self.ndim, direction, full=False
         )
 
@@ -352,7 +353,7 @@ def main():
         slopes, np.arange(nnx * nny).reshape(nnx, nny), 1, True
     )
 
-    lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
+    lefts_idx, rights_idx, directional_inner_idx = directional_indices(
         2, direction
     )
 
