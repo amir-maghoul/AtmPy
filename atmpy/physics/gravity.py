@@ -1,4 +1,7 @@
-"""This module handles basics regarding the gravity. Fingind the axis, coordinates, momenta indices and etc."""
+"""This module handles basics regarding the gravity. Fingind the axis, coordinates, momenta indices and etc.
+
+The gravity axis throughout the project is assumed to be the second axis (index = 1).
+Regardless of the dimension of the problem."""
 
 import numpy as np
 from typing import Union, cast, Tuple, TYPE_CHECKING
@@ -10,6 +13,11 @@ from atmpy.infrastructure.enums import (
     VariableIndices,
 )  # assuming you have this enum
 
+#### Setting global constant for gravity axis ###
+GRAVITY_AXIS: int = 1
+GRAVITY_DIRECTION: str = "y"
+GRAVITY_MOMENTUM_INDEX: int = VI.RHOV
+PERPENDICULAR_MOMENTUM_INDEX: int = VI.RHOW
 
 class Gravity:
     """The Gravity container. Create the needed tool to work with gravity throughout the project.
@@ -37,35 +45,16 @@ class Gravity:
         non_zero = np.nonzero(self.vector)[0]
         if len(non_zero) != 1:
             raise ValueError("Gravity vector must be nonzero in exactly one direction.")
-        self.axis: int = cast(int, non_zero[0])
-        if self.axis >= self.ndim:
-            raise ValueError(
-                f"""An {self.ndim}-dimensional problem cannot have gravity on axis {self.axis}. 
-                The gravity should exist on the highest dimension."""
-            )
-        directions = ["x", "y", "z"]
-        self.direction: str = directions[self.axis]
-        if self.axis == 0 and self.ndim != 1:
-            raise ValueError(
-                """In reflective gravity boundary condition for problems of more than one dimension, 
-                the first axis is reserved for horizontal velocity. It cannot have gravity."""
-            )
-        self.strength: float = abs(self.vector[self.axis])
 
-    @property
-    def momentum_index(self) -> Tuple[int, int]:
-        """Helper method to get the momentum variable index in the direction of gravity as the first output and the
-        momentum in the nongravity direction as the second output. Notice since RHOU can never be the momentum in the
-        gravity axis (or more clearly, first axis can never be the gravity axis), it is not included in the array
-        """
-        if self.axis == 1:
-            return (VI.RHOV, VI.RHOW)
-        elif self.axis == 2:
-            return (VI.RHOW, VI.RHOV)
-        else:
+        self.axis: int = cast(int, non_zero[0])
+        if self.axis != GRAVITY_AXIS:
             raise ValueError(
-                "Invalid gravity axis. Gravity cannot be applied on axis 0."
+                f""" The axis {GRAVITY_AXIS} is the forced axis for gravity. """
             )
+        self.direction: str = GRAVITY_DIRECTION
+        self.strength: float = self.vector[self.axis]
+        self.gravity_momentum_index = GRAVITY_MOMENTUM_INDEX
+        self.perpendicular_momentum_index = PERPENDICULAR_MOMENTUM_INDEX
 
     def get_coordinate_cells(self, grid: "Grid"):
         """
