@@ -28,17 +28,10 @@ class BCInstantiationOptions:
     type: "BdryType"
     direction: str
     grid: "Grid"
-
-
-@dataclass
-class ReflectiveGravityBCInstantiationOptions(BCInstantiationOptions):
-    """Data class to contain the boundary condition instantiation parameters for the reflective gravity boundary condition."""
-
     gravity: Tuple[float] = (0.0, 1.0, 0.0)
     stratification: callable = lambda x: x
     thermodynamics: Thermodynamics = field(default_factory=Thermodynamics)
     is_compressible: bool = field(default=True)
-
 
 @dataclass
 class BoundaryConditionsConfiguration:

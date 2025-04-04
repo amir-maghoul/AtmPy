@@ -83,7 +83,7 @@ class BoundaryManager:
         self,
         cells: "np.ndarray",
         direction: str,
-        contexts: List["BCApplicationContext"] = None,
+        contexts: List["BCApplicationContext"] = [None, None],
     ):
         """Apply the boundary conditions on a single direction, consisting of two sides.
 
@@ -105,14 +105,12 @@ class BoundaryManager:
                 condition.apply(cells, context)
 
     def apply_boundary_on_all_sides(
-        self, cells: "np.ndarray", contexts: List["BCApplicationContext"] = None
+        self, cells: "np.ndarray"
     ):
         """Apply the boundary conditions on all sides."""
         print("Applying full boundary conditions on *cell variables*...")
-        for (side, condition), context in zip(
-            self.boundary_conditions.items(), contexts
-        ):
-            condition.apply(cells, context)
+        for (side, condition) in self.boundary_conditions.items():
+            condition.apply(cells)
 
     def apply_boundary_on_single_var_one_side(
         self,
@@ -144,7 +142,7 @@ class BoundaryManager:
         self,
         variable: "np.ndarray",
         direction: str,
-        contexts: List["BCApplicationContext"] = [None],
+        contexts: List["BCApplicationContext"] = [None, None],
     ):
         """Apply the boundary for a single variable on a single direction consisting of two sides.
 
@@ -165,8 +163,7 @@ class BoundaryManager:
             condition.apply_single_variable(variable, context)
 
     def apply_boundary_on_single_var_all_sides(
-        self, variable: "np.ndarray", contexts: List["BCApplicationContext"] = [None]
-    ):
+        self, variable: "np.ndarray"):
         """Apply the boundary conditions on all sides and directions for the input variable.
 
         Parameters
@@ -177,10 +174,8 @@ class BoundaryManager:
             The context object containing the apply method information.
         """
         print("Apply BC on single variable on all sides...")
-        for (side, condition), context in zip(
-            self.boundary_conditions.items(), contexts
-        ):
-            condition.apply_single_variable(variable, context)
+        for (side, condition) in self.boundary_conditions.items():
+            condition.apply_single_variable(variable)
 
     def apply_extra(
         self,
@@ -258,9 +253,9 @@ def boundary_manager_2d():
         PeriodicAdjustment,
     )
 
-    np.set_printoptions(linewidth=100)
+    np.set_printoptions(linewidth=300)
     np.set_printoptions(suppress=True)
-    np.set_printoptions(precision=10)
+    np.set_printoptions(precision=5)
 
     nx = 6
     ngx = 2
@@ -297,23 +292,22 @@ def boundary_manager_2d():
         BCInstantiationOptions,
         BoundaryConditionsConfiguration,
         BCApplicationContext,
-        ReflectiveGravityBCInstantiationOptions as RFBCInstantiationOptions,
     )
 
     bc = BCInstantiationOptions(
-        side=BdrySide.BOTTOM, type=BdryType.WALL, direction=direction, grid=grid
+        side=BdrySide.BOTTOM, type=BdryType.REFLECTIVE_GRAVITY, direction=direction, grid=grid
     )
-    bc2 = RFBCInstantiationOptions(
-        side=BdrySide.TOP, type=BdryType.WALL, direction=direction, grid=grid
+    bc2 = BCInstantiationOptions(
+        side=BdrySide.TOP, type=BdryType.REFLECTIVE_GRAVITY, direction=direction, grid=grid
     )
-    bc3 = RFBCInstantiationOptions(
-        side=BdrySide.LEFT, type=BdryType.WALL, direction="x", grid=grid
-    )
-    bc4 = RFBCInstantiationOptions(
-        side=BdrySide.RIGHT, type=BdryType.PERIODIC, direction="x", grid=grid
-    )
-    options = [bc, bc2, bc3, bc4]
-    # options = [bc, bc2]
+    # bc3 = RFBCInstantiationOptions(
+    #     side=BdrySide.LEFT, type=BdryType.WALL, direction="x", grid=grid
+    # )
+    # bc4 = RFBCInstantiationOptions(
+    #     side=BdrySide.RIGHT, type=BdryType.PERIODIC, direction="x", grid=grid
+    # )
+    # options = [bc, bc2, bc3, bc4]
+    options = [bc, bc2]
     bc_conditions = BoundaryConditionsConfiguration(options)
 
     manager = BoundaryManager(bc_conditions)
@@ -328,7 +322,7 @@ def boundary_manager_2d():
         WallAdjustment(target_side=BdrySide.ALL, factor=100),
         PeriodicAdjustment(target_side=BdrySide.RIGHT, factor=100),
     ]
-    # manager.apply_boundary_on_all_sides(variables.cell_vars, operations)
+    manager.apply_boundary_on_all_sides(variables.cell_vars)
     # manager.apply_boundary_on_single_var_direction(
     #     variables.cell_vars[..., VI.RHOU], direction=direction, contexts=context
     # )
@@ -337,8 +331,8 @@ def boundary_manager_2d():
     # manager.apply_extra_all_sides(variables.cell_vars[..., VI.RHOU], operations)
     # manager.apply_boundary_on_all_sides(variables.cell_vars)
 
-    contexts = [BCApplicationContext(is_nodal=True)] * grid.ndim * 2
-    manager.apply_boundary_on_single_var_all_sides(x, contexts)
+    # contexts = [BCApplicationContext(is_nodal=True)] * grid.ndim * 2
+    # manager.apply_boundary_on_single_var_all_sides(x, contexts)
     print(variables.cell_vars[..., VI.RHOU])
 
 
