@@ -84,7 +84,7 @@ class BaseBoundaryCondition(ABC):
         self.side_axis: int = self._find_side_axis()
 
     @abstractmethod
-    def apply(self, cell_vars, context: "BCApplicationContext"):
+    def apply(self, cell_vars):
         """Apply the boundary condition on the cell variables"""
         pass
 
@@ -147,7 +147,7 @@ class PeriodicBoundary(BaseBoundaryCondition):
     def __init__(self, inst_opts: "BCInstantiationOptions") -> None:
         super().__init__(inst_opts)
 
-    def apply(self, cell_vars: np.ndarray, context: "BCApplicationContext"):
+    def apply(self, cell_vars: np.ndarray):
         """Apply periodic boundary condition to the cell_vars.
 
         Parameters
@@ -205,8 +205,6 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
     gravity : List[float, float, float]
         The list of the gravity strength in each axis direction. For example gravity = [0.0, 0.0, 3.0] means the
         gravity exist in the third direction with the strength of 3.0
-    gravity_axis: int
-        The axis in which the gravity affects the boundary.
     stratification: Callable
         The given stratification function
     facet: str
@@ -215,8 +213,6 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         of the array in the given axis.
         "end" = BdrySide.TOP or BdrySide.BACK
         "begin" = BdrySide.BOTTOM or BdrySide.FRONT
-    is_lamb: bool
-        Determines if the lamb boundary condition is applied.
     is_compressible: bool
         Determines if we are in the compressible regime.
     """
@@ -239,7 +235,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             raise ValueError("Facet must be either 'begin' or 'end'.")
         self.is_compressible: bool = inst_opts.is_compressible
 
-    def apply(self, cell_vars: np.ndarray, context: "BCApplicationContext"):
+    def apply(self, cell_vars: np.ndarray):
         """Apply the reflective boundary condition for the given side of the gravity axis. If self.side is top, this means
         that the boundary condition for the top side of the vertical axis is the 'Lid' boundary. The sponge BC should be
         implemented separately in another class."""
@@ -278,10 +274,10 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             )
 
         # Get the index of the velocities in cell_vars for the gravity and nongravity directions
-        momentum_index = self.gravity.momentum_index
-        # calculate the Pv for the ghost cells. "v" here is a placeholder for the velocity in the direction of gravity
+        gravity_momentum_index = self.gravity.gravity_momentum_index        # VI.RHOV
+        # calculate the Pv for the ghost cells. "v" here is the velocity in the direction of gravity
         Pv = (
-            -cell_vars[nsource + (momentum_index[0],)]
+            -cell_vars[nsource + (gravity_momentum_index,)]
             * cell_vars[nsource + (VI.RHOY,)]
             / cell_vars[nsource + (VI.RHO,)]
         )
@@ -293,7 +289,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         # Find velocity in the direction of gravity and update ghost cells.
         v = Pv / rhoY
         Th_slc = 1.0
-        cell_vars[nimage + (momentum_index[0],)] = rho * v
+        cell_vars[nimage + (gravity_momentum_index,)] = rho * v
 
         # This is the actual horizontal velocity, since the gravity axis can never be the first axis.
         u = cell_vars[nsource + (VI.RHOU,)] / cell_vars[nsource + (VI.RHO,)]
@@ -301,12 +297,13 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
 
         # w is a placeholder for the velocity in the direction of non-gravity. First, check whether the variable container
         # can be indexed that far.
-        if momentum_index[1] < cell_vars.shape[-1]:
+        perpendicular_momentum_index = self.gravity.perpendicular_momentum_index
+        if perpendicular_momentum_index < cell_vars.shape[-1]:
             w = (
-                cell_vars[nsource + (momentum_index[1],)]
+                cell_vars[nsource + (perpendicular_momentum_index,)]
                 / cell_vars[nsource + (VI.RHO,)]
             )
-            cell_vars[nimage + (momentum_index[1],)] = rho * w * Th_slc
+            cell_vars[nimage + (perpendicular_momentum_index,)] = rho * w * Th_slc
 
         # Compute the actual X and evaluate the ghost cells.
         X = cell_vars[nsource + (VI.RHOX,)] / cell_vars[nsource + (VI.RHO,)]
@@ -393,7 +390,7 @@ class Wall(BaseBoundaryCondition):
     def __init__(self, inst_opts: "BCInstantiationOptions"):
         super().__init__(inst_opts)
 
-    def apply(self, cell_vars: np.ndarray, context: "BCApplicationContext"):
+    def apply(self, cell_vars: np.ndarray):
         """Apply the wall boundary condition. All the variables get reflected by the boundary, the normal velocity gets
         reflected and negated.
 
