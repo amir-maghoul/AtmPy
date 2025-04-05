@@ -11,6 +11,7 @@ from atmpy.physics.thermodynamics import Thermodynamics
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
     from atmpy.variables.variables import Variables
+    from atmpy.variables.multiple_pressure_variables import MPV
     from atmpy.boundary_conditions.boundary_manager import BoundaryManager
 from atmpy.infrastructure.enums import VariableIndices as VI
 from atmpy.grid.utility import nodal_derivative
