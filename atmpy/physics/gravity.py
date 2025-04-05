@@ -19,6 +19,7 @@ GRAVITY_DIRECTION: str = "y"
 GRAVITY_MOMENTUM_INDEX: int = VI.RHOV
 PERPENDICULAR_MOMENTUM_INDEX: int = VI.RHOW
 
+
 class Gravity:
     """The Gravity container. Create the needed tool to work with gravity throughout the project.
 
