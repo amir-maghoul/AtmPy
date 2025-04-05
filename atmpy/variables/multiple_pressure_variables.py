@@ -77,14 +77,9 @@ class MPV:
 
         return grid
 
-    def compute_dS_on_nodes(self, direction):
+    def compute_dS_on_nodes(self):
         """Compute the derivative of S with respect to the direction of gravity. The S variable is assumed to be
         defined on the nodes.
-
-        Parameters
-        ----------
-        direction : str
-            direction of gravity. Values must be "x", "y" or "z".
 
         Returns
         -------
