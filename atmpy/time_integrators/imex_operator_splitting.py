@@ -1,7 +1,7 @@
 """This module contains different time integrators"""
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Union, List
+from typing import TYPE_CHECKING, Union, List, Any
 
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.boundary_conditions.contexts import BCApplicationContext
@@ -250,89 +250,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
     def get_dt(self):
         return self.dt
-
-
-class CoriolisOperator:
-    """
-    Encapsulates the handling of coriolis operator in the implicit time update. This is a part of operator splitting
-    for stiff coriolis operator.
-    """
-
-    def __init__(
-        self,
-        coriolis_strength: Union[np.ndarray, list],
-        gravity: "Gravity",
-        Msq: float,
-        nonhydro: bool,
-        get_strat: callable,
-    ):
-        self.coriolis_strength: Union[np.ndarray, list] = coriolis_strength
-        self.gravity: "Gravity" = gravity
-        self.Msq: float = Msq
-        self.nonhydro: bool = nonhydro
-        self.get_strat: callable = get_strat  # callable that returns stratification
-
-    def apply(self, variables: "Variables", dt: float) -> None:
-        """Apply correction to momenta due to the coriolis effect. If there are no coriolis forces in any direction,
-        do nothing.
-
-        Parameters
-        ----------
-        variables : Variables
-            The variable container containing the momenta.
-        dt : float
-            The time step.
-        """
-        if self.coriolis_strength is None or np.all(self.coriolis_strength == 0):
-            pass
-        else:
-            self._apply(variables, dt)
-
-    def _apply(self, variables: "Variables", dt: float):
-        # dt-scaled Coriolis parameters
-        wh1, wv, wh2 = dt * np.array(self.coriolis_strength)
-        # Obtain stratification (here, a dummy constant field)
-        strat = self.get_strat(variables)
-        Y = variables.rhoY / variables.rho
-        nu = -(dt**2) * (self.gravity_strength[1] / self.Msq) * strat * Y
-
-        # Common denominator simulating inversion of (I+dt C)
-        denom = 1.0 / (wh1**2 + wh2**2 + (nu + self.nonhydro) * (wv**2 + 1.0))
-        # Compute cross-coupling coefficients
-        coeff_uu = wh1**2 + nu + self.nonhydro
-        coeff_uv = self.nonhydro * (wh1 * wv + wh2)
-        coeff_uw = wh1 * wh2 - (nu + self.nonhydro) * wv
-
-        coeff_vu = wh1 * wv - wh2
-        coeff_vv = self.nonhydro * (1 + wv**2)
-        coeff_vw = wh2 * wv + wh1
-
-        # Only update W if in 3D
-        if variables.rhow is not None:
-            coeff_wu = wh1 * wh2 + (nu + self.nonhydro) * wv
-            coeff_wv = self.nonhydro * (wh2 * wv - wh1)
-            coeff_ww = nu + self.nonhydro + wh2**2
-
-        # Copy old momentum fields
-        U_old = variables.rhou.copy()
-        V_old = variables.rhov.copy()
-        if variables.rhow is not None:
-            W_old = variables.rhow.copy()
-        else:
-            W_old = 0.0
-
-        # Update momentum fields by “inverting” the Coriolis source.
-        variables.rhou[...] = denom * (
-            coeff_uu * U_old + coeff_uv * V_old + (coeff_uw * W_old)
-        )
-        variables.rhov[...] = denom * (
-            coeff_vu * U_old + coeff_vv * V_old + (coeff_vw * W_old)
-        )
-        if variables.rhow is not None:
-            variables.rhow[...] = denom * (
-                coeff_wu * U_old + coeff_wv * V_old + coeff_ww * W_old
-            )
-        print("Coriolis operator applied.")
 
 
 class PressureSolver:
