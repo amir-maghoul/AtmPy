@@ -274,7 +274,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             )
 
         # Get the index of the velocities in cell_vars for the gravity and nongravity directions
-        gravity_momentum_index = self.gravity.gravity_momentum_index        # VI.RHOV
+        gravity_momentum_index = self.gravity.gravity_momentum_index  # VI.RHOV
         # calculate the Pv for the ghost cells. "v" here is the velocity in the direction of gravity
         Pv = (
             -cell_vars[nsource + (gravity_momentum_index,)]
