@@ -104,12 +104,10 @@ class BoundaryManager:
                 condition = self.boundary_conditions[side]
                 condition.apply(cells, context)
 
-    def apply_boundary_on_all_sides(
-        self, cells: "np.ndarray"
-    ):
+    def apply_boundary_on_all_sides(self, cells: "np.ndarray"):
         """Apply the boundary conditions on all sides."""
         print("Applying full boundary conditions on *cell variables*...")
-        for (side, condition) in self.boundary_conditions.items():
+        for side, condition in self.boundary_conditions.items():
             condition.apply(cells)
 
     def apply_boundary_on_single_var_one_side(
@@ -162,8 +160,7 @@ class BoundaryManager:
         ):
             condition.apply_single_variable(variable, context)
 
-    def apply_boundary_on_single_var_all_sides(
-        self, variable: "np.ndarray"):
+    def apply_boundary_on_single_var_all_sides(self, variable: "np.ndarray"):
         """Apply the boundary conditions on all sides and directions for the input variable.
 
         Parameters
@@ -174,7 +171,7 @@ class BoundaryManager:
             The context object containing the apply method information.
         """
         print("Apply BC on single variable on all sides...")
-        for (side, condition) in self.boundary_conditions.items():
+        for side, condition in self.boundary_conditions.items():
             condition.apply_single_variable(variable)
 
     def apply_extra(
@@ -295,10 +292,10 @@ def boundary_manager_2d():
     )
 
     bc = BCInstantiationOptions(
-        side=BdrySide.BOTTOM, type=BdryType.REFLECTIVE_GRAVITY, direction=direction, grid=grid
+        side=BdrySide.BOTTOM, type=BdryType.WALL, direction=direction, grid=grid
     )
     bc2 = BCInstantiationOptions(
-        side=BdrySide.TOP, type=BdryType.REFLECTIVE_GRAVITY, direction=direction, grid=grid
+        side=BdrySide.TOP, type=BdryType.WALL, direction=direction, grid=grid
     )
     # bc3 = RFBCInstantiationOptions(
     #     side=BdrySide.LEFT, type=BdryType.WALL, direction="x", grid=grid

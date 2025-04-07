@@ -33,6 +33,7 @@ class BCInstantiationOptions:
     thermodynamics: Thermodynamics = field(default_factory=Thermodynamics)
     is_compressible: bool = field(default=True)
 
+
 @dataclass
 class BoundaryConditionsConfiguration:
     """Data class of containing the context objects of all boundary conditions of all sides"""
