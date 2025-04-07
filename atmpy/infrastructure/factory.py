@@ -9,18 +9,19 @@ from atmpy.infrastructure.registries import (
     BOUNDARY_CONDITIONS,
     ADVECTION_ROUTINES,
     LINEAR_SOLVERS,
-    TIME_INTEGRATORS,
+    TIME_INTEGRATORS, DISCRETE_OPERATORS, PRESSURE_SOLVERS,
 )
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from atmpy.boundary_conditions.contexts import (
         BaseBoundaryCondition,
-        BCApplicationContext,
         BCInstantiationOptions,
     )
-    from atmpy.time_integrators.linear_solvers import ILinearSolver
+    from atmpy.pressure_solver.linear_solvers import ILinearSolver
     from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
+    from atmpy.pressure_solver.pressure_solvers import AbstractPressureSolver
+    from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
     from atmpy.infrastructure.enums import (
         SlopeLimiters,
         RiemannSolvers,
@@ -29,6 +30,8 @@ if TYPE_CHECKING:
         AdvectionRoutines,
         LinearSolvers,
         TimeIntegrators,
+        DiscreteOperators,
+        PressureSolvers,
     )
 
 
@@ -161,12 +164,12 @@ def get_linear_solver(name: "LinearSolvers") -> "ILinearSolver":
     linear_solver_class = LINEAR_SOLVERS.get(name)
 
     if linear_solver_class is None:
-        raise ValueError(f"Unknown boundary conditions: {name}")
+        raise ValueError(f"Unknown linear solver: {name}")
 
     return linear_solver_class()
 
 
-def create_time_integrator(
+def get_time_integrator(
     name: "TimeIntegrators", **dependencies
 ) -> "AbstractTimeIntegrator":
     """
@@ -188,3 +191,49 @@ def create_time_integrator(
         raise ValueError(f"Unknown time integrator type: {name}")
 
     return integrator_class(**dependencies)
+
+def get_discrete_operators(
+    name: "DiscreteOperators", **dependencies
+) -> "AbstractDiscreteOperator":
+    """
+    Retrieves the discrete operator class based on the provided enum member.
+
+    Parameters
+    ----------
+    name: DiscreteOperators (enum)
+        The enum member specifying the desired discrete operator.
+
+    Returns
+    -------
+    AbstractDiscreteOperator: The corresponding discrete operator class.
+
+    """
+    discrete_operator_class = DISCRETE_OPERATORS.get(name)
+
+    if discrete_operator_class is None:
+        raise ValueError(f"Unknown discrete operator type: {name}")
+
+    return discrete_operator_class(**dependencies)
+
+def get_pressure_solver(
+    name: "PressureSolvers", **dependencies
+) -> "AbstractPressureSolver":
+    """
+    Retrieves the pressure solver class based on the provided enum member.
+
+    Parameters
+    ----------
+    name: PressureSolvers
+        The enum member specifying the desired pressure solver.
+
+    Returns
+    -------
+    AbstractPressureSolver: The corresponding pressure solver class.
+
+    """
+    pressure_solver_class = PRESSURE_SOLVERS.get(name)
+
+    if pressure_solver_class is None:
+        raise ValueError(f"Unknown pressure solver type: {name}")
+
+    return pressure_solver_class(**dependencies)

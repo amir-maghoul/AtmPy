@@ -92,6 +92,7 @@ class BoundarySide(Enum):
 
     @property
     def opposite(self):
+        """ Create the dictionary of opposite sides"""
         opposites = {
             BoundarySide.LEFT: BoundarySide.RIGHT,
             BoundarySide.RIGHT: BoundarySide.LEFT,
@@ -106,18 +107,23 @@ class BoundarySide(Enum):
 
 class AdvectionRoutines(Enum):
     """Map name to function for the advection solver"""
-
     STRANG_SPLIT = "strang_split"
 
 
 class LinearSolvers(Enum):
     """Map name to function for the linear solver"""
-
     BICGSTAB = "bicgstab"
     GMRES = "gmres"
 
 
 class TimeIntegrators(Enum):
     """Map name to function for the time integrator"""
-
     IMEX = "imex"
+
+class DiscreteOperators(Enum):
+    """Map name to function for the discrete operators"""
+    CLASSIC_OPERATOR = "classical_discrete_operators"
+
+class PressureSolvers(Enum):
+    """Map name to function for the pressure solver"""
+    CLASSIC_PRESSURE_SOLVER = "classical_pressure_solver"

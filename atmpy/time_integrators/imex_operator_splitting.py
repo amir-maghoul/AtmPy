@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Union, List, Any
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.boundary_conditions.contexts import BCApplicationContext
 from atmpy.infrastructure.utility import directional_indices, one_element_inner_slice
+from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
 
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
@@ -15,13 +16,10 @@ if TYPE_CHECKING:
     from atmpy.boundary_conditions.boundary_manager import BoundaryManager
     from atmpy.physics.gravity import Gravity
     from atmpy.physics.thermodynamics import Thermodynamics
+    from atmpy.time_integrators.coriolis import CoriolisOperator
+    from atmpy.pressure_solver.pressure_solvers import AbstractPressureSolver
 
 from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
-from atmpy.time_integrators.utility import (
-    nodal_derivative,
-    nodal_variable_gradient,
-    pressured_momenta_divergence,
-)
 import scipy.sparse.linalg
 from atmpy.infrastructure.enums import (
     BoundarySide as BdrySide,
@@ -38,8 +36,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         mpv: "MPV",
         flux: "Flux",
         boundary_manager: "BoundaryManager",
-        coriolis_operator: CoriolisOperator,
-        pressure_solver: PressureSolver,
+        coriolis_operator: "CoriolisOperator",
+        pressure_solver: "AbstractPressureSolver",
         thermodynamics: "Thermodynamics",
         dt: float,
         Msq: float,
@@ -53,7 +51,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.boundary_manager: "BoundaryManager" = boundary_manager
         self.coriolis: "CoriolisOperator" = coriolis_operator
         self.gravity: "Gravity" = self.coriolis.gravity
-        self.pressure_solver: "PressureSolver" = pressure_solver
+        self.pressure_solver: "AbstractPressureSolver" = pressure_solver
+        self.discrete_operator: "AbstractDiscreteOperator" = self.pressure_solver.discrete_operator
         self.th: "Thermodynamics" = thermodynamics
         self.dt: float = dt
         self.Msq: float = Msq
@@ -94,7 +93,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         dbuoy = cellvars[..., VI.RHOY] * cellvars[..., VI.RHOX] / cellvars[..., VI.RHO]
 
         # index 0: momentum in the direction of gravity. index 1: momentum in the direction of non-gravity.
-        vertical_momentum_index, _ = self.gravity.momentum_index
+        vertical_momentum_index = self.gravity.gravity_momentum_index
 
         ###################### Update variables
         self._forward_momenta_update(cellvars, p2n, dbuoy, g, vertical_momentum_index)
@@ -138,14 +137,14 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         vertical_momentum_index: VariablesIndices (Enum)
             The index of the vertical momentum in the variable container
         """
-        coriolis = self.coriolis.coriolis_strength
+        coriolis = self.coriolis.strength
         adjusted_momenta = self.variables.adjust_background_wind(self.wind_speed, -1.0)
 
         # pressure gradient factor: (P/Gamma)
         rhoYovG = self.variables.cell_vars[..., VI.RHOY] * self.th.Gammainv
 
         # Calculate the pressure gradiant (RHS of the momenta equations)
-        dpdx, dpdy, dpdz = nodal_variable_gradient(p2n, self.grid.ndim, self.grid.dxyz)
+        dpdx, dpdy, dpdz = self.discrete_operator.gradient(p2n)
 
         ###############################################################################################################
         ## UPDATING VARIABLES
@@ -180,6 +179,14 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         """Update the Exner pressure."""
         # Calculate the right hand side of the pressure equation (divergence of momenta on the nodes)
         self.mpv.rhs[...] = pressured_momenta_divergence(self.grid, self.variables)
+
+        # Compute the weighting factor Y = (rhoY / rho) = Theta
+        Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
+
+        # Compute the divergence of the pressure-weighted momenta: (Pu)_x + (Pv)_y + (Pw)_z where
+        # P = rho*Y = rho*Theta
+        momenta_indices = [VI.RHOU, VI.RHOV, VI.RHOW][:self.grid.ndim]
+        self.mpv.rhs[...] = self.discrete_operator.divergence(self.variables.cell_vars[..., momenta_indices] * Y)
 
         # Adjust wall boundary nodes (scale). Notice the side is set to be BdrySide.ALL.
         # This will apply the extra method whenever the boundary is defined to be WALL.
@@ -252,107 +259,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         return self.dt
 
 
-class PressureSolver:
-    """
-    PressureSolver encapsulates the pressure correction procedure.
-    It assembles the operator for the pressure correction (using, for example,
-    a discrete Laplacian), builds the right–hand side from the divergence and other
-    source terms, and then solves the resulting linear system via an injected linear solver.
 
-    After obtaining the pressure correction, it updates the pressure (or p2-like)
-    diagnostic in the Variables object. In a complete implementation the solver would
-    also update ghost node values via boundary routines.
-    """
-
-    def __init__(self, linear_solver):
-        """
-        linear_solver: an instance implementing the ILinearSolver interface
-                       (e.g., a BiCGStabSolver).
-        """
-        self.linear_solver = linear_solver
-
-    def build_operator(self, variables, grid, dt):
-        """
-        Assemble the pressure correction operator as a linear operator.
-        This might be built using a multigrid, 9-point, or 27-point stencil, for example.
-
-        For this simplified example we assume a 2D discrete Laplacian over the grid.
-        """
-        shape = (
-            variables.rho.shape
-        )  # assume the same shape for the diagnostic pressure field
-        size = np.prod(shape)
-
-        # Define the operator's action (a dummy Laplacian for illustration)
-        def matvec(x):
-            # x comes in as a flattened vector. Reshape to grid form.
-            u = x.reshape(shape)
-            laplacian = np.zeros_like(u)
-            # A simple finite-difference Laplacian for interior points:
-            laplacian[1:-1, 1:-1] = (
-                u[:-2, 1:-1] - 2 * u[1:-1, 1:-1] + u[2:, 1:-1]
-            ) / grid.dx**2 + (
-                u[1:-1, :-2] - 2 * u[1:-1, 1:-1] + u[1:-1, 2:]
-            ) / grid.dy**2
-            # (In practice, ghost cells and boundary conditions are important.)
-            return laplacian.ravel()
-
-        A = scipy.sparse.linalg.LinearOperator((size, size), matvec=matvec)
-        return A
-
-    def build_rhs(self, variables, grid, dt):
-        """
-        Build the right-hand side (RHS) for the pressure correction.
-        Typically this uses the divergence of the momentum field along with
-        other contributions (for instance, compressibility or additional source terms).
-
-        In the legacy code, functions such as divergence_nodes and adjustments for
-        compressibility are used. Here we provide a simplified placeholder version.
-        """
-        shape = variables.rho.shape
-        rhs = np.zeros(shape)
-
-        # For example, compute a simple discrete divergence based on momentum differences.
-        # (Replace this with a proper discrete operator as needed.)
-        rhs[1:-1, 1:-1] = (variables.rhou[2:, 1:-1] - variables.rhou[:-2, 1:-1]) / (
-            2 * grid.dx
-        ) + (variables.rhov[1:-1, 2:] - variables.rhov[1:-1, :-2]) / (2 * grid.dy)
-        # Additional modifications (e.g. compressibility weighting) may be applied.
-
-        # Flatten rhs for the linear solver.
-        return rhs.ravel()
-
-    def solve(self, variables, grid, dt):
-        """
-        Perform the pressure correction step:
-          1. Build the operator A for the pressure correction.
-          2. Compute the right-hand side vector from the momentum divergence and sources.
-          3. Solve the linear system A * p_corr = rhs with the injected linear solver.
-          4. Reshape and update the diagnostic pressure field (e.g., p2_nodes or variables.pressure).
-
-        Boundary updates and ghost cell enforcement can be handled here or delegated.
-        """
-        A = self.build_operator(variables, grid, dt)
-        rhs = self.build_rhs(variables, grid, dt)
-
-        # Solve the system (using, e.g., BiCGStab)
-        solution = self.linear_solver.solve(A, rhs)
-        # Reshape the solution to the grid dimensions.
-        pressure_correction = solution.reshape(variables.rho.shape)
-
-        # Update the pressure diagnostic field.
-        # In the legacy code, this update might look like:
-        #   mpv.p2_nodes += weight * dp2n  (with dp2n computed via pressure derivative kernels)
-        try:
-            # If the field already exists, update it.
-            variables.pressure += pressure_correction * dt
-        except AttributeError:
-            # Otherwise, create it as a new field.
-            variables.pressure = pressure_correction * dt
-
-        # One might update boundary ghost values here as well,
-        # e.g., boundary_manager.set_ghostnodes_pressure(variables.pressure, node, user_data)
-        print("Pressure solve complete and pressure field updated.")
 
 
 if __name__ == "__main__":
