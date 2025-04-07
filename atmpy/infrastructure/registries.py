@@ -11,11 +11,15 @@ from atmpy.infrastructure.enums import (
     AdvectionRoutines,
     LinearSolvers,
     TimeIntegrators,
+    DiscreteOperators,
+    PressureSolvers,
 )
 from atmpy.boundary_conditions.boundary_conditions import *
 from atmpy.solver.advection_routines import *
-from atmpy.time_integrators.linear_solvers import *
+from atmpy.pressure_solver.linear_solvers import *
 from atmpy.time_integrators.imex_operator_splitting import IMEXTimeIntegrator
+from atmpy.pressure_solver.discrete_operations import *
+from atmpy.pressure_solver.pressure_solvers import *
 
 SLOPE_LIMITERS = {
     SlopeLimiters.MINMOD: minmod,
@@ -58,4 +62,12 @@ LINEAR_SOLVERS = {
 
 TIME_INTEGRATORS = {
     TimeIntegrators.IMEX: IMEXTimeIntegrator,
+}
+
+DISCRETE_OPERATORS = {
+    DiscreteOperators.CLASSIC_OPERATOR: ClassicalDiscreteOperator
+}
+
+PRESSURE_SOLVERS = {
+    PressureSolvers.CLASSIC_PRESSURE_SOLVER: ClassicalPressureSolver,
 }

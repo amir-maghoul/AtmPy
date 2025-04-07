@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from typing import List, Tuple
 
-class AbstractDiscreteOperators(ABC):
+class AbstractDiscreteOperator(ABC):
     """ Abstract class for discrete operators."""
 
     def __init__(self, ndim: int, dxyz: List[float]):
@@ -52,7 +52,7 @@ class AbstractDiscreteOperators(ABC):
         pass
 
 
-class DiscreteOperators(AbstractDiscreteOperators):
+class ClassicalDiscreteOperator(AbstractDiscreteOperator):
     def __init__(self, ndim: int, dxyz: List[float]):
         super().__init__(ndim, dxyz)
 
@@ -133,9 +133,6 @@ class DiscreteOperators(AbstractDiscreteOperators):
         if vector.shape[-1] > 3:
             raise ValueError("The number of arguments passed to the method must be the same as the number of dimensions.")
 
-        U = np.zeros_like(args)
-        axes = np.arange(vector.shape[-1])
-
         # Pre-allocation. The result should have one less element in all directions.
         Ux = np.zeros([nc-1 for nc in vector[..., 0].shape])
 
@@ -145,7 +142,72 @@ class DiscreteOperators(AbstractDiscreteOperators):
         return Ux
 
     def gradient(self, p: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        return p
+        """ Taken from reference. See Notes.
+           Calculate the discrete gradient of a given scalar field in 1D, 2D, or 3D. The algorithm mimics the calculation of
+           nodal pressure gradient specified in eq. (30a) in BK19 paper.
+
+
+           Parameters
+           ----------
+           p : np.ndarray of shape (nx+1, [ny+1], [nz+1])
+               The nodal scalar field on which the gradient is applied.
+           ndim : int
+               The number of dimensions of the scalar field (1, 2, or 3).
+           dxyz : List[float]
+               The list of discretization fineness [dx, (dy), (dz)]
+
+           Returns
+           -------
+           Tuple[np.ndarray, ...] of shape (nx, ny, nz)
+               The gradient components (Dpx, Dpy, Dpz). For ndim < 3, unused components are zero.
+               The gradient is defined on cells.
+
+           Notes
+           -----
+           Taken from https://github.com/ray-chew/pyBELLA/blob/develop/src/dycore/physics/low_mach/second_projection.py
+           """
+        dx, dy, dz = dxyz
+
+        # Compute the slices for differencing (for example p[:-1] - p[1:])
+        indices = [idx for idx in it.product([slice(0, -1), slice(1, None)], repeat=ndim)]
+        if ndim == 1:
+            # In 1D, gradient is (p[1:] - p[:-1]) / dx (centered difference)
+            signs_x: Tuple[float, ...] = (-1.0, +1.0)
+            signs_y: Tuple[float, ...] = (0.0, 0.0)
+            signs_z: Tuple[float, ...] = (0.0, 0.0)
+            scale: float = 1.0  # No averaging needed in 1D
+        if ndim == 2:
+            # Compute the sign factors of each neighboring cell to the center of calculation
+            # Basically in 2D we have for example in x-direction:
+            # Dpx = (-p00 - p01 + p10 + p11) * 0.5 / dx
+            signs_x: Tuple[float, ...] = (-1.0, -1.0, +1.0, +1.0)
+            signs_y: Tuple[float, ...] = (-1.0, +1.0, -1.0, +1.0)
+            signs_z: Tuple[float, ...] = (0.0, 0.0, 0.0, 0.0)
+            scale: float = 0.5
+        elif ndim == 3:
+            # Compute the sign factors of each neighboring cell to the center of calculation
+            # Basically in 3D we have for example in x-direction:
+            # Dpx = (-p000 - p001 - p010 - p011 + p100 + p101 + p110 + p111) * 0.25 / dx
+            signs_x: Tuple[float, ...] = (-1.0, -1.0, -1.0, -1.0, +1.0, +1.0, +1.0, +1.0)
+            signs_y: Tuple[float, ...] = (-1.0, -1.0, +1.0, +1.0, -1.0, -1.0, +1.0, +1.0)
+            signs_z: Tuple[float, ...] = (-1.0, +1.0, -1.0, +1.0, -1.0, +1.0, -1.0, +1.0)
+            scale: float = 0.25
+
+        Dpx, Dpy, Dpz = 0.0, 0.0, 0.0
+        cnt = 0
+
+        # Compute the unfactored gradient
+        for index in indices:
+            Dpx += signs_x[cnt] * p[index]
+            Dpy += signs_y[cnt] * p[index]
+            Dpz += signs_z[cnt] * p[index]
+            cnt += 1
+
+        Dpx *= scale / dx
+        Dpy *= scale / dy
+        Dpz *= scale / dz
+
+        return Dpx, Dpy, Dpz
 
 if __name__ == "__main__":
     x = np.arange(30).reshape(5, 6)
