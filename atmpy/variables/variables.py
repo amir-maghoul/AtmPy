@@ -234,7 +234,7 @@ class Variables:
         np.ndarray
         """
         AXES: int = 3
-        adjusted_momenta = np.zeros_like((self.grid.cshape) + (3,))
+        adjusted_momenta = np.zeros((self.grid.cshape) + (3,))
         for wind_speed, axis in zip(wind_speeds, range(AXES)):
             momentum_idx = momentum_index(axis)
             try:
