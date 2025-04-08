@@ -7,6 +7,7 @@ from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.boundary_conditions.contexts import BCApplicationContext
 from atmpy.infrastructure.utility import directional_indices, one_element_inner_slice
 from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
+from atmpy.infrastructure.enums import VariableIndices as VI
 
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
@@ -20,12 +21,12 @@ if TYPE_CHECKING:
     from atmpy.pressure_solver.pressure_solvers import AbstractPressureSolver
 
 from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
-import scipy.sparse.linalg
+from atmpy.time_integrators.utility import *
+
 from atmpy.infrastructure.enums import (
     BoundarySide as BdrySide,
     BoundaryConditions as BdryType,
 )
-from atmpy.time_integrators.utility import *
 
 
 class IMEXTimeIntegrator(AbstractTimeIntegrator):
@@ -52,7 +53,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.coriolis: "CoriolisOperator" = coriolis_operator
         self.gravity: "Gravity" = self.coriolis.gravity
         self.pressure_solver: "AbstractPressureSolver" = pressure_solver
-        self.discrete_operator: "AbstractDiscreteOperator" = self.pressure_solver.discrete_operator
+        self.discrete_operator: "AbstractDiscreteOperator" = (
+            self.pressure_solver.discrete_operator
+        )
         self.th: "Thermodynamics" = thermodynamics
         self.dt: float = dt
         self.Msq: float = Msq
@@ -153,20 +156,20 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Horizontal momentum in x
         cellvars[..., VI.RHOU] -= self.dt * (
             rhoYovG * dpdx
-            - coriolis[3] * adjusted_momenta[2]
-            + coriolis[2] * adjusted_momenta[3]
+            - coriolis[2] * adjusted_momenta[..., 1]
+            + coriolis[1] * adjusted_momenta[..., 2]
         )
         if self.grid.ndim >= 2:
             cellvars[..., VI.RHOV] -= self.dt * (
                 rhoYovG * dpdy
-                - coriolis[1] * adjusted_momenta[3]
-                + coriolis[3] * adjusted_momenta[1]
+                - coriolis[0] * adjusted_momenta[..., 2]
+                + coriolis[2] * adjusted_momenta[..., 0]
             )
         if self.grid.ndim == 3:
             cellvars[..., VI.RHOU] -= self.dt * (
                 rhoYovG * dpdy
-                - coriolis[2] * adjusted_momenta[1]
-                + coriolis[1] * adjusted_momenta[2]
+                - coriolis[1] * adjusted_momenta[..., 0]
+                + coriolis[0] * adjusted_momenta[..., 1]
             )
 
         # Updates: The momentum in the direction of gravity
@@ -177,19 +180,20 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
     def _forward_pressure_update(self, cellvars: np.ndarray, p2n: np.ndarray):
         """Update the Exner pressure."""
-        # Calculate the right hand side of the pressure equation (divergence of momenta on the nodes)
-        self.mpv.rhs[...] = pressured_momenta_divergence(self.grid, self.variables)
 
         # Compute the weighting factor Y = (rhoY / rho) = Theta
         Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
 
         # Compute the divergence of the pressure-weighted momenta: (Pu)_x + (Pv)_y + (Pw)_z where
         # P = rho*Y = rho*Theta
-        momenta_indices = [VI.RHOU, VI.RHOV, VI.RHOW][:self.grid.ndim]
-        self.mpv.rhs[...] = self.discrete_operator.divergence(self.variables.cell_vars[..., momenta_indices] * Y)
+        momenta_indices = [VI.RHOU, VI.RHOV, VI.RHOW][: self.grid.ndim]
+        inner_slice = one_element_inner_slice(self.grid.ndim, full=False)
+        self.mpv.rhs[inner_slice] = self.discrete_operator.divergence(
+            self.variables.cell_vars[..., momenta_indices] * Y[..., np.newaxis],
+        )
 
         # Adjust wall boundary nodes (scale). Notice the side is set to be BdrySide.ALL.
-        # This will apply the extra method whenever the boundary is defined to be WALL.
+        # This will apply the 'extra' method whenever the boundary is defined to be WALL.
         boundary_operation = [
             WallAdjustment(
                 target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=2.0
@@ -205,7 +209,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # Create a nodal variable to store the intermediate updates
         dp2n = np.zeros_like(p2n)
-        dp2n[inner_idx] -= self.dt * dpidP * self.mpv.rhs
+        dp2n[inner_idx] -= self.dt * dpidP * self.mpv.rhs[inner_slice]
         self.mpv.p2_nodes[...] += self.is_compressible * dp2n
 
     def _forward_buoyancy_update(
@@ -222,9 +226,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         """
         # get Chi variable and the derivative
         S0c = self.mpv.get_S0c_on_cells()
-        dSdy = self.mpv.compute_dS_on_nodes(self.gravity.direction)
+        dSdy = self.mpv.compute_dS_on_nodes()
 
-        # Intermediate variable
+        # Intermediate variable for current Chi
         currentX = cellvars[..., VI.RHO] * (
             (cellvars[..., VI.RHO] / cellvars[..., VI.RHOY]) - S0c
         )
@@ -259,8 +263,182 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         return self.dt
 
 
+def example_usage():
+    from atmpy.physics.thermodynamics import Thermodynamics
+    from atmpy.grid.utility import DimensionSpec, create_grid
+    from atmpy.variables.variables import Variables
+    from atmpy.infrastructure.enums import VariableIndices as VI
+    from atmpy.boundary_conditions.bc_extra_operations import (
+        WallAdjustment,
+        PeriodicAdjustment,
+    )
 
+    np.set_printoptions(linewidth=300)
+    np.set_printoptions(suppress=True)
+    np.set_printoptions(precision=5)
+
+    ####################################################################################################################
+    # GRID DATA ########################################################################################################
+    ####################################################################################################################
+
+    nx = 6
+    ngx = 2
+    nnx = nx + 2 * ngx
+    ny = 5
+    ngy = 2
+    nny = ny + 2 * ngy
+
+    dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
+    grid = create_grid(dim)
+
+    ####################################################################################################################
+    ## VARIABLE DATA ###################################################################################################
+    ####################################################################################################################
+
+    rng = np.random.default_rng()
+    arr = np.arange(nnx * nny)
+    rng.shuffle(arr)
+    array = arr.reshape(nnx, nny)
+
+    variables = Variables(grid, 6, 1)
+    variables.cell_vars[..., VI.RHO] = 1
+    variables.cell_vars[..., VI.RHO][1:-1, 1:-1] = 4
+    variables.cell_vars[..., VI.RHOU] = array
+    variables.cell_vars[..., VI.RHOY] = 2
+    variables.cell_vars[..., VI.RHOW] = 3
+
+    rng.shuffle(arr)
+    array = arr.reshape(nnx, nny)
+    variables.cell_vars[..., VI.RHOV] = array
+    gravity = np.array([0.0, 1.0, 0.0])
+    th = Thermodynamics()
+
+    ####################################################################################################################
+    ######### MPV ######################################################################################################
+    ####################################################################################################################
+    from atmpy.variables.multiple_pressure_variables import MPV
+
+    mpv = MPV(grid)
+
+    ####################################################################################################################
+    ######### FLUX #####################################################################################################
+    ####################################################################################################################
+    from atmpy.physics.eos import ExnerBasedEOS
+    from atmpy.flux.flux import Flux
+
+    eos = ExnerBasedEOS()
+    flux = Flux(grid, variables, eos)
+
+    ####################################################################################################################
+    ######### BOUNDARY MANAGER #########################################################################################
+    ####################################################################################################################
+    from atmpy.boundary_conditions.boundary_manager import BoundaryManager
+    from atmpy.boundary_conditions.contexts import (
+        BCInstantiationOptions,
+        BoundaryConditionsConfiguration,
+        BCApplicationContext,
+    )
+
+    gravity_vec = [0.0, 1.0, 0.0]
+    direction = "y"
+
+    bc = BCInstantiationOptions(
+        side=BdrySide.BOTTOM, type=BdryType.WALL, direction=direction, grid=grid
+    )
+    bc2 = BCInstantiationOptions(
+        side=BdrySide.TOP, type=BdryType.WALL, direction=direction, grid=grid
+    )
+    # bc3 = RFBCInstantiationOptions(
+    #     side=BdrySide.LEFT, type=BdryType.WALL, direction="x", grid=grid
+    # )
+    # bc4 = RFBCInstantiationOptions(
+    #     side=BdrySide.RIGHT, type=BdryType.PERIODIC, direction="x", grid=grid
+    # )
+    # options = [bc, bc2, bc3, bc4]
+    options = [bc, bc2]
+    bc_conditions = BoundaryConditionsConfiguration(options)
+    manager = BoundaryManager(bc_conditions)
+
+    ####################################################################################################################
+    ########## DISCRETE OPERATOR AND PRESSURE SOLVER ###################################################################
+    ####################################################################################################################
+    from atmpy.infrastructure.enums import (
+        PressureSolvers,
+        DiscreteOperators,
+        LinearSolvers,
+    )
+    from atmpy.pressure_solver.contexts import (
+        DCInstantiationContext,
+        PSInstantiationContext,
+    )
+
+    op_context = DCInstantiationContext(ndim=grid.ndim, dxyz=grid.dxyz)
+    linear_solver = LinearSolvers.BICGSTAB
+
+    # Instantiate the pressure solver context by specifying enums for pressure solver and discrete operator.
+    ps_context = PSInstantiationContext(
+        solver_type=PressureSolvers.CLASSIC_PRESSURE_SOLVER,
+        discrete_operator_type=DiscreteOperators.CLASSIC_OPERATOR,
+        op_context=op_context,
+        linear_solver_type=linear_solver,
+    )
+
+    pressure = ps_context.instantiate()
+
+    ####################################################################################################################
+    ######## TIME INTEGRATION ##########################################################################################
+    ####################################################################################################################
+    from atmpy.physics.gravity import Gravity
+    from atmpy.time_integrators.coriolis import CoriolisOperator
+
+    gravity = Gravity(gravity_vec, grid.ndim)
+    coriolis = CoriolisOperator([0.0, 1.0, 0.0], gravity)
+
+    ##### Approach 1 ######################################################
+    ### Using instantiation context for central instatiation of all classes:
+    from atmpy.time_integrators.contexts import TimeIntegratorContext
+    from atmpy.infrastructure.enums import TimeIntegrators
+
+    context = TimeIntegratorContext(
+        integrator_type=TimeIntegrators.IMEX,
+        grid=grid,
+        variables=variables,
+        flux=flux,
+        boundary_manager=manager,
+        dt=0.1,
+        t_end=10.0,
+        maxstep=100,
+        extra_dependencies={
+            "mpv": mpv,
+            "coriolis_operator": coriolis,
+            "pressure_solver": pressure,
+            "thermodynamics": th,
+            "Msq": 1.0,
+            "wind_speed": [0.0, 0.0, 0.0],  # optional: override default wind speed
+        },
+    )
+    time_integrator = context.instantiate()
+
+    ###### Approach 2 #############################
+    # Or simply using the direct needed integrator:
+    # time_integrator = IMEXTimeIntegrator(
+    #     grid=grid,
+    #     variables=variables,
+    #     mpv=mpv,
+    #     flux=flux,
+    #     boundary_manager=manager,
+    #     coriolis_operator=coriolis,
+    #     pressure_solver=pressure,
+    #     thermodynamics=th,
+    #     dt=0.1,
+    #     Msq=1.0
+    # )
+    print(variables.cell_vars[..., VI.RHOU])
+    time_integrator.forward_update()
+    time_integrator.forward_update()
+
+    print(variables.cell_vars[..., VI.RHOU])
 
 
 if __name__ == "__main__":
-    pass
+    example_usage()
