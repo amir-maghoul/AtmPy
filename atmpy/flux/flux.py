@@ -59,7 +59,6 @@ class Flux:
         grid: "Grid",
         variables: Variables,
         eos: "EOS",
-        dt: float,
         solver: RiemannSolvers = RiemannSolvers.MODIFIED_HLL,
         reconstruction: FluxReconstructions = FluxReconstructions.MODIFIED_MUSCL,
         limiter: SlopeLimiters = SlopeLimiters.VAN_LEER,
@@ -73,8 +72,6 @@ class Flux:
             The variable container
         eos : :py:class:`atmpy.physics.eos.EOS`
             The equation of state
-        dt : float
-            The time step of the problem.
         solver : RiemannSolvers (Enum)
             An enum name from the implemented RiemannSolvers Enum,
             e.g. RiemannSolvers.HLL, RiemannSolvers.RUSANOV, etc.
@@ -97,7 +94,6 @@ class Flux:
         self.grid = grid
         self.variables = variables
         self.eos = eos
-        self.dt = dt
         self.riemann_solver = get_riemann_solver(solver)
         self.reconstruction = get_reconstruction_method(reconstruction)
         self.limiter = get_slope_limiter(limiter)
@@ -334,7 +330,7 @@ def main():
     array = arr.reshape(nnx, nny)
     variables.cell_vars[..., VI.RHOV] = array
     eos = ExnerBasedEOS()
-    flux = Flux(grid, variables, eos, dt)
+    flux = Flux(grid, variables, eos)
     variables.to_primitive(eos)
     primitives = variables.primitives
 

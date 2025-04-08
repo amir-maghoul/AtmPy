@@ -65,6 +65,7 @@ def create_grid(dimensions: List[DimensionSpec]):
     args = to_grid_args(dimensions)
     return Grid(**args)
 
+
 def cell_to_node_average(
     grid: Grid, var_cells: np.ndarray, var_nodes: np.ndarray = None
 ) -> np.ndarray:
