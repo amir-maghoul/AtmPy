@@ -1,22 +1,28 @@
-""" This module handles solving the equation for the pressure variable including the Laplace/Poisson equation."""
+"""This module handles solving the equation for the pressure variable including the Laplace/Poisson equation."""
 
 from abc import ABC, abstractmethod
 import numpy as np
 import scipy as sp
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
     from atmpy.pressure_solver.linear_solvers import ILinearSolver
 
-class AbstractPressureSolver(ABC):
-    """ Create different definitions of pressure solvers."""
 
-    def __init__(self, discrete_operator: "AbstractDiscreteOperator", linear_solver: "ILinearSolver"):
+class AbstractPressureSolver(ABC):
+    """Create different definitions of pressure solvers."""
+
+    def __init__(
+        self,
+        discrete_operator: "AbstractDiscreteOperator",
+        linear_solver: "ILinearSolver",
+    ):
         self.discrete_operator: "AbstractDiscreteOperator" = discrete_operator
         self.linear_solver: "ILinearSolver" = linear_solver
 
 
-class ClassicalPressureSolver:
+class ClassicalPressureSolver(AbstractPressureSolver):
     """
     PressureSolver encapsulates the pressure correction procedure.
     It assembles the operator for the pressure correction (using, for example,
@@ -28,7 +34,11 @@ class ClassicalPressureSolver:
     also update ghost node values via boundary routines.
     """
 
-    def __init__(self, discrete_operator: "AbstractDiscreteOperator", linear_solver: "ILinearSolver"):
+    def __init__(
+        self,
+        discrete_operator: "AbstractDiscreteOperator",
+        linear_solver: "ILinearSolver",
+    ):
         super().__init__(discrete_operator, linear_solver)
 
     def build_operator(self, variables, grid, dt):
