@@ -64,9 +64,7 @@ TIME_INTEGRATORS = {
     TimeIntegrators.IMEX: IMEXTimeIntegrator,
 }
 
-DISCRETE_OPERATORS = {
-    DiscreteOperators.CLASSIC_OPERATOR: ClassicalDiscreteOperator
-}
+DISCRETE_OPERATORS = {DiscreteOperators.CLASSIC_OPERATOR: ClassicalDiscreteOperator}
 
 PRESSURE_SOLVERS = {
     PressureSolvers.CLASSIC_PRESSURE_SOLVER: ClassicalPressureSolver,

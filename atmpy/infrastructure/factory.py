@@ -9,7 +9,9 @@ from atmpy.infrastructure.registries import (
     BOUNDARY_CONDITIONS,
     ADVECTION_ROUTINES,
     LINEAR_SOLVERS,
-    TIME_INTEGRATORS, DISCRETE_OPERATORS, PRESSURE_SOLVERS,
+    TIME_INTEGRATORS,
+    DISCRETE_OPERATORS,
+    PRESSURE_SOLVERS,
 )
 from typing import TYPE_CHECKING
 
@@ -169,29 +171,6 @@ def get_linear_solver(name: "LinearSolvers") -> "ILinearSolver":
     return linear_solver_class()
 
 
-def get_time_integrator(
-    name: "TimeIntegrators", **dependencies
-) -> "AbstractTimeIntegrator":
-    """
-    Retrieves the time integrator class based on the provided enum member.
-
-    Parameters
-    ----------
-    name: TimeIntegrators (enum)
-        The enum member specifying the desired time integrator.
-
-    Returns
-    -------
-    AbstractTimeIntegrator: The corresponding time integrator class.
-
-    """
-    integrator_class = TIME_INTEGRATORS.get(name)
-
-    if integrator_class is None:
-        raise ValueError(f"Unknown time integrator type: {name}")
-
-    return integrator_class(**dependencies)
-
 def get_discrete_operators(
     name: "DiscreteOperators", **dependencies
 ) -> "AbstractDiscreteOperator":
@@ -215,6 +194,7 @@ def get_discrete_operators(
 
     return discrete_operator_class(**dependencies)
 
+
 def get_pressure_solver(
     name: "PressureSolvers", **dependencies
 ) -> "AbstractPressureSolver":
@@ -237,3 +217,27 @@ def get_pressure_solver(
         raise ValueError(f"Unknown pressure solver type: {name}")
 
     return pressure_solver_class(**dependencies)
+
+
+def get_time_integrator(
+    name: "TimeIntegrators", **dependencies
+) -> "AbstractTimeIntegrator":
+    """
+    Retrieves the time integrator class based on the provided enum member.
+
+    Parameters
+    ----------
+    name: TimeIntegrators (enum)
+        The enum member specifying the desired time integrator.
+
+    Returns
+    -------
+    AbstractTimeIntegrator: The corresponding time integrator class.
+
+    """
+    integrator_class = TIME_INTEGRATORS.get(name)
+
+    if integrator_class is None:
+        raise ValueError(f"Unknown time integrator type: {name}")
+
+    return integrator_class(**dependencies)

@@ -160,7 +160,9 @@ class BoundaryManager:
         ):
             condition.apply_single_variable(variable, context)
 
-    def apply_boundary_on_single_var_all_sides(self, variable: "np.ndarray", contexts: List["BCApplicationContext"]):
+    def apply_boundary_on_single_var_all_sides(
+        self, variable: "np.ndarray", contexts: List["BCApplicationContext"]
+    ):
         """Apply the boundary conditions on all sides and directions for the input variable.
 
         Parameters
@@ -171,7 +173,9 @@ class BoundaryManager:
             The context object containing the apply method information.
         """
         print("Apply BC on single variable on all sides...")
-        for (side, condition), context in zip(self.boundary_conditions.items(), contexts):
+        for (side, condition), context in zip(
+            self.boundary_conditions.items(), contexts
+        ):
             condition.apply_single_variable(variable, context)
 
     def apply_extra(
