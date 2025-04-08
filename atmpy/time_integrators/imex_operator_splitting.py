@@ -42,7 +42,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         thermodynamics: "Thermodynamics",
         dt: float,
         Msq: float,
-        **kwargs,
+        is_nongeostrophic: bool,
+        is_nonhydrostatic: bool,
+        is_compressible: bool,
+        wind_speed: float = [0.0, 0.0, 0.0],
     ):
         # Inject dependencies
         self.grid: "Grid" = grid
@@ -59,14 +62,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.th: "Thermodynamics" = thermodynamics
         self.dt: float = dt
         self.Msq: float = Msq
-        self.is_nongeostrophic: bool = True
-        self.is_nonhydrostatic: bool = True
-        self.is_compressible: bool = True
-        self.wind_speed: Union[list, np.ndarray] = (
-            [0.0, 0.0, 0.0]
-            if kwargs.get("wind_speed") is None
-            else kwargs.get("wind_speed")
-        )
+        self.is_nongeostrophic: bool = is_nongeostrophic
+        self.is_nonhydrostatic: bool = is_nonhydrostatic
+        self.is_compressible: bool = is_compressible
+        self.wind_speed: Union[list, np.ndarray] = wind_speed
 
     def step(self):
         # 1. Explicit forward update (e.g. divergence, pressure gradient, momentum update)
@@ -406,13 +405,14 @@ def example_usage():
         flux=flux,
         boundary_manager=manager,
         dt=0.1,
-        t_end=10.0,
-        maxstep=100,
         extra_dependencies={
             "mpv": mpv,
             "coriolis_operator": coriolis,
             "pressure_solver": pressure,
             "thermodynamics": th,
+            "is_nonhydrostatic": True,
+            "is_nongeostrophic": True,
+            "is_compressible": True,
             "Msq": 1.0,
             "wind_speed": [0.0, 0.0, 0.0],  # optional: override default wind speed
         },

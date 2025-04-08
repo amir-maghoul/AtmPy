@@ -51,8 +51,6 @@ class TimeIntegratorContext:
     flux: Flux
     boundary_manager: BoundaryManager
     dt: float
-    t_end: float
-    maxstep: int
     extra_dependencies: Dict[str, Any] = field(default_factory=dict)
 
     def instantiate(self) -> AbstractTimeIntegrator:
@@ -66,8 +64,6 @@ class TimeIntegratorContext:
             "flux": self.flux,
             "boundary_manager": self.boundary_manager,
             "dt": self.dt,
-            "t_end": self.t_end,
-            "maxstep": self.maxstep,
         }
         # Merge in any extra dependencies required by the specific integrator.
         dependencies.update(self.extra_dependencies)
@@ -85,8 +81,6 @@ class TimeIntegratorContext:
 #     flux=flux,
 #     boundary_manager=manager,
 #     dt=0.1,
-#     t_end=10.0,
-#     maxstep=100,
 #     extra_dependencies={
 #         "mpv": mpv,
 #         "coriolis_operator": coriolis,
