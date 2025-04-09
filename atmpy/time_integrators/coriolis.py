@@ -30,9 +30,8 @@ class CoriolisOperator:
         w: np.ndarray,
         variables: "Variables",
         mpv: "MPV",
-        direction: str,
-        is_nonhydrostatic: bool,
         is_nongeostrophic: bool,
+        is_nonhydrostatic: bool,
         Msq: float,
         dt: float,
     ) -> None:
@@ -47,13 +46,29 @@ class CoriolisOperator:
             The variable container containing the density and temperature variables.
         mpv : MPV
             The MPV object containing the Chi variable and its derivative method.
+        is_nongeostrophic : bool
+            The switch between geostrophic and non-geostrophic regimes.
+        is_nonhydrostatic : bool
+            The switch between hydrostatic and non-hydrostatic regimes.
+        Msq : float
+            The mach number squared.
         dt : float
             The time step.
         """
         if self.strength is None or np.all(self.strength == 0):
             pass
         else:
-            self._apply(variables, dt)
+            self._apply(
+                u,
+                v,
+                w,
+                variables,
+                mpv,
+                is_nongeostrophic,
+                is_nonhydrostatic,
+                Msq,
+                dt,
+            )
 
     def _apply(
         self,
@@ -62,9 +77,8 @@ class CoriolisOperator:
         W: np.ndarray,
         variables: "Variables",
         mpv: "MPV",
-        direction: str,
-        is_nonhydrostatic: bool,
         is_nongeostrophic: bool,
+        is_nonhydrostatic: bool,
         Msq: float,
         dt: float,
     ) -> None:
@@ -147,30 +161,25 @@ class CoriolisOperator:
         # Calculate the timed coriolis strength
         coriolis = dt * self.strength
 
-        determinant = self._calculate_determinant_y_direction(
-            nonhydro, nongeo, coriolis, dChi, dt
-        )
+        determinant = self._calculate_determinant(nonhydro, nongeo, coriolis, dChi)
 
         #####################
         #### THE INVERSE ####
 
         uu, uv, uw = (
-            self._inverse_matrix_first_row(nonhydro, nongeo, coriolis, dChi)
-            / determinant
+            self._inverse_matrix_first_row(determinant, nonhydro, nongeo, coriolis, dChi)
         )
         vu, vv, vw = (
-            self._inverse_matrix_second_row(nonhydro, nongeo, coriolis, dChi)
-            / determinant
+            self._inverse_matrix_second_row(determinant, nonhydro, nongeo, coriolis, dChi)
         )
         wu, wv, ww = (
-            self._inverse_matrix_third_row(nonhydro, nongeo, coriolis, dChi)
-            / determinant
+            self._inverse_matrix_third_row(determinant, nonhydro, nongeo, coriolis, dChi)
         )
 
         return uu, uv, uw, vu, vv, vw, wu, wv, ww
 
     def _inverse_matrix_first_row(
-        self, nonhydro: bool, nongeo: bool, coriolis: np.ndarray, dChi: np.ndarray
+        self, determinant: np.ndarray, nonhydro: bool, nongeo: bool, coriolis: np.ndarray, dChi: np.ndarray
     ) -> Tuple[Any, Any, Any]:
         """calculate the first row of the inverse matrix."""
         o1, o2, o3 = coriolis
@@ -179,10 +188,10 @@ class CoriolisOperator:
         uv = nongeo * o3 + o1 * o2
         uw = o1 * o3 - o2 * (nonhydro - dChi)
 
-        return uu, uv, uw
+        return uu/determinant, uv/determinant, uw/determinant
 
     def _inverse_matrix_second_row(
-        self, nonhydro: bool, nongeo: bool, coriolis: np.ndarray, dChi: np.ndarray
+        self,determinant, nonhydro: bool, nongeo: bool, coriolis: np.ndarray, dChi: np.ndarray
     ) -> Tuple[Any, Any, Any]:
         """calculate the second row of the inverse matrix."""
         o1, o2, o3 = coriolis
@@ -191,10 +200,10 @@ class CoriolisOperator:
         vv = nongeo**2 + o2**2
         vw = nongeo * o1 + o2 * o3
 
-        return vu, vv, vw
+        return vu/determinant, vv/determinant, vw/determinant
 
     def _inverse_matrix_third_row(
-        self, nonhydro: bool, nongeo: bool, coriolis: np.ndarray, dChi: np.ndarray
+        self, determinant:np.ndarray, nonhydro: bool, nongeo: bool, coriolis: np.ndarray, dChi: np.ndarray
     ) -> Tuple[Any, Any, Any]:
         """Calculate the third row of the inverse matrix."""
         o1, o2, o3 = coriolis
@@ -203,7 +212,26 @@ class CoriolisOperator:
         wv = o2 * o3 - nongeo * o1
         ww = nongeo * (nonhydro - dChi) + o3**2
 
-        return wu, wv, ww
+        return wu/determinant, wv/determinant, ww/determinant
+
+    def _calculate_determinant(
+        self,
+        nonhydro: bool,
+        nongeo: bool,
+        coriolis: np.ndarray,
+        dChi: np.ndarray,
+    ):
+        """Calculate the determinant of the matrix involving the coriolis force. See calculate_inverse_coriolis_y_direction
+        method for more details."""
+        if self.gravity.direction == "y":
+            determinant = self._calculate_determinant_y_direction(
+                nonhydro, nongeo, coriolis, dChi
+            )
+        else:
+            NotImplemented(
+                "The matrix inversion is not implemented for gravity direction other that 'y' axis."
+            )
+        return determinant
 
     def _calculate_determinant_y_direction(
         self,
@@ -211,7 +239,6 @@ class CoriolisOperator:
         nongeo: bool,
         coriolis: np.ndarray,
         dChi: np.ndarray,
-        dt: float,
     ):
         """Calculate the determinant of the matrix involving the coriolis force. See calculate_inverse_coriolis_y_direction
         method for more details."""
