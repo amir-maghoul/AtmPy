@@ -54,10 +54,16 @@ class MPV:
         self.v: np.ndarray = np.zeros(grid.cshape)
         self.w: np.ndarray = np.zeros(grid.cshape)
 
-        # Right hand side of the pressure equation. Defined on nodes.
-        self.rhs: np.ndarray = np.zeros(grid.nshape)
-        self.wcenter: np.ndarray = np.zeros(grid.nshape)
-        self.wplus: np.ndarray = np.zeros((grid.ndim,) + grid.cshape)
+        # Containers for the pressure equation
+        self.rhs: np.ndarray = np.zeros(
+            grid.nshape
+        )  # Container for the divergence of momenta
+        self.wcenter: np.ndarray = np.zeros(
+            grid.nshape
+        )  # Container for the dP/dpi in the Helmholz eq.
+        self.wplus: np.ndarray = np.zeros(
+            (grid.ndim,) + grid.cshape
+        )  # Container for the (P*Theta) in momenta eq.
 
         # The variable container for hydrostate
         self.hydrostate: Variables = Variables(

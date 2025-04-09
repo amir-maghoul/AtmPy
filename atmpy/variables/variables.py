@@ -218,7 +218,7 @@ class Variables:
             self.cell_vars[..., VI.RHOW] = rho * self.primitives[..., PVI.W]
 
     def adjust_background_wind(
-        self, wind_speeds: Union[np.ndarray, list], scale: float
+        self, wind_speeds: Union[np.ndarray, list], scale: float, in_place: bool = False
     ) -> np.ndarray:
         """Modify the momenta using the background wind and the given factor
 
@@ -228,13 +228,20 @@ class Variables:
             The list or numpy array containing the wind velocities in each direction.
         scale : float
             The scaling factor
+        in_place : bool
+            Whether to update the momenta in place or create a variable
 
         Returns
         -------
         np.ndarray
         """
         AXES: int = 3
-        adjusted_momenta = np.zeros((self.grid.cshape) + (3,))
+        indices = [VI.RHOU, VI.RHOV, VI.RHOW]
+
+        if in_place:
+            adjusted_momenta = self.cell_vars[..., indices]
+        else:
+            adjusted_momenta = np.zeros(self.grid.cshape + (3,))
         for wind_speed, axis in zip(wind_speeds, range(AXES)):
             momentum_idx = momentum_index(axis)
             try:
