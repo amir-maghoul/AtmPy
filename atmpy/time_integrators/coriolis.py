@@ -166,20 +166,25 @@ class CoriolisOperator:
         #####################
         #### THE INVERSE ####
 
-        uu, uv, uw = (
-            self._inverse_matrix_first_row(determinant, nonhydro, nongeo, coriolis, dChi)
+        uu, uv, uw = self._inverse_matrix_first_row(
+            determinant, nonhydro, nongeo, coriolis, dChi
         )
-        vu, vv, vw = (
-            self._inverse_matrix_second_row(determinant, nonhydro, nongeo, coriolis, dChi)
+        vu, vv, vw = self._inverse_matrix_second_row(
+            determinant, nonhydro, nongeo, coriolis, dChi
         )
-        wu, wv, ww = (
-            self._inverse_matrix_third_row(determinant, nonhydro, nongeo, coriolis, dChi)
+        wu, wv, ww = self._inverse_matrix_third_row(
+            determinant, nonhydro, nongeo, coriolis, dChi
         )
 
         return uu, uv, uw, vu, vv, vw, wu, wv, ww
 
     def _inverse_matrix_first_row(
-        self, determinant: np.ndarray, nonhydro: bool, nongeo: bool, coriolis: np.ndarray, dChi: np.ndarray
+        self,
+        determinant: np.ndarray,
+        nonhydro: bool,
+        nongeo: bool,
+        coriolis: np.ndarray,
+        dChi: np.ndarray,
     ) -> Tuple[Any, Any, Any]:
         """calculate the first row of the inverse matrix."""
         o1, o2, o3 = coriolis
@@ -188,10 +193,15 @@ class CoriolisOperator:
         uv = nongeo * o3 + o1 * o2
         uw = o1 * o3 - o2 * (nonhydro - dChi)
 
-        return uu/determinant, uv/determinant, uw/determinant
+        return uu / determinant, uv / determinant, uw / determinant
 
     def _inverse_matrix_second_row(
-        self,determinant, nonhydro: bool, nongeo: bool, coriolis: np.ndarray, dChi: np.ndarray
+        self,
+        determinant,
+        nonhydro: bool,
+        nongeo: bool,
+        coriolis: np.ndarray,
+        dChi: np.ndarray,
     ) -> Tuple[Any, Any, Any]:
         """calculate the second row of the inverse matrix."""
         o1, o2, o3 = coriolis
@@ -200,10 +210,15 @@ class CoriolisOperator:
         vv = nongeo**2 + o2**2
         vw = nongeo * o1 + o2 * o3
 
-        return vu/determinant, vv/determinant, vw/determinant
+        return vu / determinant, vv / determinant, vw / determinant
 
     def _inverse_matrix_third_row(
-        self, determinant:np.ndarray, nonhydro: bool, nongeo: bool, coriolis: np.ndarray, dChi: np.ndarray
+        self,
+        determinant: np.ndarray,
+        nonhydro: bool,
+        nongeo: bool,
+        coriolis: np.ndarray,
+        dChi: np.ndarray,
     ) -> Tuple[Any, Any, Any]:
         """Calculate the third row of the inverse matrix."""
         o1, o2, o3 = coriolis
@@ -212,7 +227,7 @@ class CoriolisOperator:
         wv = o2 * o3 - nongeo * o1
         ww = nongeo * (nonhydro - dChi) + o3**2
 
-        return wu/determinant, wv/determinant, ww/determinant
+        return wu / determinant, wv / determinant, ww / determinant
 
     def _calculate_determinant(
         self,

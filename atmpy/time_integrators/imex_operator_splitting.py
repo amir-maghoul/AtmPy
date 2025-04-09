@@ -66,6 +66,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.is_nonhydrostatic: bool = is_nonhydrostatic
         self.is_compressible: bool = is_compressible
         self.wind_speed: Union[list, np.ndarray] = wind_speed
+        self.vertical_momentum_index: int = self.gravity.gravity_momentum_index
 
     def step(self):
         # 1. Explicit forward update (e.g. divergence, pressure gradient, momentum update)
@@ -94,12 +95,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Calculate the buoyancy PX'
         dbuoy = cellvars[..., VI.RHOY] * cellvars[..., VI.RHOX] / cellvars[..., VI.RHO]
 
-        # index 0: momentum in the direction of gravity. index 1: momentum in the direction of non-gravity.
-        vertical_momentum_index = self.gravity.gravity_momentum_index
-
         ###################### Update variables
-        self._forward_momenta_update(cellvars, p2n, dbuoy, g, vertical_momentum_index)
-        self._forward_buoyancy_update(cellvars, vertical_momentum_index)
+        self._forward_momenta_update(cellvars, p2n, dbuoy, g)
+        self._forward_buoyancy_update(cellvars)
         self._forward_pressure_update(cellvars, p2n)
 
         ####################### Update boundary values
@@ -113,8 +111,55 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.mpv.p2_nodes, contexts
         )
 
-        # Update all other variables.
+        # Update all other variables on the boundary.
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
+
+    def backward_explicit_update(self):
+        """This is the first part of implicit Euler update. This method does the job to calculate the terms involving the
+        n-th timestep in the implicit scheme. The method backward_implicit_update involves the terms evaluated at the
+        (n+1)-th timestep in the implicit scheme."""
+
+        cellvars = self.variables.cell_vars
+        # First calculate the extra explicit buoyancy term that is not calculated in the coriolis matrix inversion:
+        bouyoncy = cellvars[..., VI.RHOY] * (
+            cellvars[..., VI.RHOX] / cellvars[..., VI.RHO]
+        )
+
+        # Update the corresponding vertical momentum explicitly
+        g = self.gravity.strength
+        cellvars[..., self.vertical_momentum_index] -= self.dt * (
+            (g / self.Msq) * bouyoncy * self.is_nongeostrophic
+        )
+
+        # Remove background wind
+        self.variables.adjust_background_wind(
+            self.wind_speed, scale=-1.0, in_place=True
+        )
+
+        # Apply the solver inverse matrix (Matrix combining the switches, the coriolis force and the singular buoyancy term)
+        self.coriolis.apply(
+            cellvars[..., VI.RHOU],
+            cellvars[..., VI.RHOV],
+            cellvars[..., VI.RHOW],
+            self.variables,
+            self.mpv,
+            self.is_nongeostrophic,
+            self.is_nonhydrostatic,
+            self.Msq,
+            self.dt,
+        )
+
+        # Restore background wind
+        self.variables.adjust_background_wind(self.wind_speed, scale=1.0, in_place=True)
+
+        # Update all other variables on the boundary.
+        self.boundary_manager.apply_boundary_on_all_sides(cellvars)
+
+    def backward_update_implicit(self):
+        # Encapsulate the pressure solve (euler_backward_non_advective_impl_part)
+        # For example, assemble the pressure operator and call the pressure_solver.
+        self.pressure_solver.solve(self.variables, self.dt)
+        print("Implicit (pressure) update complete.")
 
     def _forward_momenta_update(
         self,
@@ -122,7 +167,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         p2n: np.ndarray,
         dbuoy: np.ndarray,
         g: float,
-        vertical_momentum_index: int,
     ):
         """Update the momenta
 
@@ -136,8 +180,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             The pressured perturbation of Chi: PX'
         g: float
             The gravity strength
-        vertical_momentum_index: VariablesIndices (Enum)
-            The index of the vertical momentum in the variable container
         """
         coriolis = self.coriolis.strength
         adjusted_momenta = self.variables.adjust_background_wind(self.wind_speed, -1.0)
@@ -173,7 +215,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # Updates: The momentum in the direction of gravity
         # Find vertical vs horizontal velocities:
-        cellvars[..., vertical_momentum_index] -= self.dt * (
+        cellvars[..., self.vertical_momentum_index] -= self.dt * (
             (g / self.Msq) * dbuoy * self.is_nongeostrophic
         )
 
@@ -211,17 +253,13 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         dp2n[inner_idx] -= self.dt * dpidP * self.mpv.rhs[inner_slice]
         self.mpv.p2_nodes[...] += self.is_compressible * dp2n
 
-    def _forward_buoyancy_update(
-        self, cellvars: np.ndarray, vertical_momentum_index: int
-    ):
+    def _forward_buoyancy_update(self, cellvars: np.ndarray):
         """Update the X' variable (rho X in the variables)
 
         Parameters
         ----------
         cellvars: np.ndarray
            The cell variables
-        vertical_momentum_index: VariablesIndices (Enum)
-           The index of the vertical momentum in the variable container
         """
         # get Chi variable and the derivative
         S0c = self.mpv.get_S0c_on_cells()
@@ -238,25 +276,88 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         cellvars[..., VI.RHOX] = (
             currentX
             - self.dt
-            * cellvars[..., vertical_momentum_index]
+            * cellvars[..., self.vertical_momentum_index]
             * dSdy
             * cellvars[..., VI.RHO]
         )
 
-    def backward_update_implicit(self):
-        # Encapsulate the pressure solve (euler_backward_non_advective_impl_part)
-        # For example, assemble the pressure operator and call the pressure_solver.
-        self.pressure_solver.solve(self.variables, self.dt)
-        print("Implicit (pressure) update complete.")
+    def operator_coefficients_nodes(self):
+        """This function calculates the coefficients for the pressure equation.
 
-    def backward_update_explicit(self):
-        # Encapsulate the explicit corrections like background wind modifications
-        # and the explicit multiplicative inverse of the Coriolis operator
-        # (euler_backward_non_advective_expl_part)
-        self.adjust_background_wind(-1.0)
-        self.coriolis_operator.apply(self.variables, self.dt)
-        self.adjust_background_wind(+1.0)
-        print("Explicit backward update complete.")
+        Basically it calculates there are two sets of coefficients needed to be calculated:
+        1. alpha_h*(P*Theta) in Momentum equations (Coefficient of pressure term in Helmholtz equation)
+        2. alpha_p*(dP/dpi) in Pressure equation   (Coefficient of pressure term in Momentum equation)
+
+        The first will be stored in mpv.wplus
+        The second will be stored in mpv.wcenter
+
+        Notes
+        -----
+        Two minor differences in calculation of alpha_p*(dP/dpi):
+
+        - First it considers that the alpha_p = 1, since for incompressible case, we handle the case elsewhere in the
+        time update.
+        - Second, it calculates this term for the Helmholtz equation of pressure. Therefore, it calculates the term after
+        bringing dP/dpi to the right hand side of the Helmholtz equation for pressure.
+
+        Remember the P and pi are connected to each other through the following formula:
+        pi = (1/Msq) * P^(gamma - 1). Therefore, dpi/dP = (gamma - 1)/Msq * P^(gamma - 2). Since we need the inverse
+        (dP/dpi), every part of this will be inverted in the code. The -dt**2 is due to the right-hand side of the
+        Helmholtz equation."""
+
+        #################### Preparing the constant values needed #####################################################
+        Gammainv = self.th.Gammainv
+        ndim = self.grid.ndim
+
+        #################### Calculate the coefficients ###############################################################
+        self._calculate_coefficient_pTheta(ndim, Gammainv)
+        self._calculate_coefficient_dPdpi(ndim)
+
+        #################### Update the boundary nodes for the dP/dpi container. ######################################
+        # Create the operation context to scale down the nodes. Notice the side is set to be BdrySide.ALL.
+        # This will apply the 'extra' method whenever the boundary is defined to be WALL.
+        boundary_operation = [
+            WallAdjustment(
+                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
+            )
+        ]
+        self.boundary_manager.apply_extra_all_sides(
+            self.mpv.wcenter, boundary_operation
+        )
+
+    def _calculate_coefficient_pTheta(self, ndim, Gammainv):
+        """First part of coefficient calculation. Calculates P*Theta. See docstring of operator_coefficients_nodes for
+        more information."""
+
+        # Calculate (P*Theta): Coefficient of pressure term in momentum equation
+        Y = (
+            self.variables.cell_vars[..., VI.RHOY]
+            / self.variables.cell_vars[..., VI.RHO]
+        )
+        coeff = Gammainv * self.variables.cell_vars[..., VI.RHOY] * Y
+
+        # Fill wplux with the values of (P*Theta)
+        for dim in range(ndim):
+            self.mpv.wplus[dim][...] = coeff
+
+    def _calculate_coefficient_dPdpi(self, ndim):
+        """Calculate the second part of the coefficient calculation. Calculate dP/dpi. See docstring of
+        operator_coefficients_nodes for more information."""
+
+        # Calculate the coefficient and the exponent of the dP/dpi using the formula directly. (see the docstring)
+        ccenter = -self.Msq * self.th.gm1inv / (self.dt**2)
+        cexp = 2.0 - self.th.gamma
+
+        # Temp variable for rhoTheta=P for readability
+        P = self.variables.cell_vars[..., VI.RHOY]
+
+        # Averaging over the nodes and fill the mpv container
+        kernel = np.ones([2] * ndim)
+        self.mpv.wcenter = (
+            ccenter
+            * sp.signal.fftconvolve(P**cexp, kernel, mode="valid")
+            / kernel.sum()
+        )
 
     def get_dt(self):
         return self.dt
@@ -394,7 +495,7 @@ def example_usage():
     coriolis = CoriolisOperator([0.0, 1.0, 0.0], gravity)
 
     ##### Approach 1 ######################################################
-    ### Using instantiation context for central instatiation of all classes:
+    ### Using instantiation context for central instantiation of all classes:
     from atmpy.time_integrators.contexts import TimeIntegratorContext
     from atmpy.infrastructure.enums import TimeIntegrators
 
@@ -404,7 +505,7 @@ def example_usage():
         variables=variables,
         flux=flux,
         boundary_manager=manager,
-        dt=0.1,
+        dt=0.01,
         extra_dependencies={
             "mpv": mpv,
             "coriolis_operator": coriolis,
@@ -434,8 +535,7 @@ def example_usage():
     #     Msq=1.0
     # )
     print(variables.cell_vars[..., VI.RHOU])
-    time_integrator.forward_update()
-    time_integrator.forward_update()
+    time_integrator.backward_explicit_update()
 
     print(variables.cell_vars[..., VI.RHOU])
 
