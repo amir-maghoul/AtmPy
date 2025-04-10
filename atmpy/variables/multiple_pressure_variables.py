@@ -60,7 +60,7 @@ class MPV:
         )  # Container for the divergence of momenta
         self.wcenter: np.ndarray = np.zeros(
             grid.nshape
-        )  # Container for the dP/dpi in the Helmholz eq.
+        )  # Container for the dP/dpi in the Helmholtz eq.
         self.wplus: np.ndarray = np.zeros(
             (grid.ndim,) + grid.cshape
         )  # Container for the (P*Theta) in momenta eq.

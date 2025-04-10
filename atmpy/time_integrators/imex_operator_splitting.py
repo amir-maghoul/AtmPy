@@ -45,7 +45,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         is_nongeostrophic: bool,
         is_nonhydrostatic: bool,
         is_compressible: bool,
-        wind_speed: float = [0.0, 0.0, 0.0],
+        wind_speed: List[float]
     ):
         # Inject dependencies
         self.grid: "Grid" = grid
@@ -65,8 +65,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.is_nongeostrophic: bool = is_nongeostrophic
         self.is_nonhydrostatic: bool = is_nonhydrostatic
         self.is_compressible: bool = is_compressible
-        self.wind_speed: Union[list, np.ndarray] = wind_speed
+        self.wind_speed: np.ndarray = np.array(wind_speed)
         self.vertical_momentum_index: int = self.gravity.gravity_momentum_index
+        self.ndim = self.grid.ndim
 
     def step(self):
         # 1. Explicit forward update (e.g. divergence, pressure gradient, momentum update)
@@ -79,7 +80,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.backward_update_implicit()
 
         # 4. Explicit correction update (e.g. adjusting momentum with background winds, applying inverse Coriolis)
-        self.backward_update_explicit()
+        self.backward_explicit_update()
 
         # 5. Final boundary condition update, if needed.
         self.boundary_manager.apply_all(self.variables)
@@ -120,6 +121,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         (n+1)-th timestep in the implicit scheme."""
 
         cellvars = self.variables.cell_vars
+
         # First calculate the extra explicit buoyancy term that is not calculated in the coriolis matrix inversion:
         bouyoncy = cellvars[..., VI.RHOY] * (
             cellvars[..., VI.RHOX] / cellvars[..., VI.RHO]
@@ -185,7 +187,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         adjusted_momenta = self.variables.adjust_background_wind(self.wind_speed, -1.0)
 
         # pressure gradient factor: (P/Gamma)
-        rhoYovG = self.variables.cell_vars[..., VI.RHOY] * self.th.Gammainv
+        rhoYovG = self._calculate_P_over_Gamma()
 
         # Calculate the pressure gradiant (RHS of the momenta equations)
         dpdx, dpdy, dpdz = self.discrete_operator.gradient(p2n)
@@ -281,8 +283,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             * cellvars[..., VI.RHO]
         )
 
-    def operator_coefficients_nodes(self):
-        """This function calculates the coefficients for the pressure equation.
+    def pressure_coefficients_nodes(self):
+        """ Calculate the coefficients for the pressure equation. Notice the coefficients are nodal.
 
         Basically it calculates there are two sets of coefficients needed to be calculated:
         1. alpha_h*(P*Theta) in Momentum equations (Coefficient of pressure term in Helmholtz equation)
@@ -295,23 +297,25 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         -----
         Two minor differences in calculation of alpha_p*(dP/dpi):
 
-        - First it considers that the alpha_p = 1, since for incompressible case, we handle the case elsewhere in the
+        - First, it considers that the alpha_p = 1, since for incompressible case, we handle the case elsewhere in the
         time update.
         - Second, it calculates this term for the Helmholtz equation of pressure. Therefore, it calculates the term after
-        bringing dP/dpi to the right hand side of the Helmholtz equation for pressure.
+        bringing dP/dpi to the right hand side of the Helmholtz equation for pressure:
 
         Remember the P and pi are connected to each other through the following formula:
         pi = (1/Msq) * P^(gamma - 1). Therefore, dpi/dP = (gamma - 1)/Msq * P^(gamma - 2). Since we need the inverse
         (dP/dpi), every part of this will be inverted in the code. The -dt**2 is due to the right-hand side of the
         Helmholtz equation."""
 
-        #################### Preparing the constant values needed #####################################################
-        Gammainv = self.th.Gammainv
-        ndim = self.grid.ndim
-
         #################### Calculate the coefficients ###############################################################
-        self._calculate_coefficient_pTheta(ndim, Gammainv)
-        self._calculate_coefficient_dPdpi(ndim)
+        pTheta = self._calculate_coefficient_pTheta()
+        dPdpi = self._calculate_coefficient_dPdpi()
+
+        ######### Fill wplux and wcenter containers with the corresponding values above ###############################
+        for dim in range(self.ndim):
+            self.mpv.wplus[dim][...] = pTheta
+
+        self.mpv.wcenter = dPdpi
 
         #################### Update the boundary nodes for the dP/dpi container. ######################################
         # Create the operation context to scale down the nodes. Notice the side is set to be BdrySide.ALL.
@@ -325,7 +329,62 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.mpv.wcenter, boundary_operation
         )
 
-    def _calculate_coefficient_pTheta(self, ndim, Gammainv):
+    def correction_nodes(self, p: np.ndarray, updt_chi: np.ndarray):
+        """ Adjust the momenta and Chi variables.
+
+        Parameters
+        ----------
+        p : np.ndarray
+            The pressure vector. Basically placeholder for the perturbation of the Exner pressure (pi')
+        updt_chi : np.ndarray
+            The new updated value for Chi
+        """
+
+        # Temporary variable for readability
+        cellvars = self.variables.cell_vars
+        dS = self.mpv.compute_dS_on_nodes()
+
+        #### Calculate the needed values for the updates in the RHS of the momenta equations (pressure gradiant and the
+        #### pTheta coefficients)
+        #### The pressure gradient is basically the derivative of the Exner perturbation (see RHS of momenta eq.)
+        dpdx, dpdy, dpdz = self.discrete_operator.gradient(p)
+        pTheta = self._calculate_coefficient_pTheta()
+
+        #### calculate the intermediate variables
+        u = -self.dt * pTheta * dpdx
+        v = -self.dt * pTheta * dpdy
+        w = -self.dt * pTheta * dpdz
+
+        #### Adjust the intermediate variables using the coriolis update
+        self.coriolis.apply(
+            u,
+            v,
+            w,
+            self.variables,
+            self.mpv,
+            self.is_nongeostrophic,
+            self.is_nonhydrostatic,
+            self.Msq,
+            self.dt,
+        )
+
+        ### Update the full variables using the intermediate variables.
+        chi = cellvars[..., VI.RHO] / cellvars[..., VI.RHOY]
+        cellvars[..., VI.RHOU] += chi * self.mpv.u
+        cellvars[..., VI.RHOV] += chi * self.mpv.v if self.ndim == 2 else 0.0
+        cellvars[..., VI.RHOW] += chi * self.mpv.w if self.ndim == 3 else 0.0
+        cellvars[..., VI.RHOX] += -updt_chi * self.dt * dS * cellvars[..., self.vertical_momentum_index]
+
+    def rhs_from_p_old(self):
+        """ Calculate the first time on RHS of the pressure equation: dP/dpi * pi^{prime} """
+
+        # Create node-to-cell index (slice(1, -1) in all directions)
+        inner_idx = one_element_inner_slice(self.grid.ndim, full=False)
+
+        # Remember: wcenter is container for dP/dpi and p2_nodes is Exner perturbation
+        return self.mpv.wcenter * self.mpv.p2_nodes[inner_idx]
+
+    def _calculate_coefficient_pTheta(self):
         """First part of coefficient calculation. Calculates P*Theta. See docstring of operator_coefficients_nodes for
         more information."""
 
@@ -334,13 +393,13 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.variables.cell_vars[..., VI.RHOY]
             / self.variables.cell_vars[..., VI.RHO]
         )
-        coeff = Gammainv * self.variables.cell_vars[..., VI.RHOY] * Y
+        return self._calculate_P_over_Gamma() * Y
 
-        # Fill wplux with the values of (P*Theta)
-        for dim in range(ndim):
-            self.mpv.wplus[dim][...] = coeff
+    def _calculate_P_over_Gamma(self):
+        """ Calculates P/Gamma. This is an intermediate function to avoid duplicate codes."""
+        return self.th.Gammainv * self.variables.cell_vars[..., VI.RHOY]
 
-    def _calculate_coefficient_dPdpi(self, ndim):
+    def _calculate_coefficient_dPdpi(self):
         """Calculate the second part of the coefficient calculation. Calculate dP/dpi. See docstring of
         operator_coefficients_nodes for more information."""
 
@@ -352,8 +411,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         P = self.variables.cell_vars[..., VI.RHOY]
 
         # Averaging over the nodes and fill the mpv container
-        kernel = np.ones([2] * ndim)
-        self.mpv.wcenter = (
+        kernel = np.ones([2] * self.ndim)
+        return (
             ccenter
             * sp.signal.fftconvolve(P**cexp, kernel, mode="valid")
             / kernel.sum()
@@ -499,7 +558,7 @@ def example_usage():
     from atmpy.time_integrators.contexts import TimeIntegratorContext
     from atmpy.infrastructure.enums import TimeIntegrators
 
-    context = TimeIntegratorContext(
+    context: TimeIntegratorContext[IMEXTimeIntegrator] = TimeIntegratorContext(
         integrator_type=TimeIntegrators.IMEX,
         grid=grid,
         variables=variables,
@@ -534,10 +593,13 @@ def example_usage():
     #     dt=0.1,
     #     Msq=1.0
     # )
-    print(variables.cell_vars[..., VI.RHOU])
+    # print(variables.cell_vars[..., VI.RHOU])
+    print(mpv.wcenter)
     time_integrator.backward_explicit_update()
+    time_integrator.pressure_coefficients_nodes()
+    print(mpv.wcenter)
 
-    print(variables.cell_vars[..., VI.RHOU])
+    # print(variables.cell_vars[..., VI.RHOU])
 
 
 if __name__ == "__main__":
