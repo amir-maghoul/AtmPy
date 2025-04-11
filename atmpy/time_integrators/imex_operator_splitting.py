@@ -157,11 +157,41 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Update all other variables on the boundary.
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
 
-    def backward_update_implicit(self):
-        # Encapsulate the pressure solve (euler_backward_non_advective_impl_part)
-        # For example, assemble the pressure operator and call the pressure_solver.
-        self.pressure_solver.solve(self.variables, self.dt)
-        print("Implicit (pressure) update complete.")
+    def backward_update_implicit(self, initial_vars: np.ndarray = None):
+        """ Compute the one step of the implicit part of the Euler backward scheme. This is a part of the BK19 algorithm.
+        Notice before the call to this method, the coefficient variables must be created at half timestep. Then going back
+        to the initial variables, we start anew to advance the time stepping in a implicit trapezoidal rule
+
+        Parameters
+        ----------
+        initial_vars: np.ndarray
+            The initial variables of the problem before any changes were made by calculation of half-time step.
+        """
+        cellvars = self.variables.cell_vars
+
+        # First update the boundary and calculate the coefficients of the pressure equation
+        if initial_vars:
+            self.boundary_manager.apply_boundary_on_all_sides(initial_vars)
+            self.pressure_coefficients_nodes(initial_vars)
+        else:
+            self.boundary_manager.apply_boundary_on_all_sides(cellvars)
+            self.pressure_coefficients_nodes(cellvars)
+
+        # First create the application context for the boundary manager. That is setting the flag is_nodal for all
+        # dimensions and all sides (therefore ndim*2) to True since p2_nodes is nodal.
+        contexts = [BCApplicationContext(is_nodal=True)] * self.grid.ndim * 2
+
+        # Update the boundary nodes for pressure variable
+        self.boundary_manager.apply_boundary_on_single_var_all_sides(
+            self.mpv.p2_nodes, contexts
+        )
+
+        # Adjust the variables using the pressure variable
+        self.correction_nodes(self.mpv.p2_nodes, 0.0)
+
+        # Update boundary
+        self.boundary_manager.apply_boundary_on_all_sides(cellvars)
+
 
     def _forward_momenta_update(
         self,
@@ -187,9 +217,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         adjusted_momenta = self.variables.adjust_background_wind(self.wind_speed, -1.0)
 
         # pressure gradient factor: (P/Gamma)
-        rhoYovG = self._calculate_P_over_Gamma()
+        rhoYovG = self._calculate_P_over_Gamma(cellvars)
 
-        # Calculate the pressure gradiant (RHS of the momenta equations)
+        # Calculate the Exner pressure perturbation (Pi^prime) gradiant (RHS of the momenta equations)
         dpdx, dpdy, dpdz = self.discrete_operator.gradient(p2n)
 
         ###############################################################################################################
@@ -283,7 +313,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             * cellvars[..., VI.RHO]
         )
 
-    def pressure_coefficients_nodes(self):
+    def pressure_coefficients_nodes(self, cellvars: np.ndarray):
         """ Calculate the coefficients for the pressure equation. Notice the coefficients are nodal.
 
         Basically it calculates there are two sets of coefficients needed to be calculated:
@@ -293,9 +323,17 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         The first will be stored in mpv.wplus
         The second will be stored in mpv.wcenter
 
+        Parameters
+        ----------
+        cellvars: np.ndarray
+            The array of variables on cells.
+
         Notes
         -----
-        Two minor differences in calculation of alpha_p*(dP/dpi):
+        1. A variable container is passed to the method to decouple it from the attribute variable to be able to use the
+            method on the initial variables in the trapezoidal rule.
+
+        2. Two minor differences in calculation of alpha_p*(dP/dpi):
 
         - First, it considers that the alpha_p = 1, since for incompressible case, we handle the case elsewhere in the
         time update.
@@ -308,8 +346,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         Helmholtz equation."""
 
         #################### Calculate the coefficients ###############################################################
-        pTheta = self._calculate_coefficient_pTheta()
-        dPdpi = self._calculate_coefficient_dPdpi()
+        pTheta = self._calculate_coefficient_pTheta(cellvars)
+        dPdpi = self._calculate_coefficient_dPdpi(cellvars)
 
         ######### Fill wplux and wcenter containers with the corresponding values above ###############################
         for dim in range(self.ndim):
@@ -329,7 +367,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.mpv.wcenter, boundary_operation
         )
 
-    def correction_nodes(self, p: np.ndarray, updt_chi: np.ndarray):
+    def correction_nodes(self, p: np.ndarray, updt_chi: Union[np.ndarray, float]):
         """ Adjust the momenta and Chi variables.
 
         Parameters
@@ -344,11 +382,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         cellvars = self.variables.cell_vars
         dS = self.mpv.compute_dS_on_nodes()
 
-        #### Calculate the needed values for the updates in the RHS of the momenta equations (pressure gradiant and the
-        #### pTheta coefficients)
-        #### The pressure gradient is basically the derivative of the Exner perturbation (see RHS of momenta eq.)
+        #### Calculate the needed values for the updates in the RHS of the momenta equations (the Exner pressure
+        #### perturbation (Pi^prime)_x, _y, _z (see RHS of momenta eq.) and the pTheta coefficients)
         dpdx, dpdy, dpdz = self.discrete_operator.gradient(p)
-        pTheta = self._calculate_coefficient_pTheta()
+        pTheta = self._calculate_coefficient_pTheta(cellvars)
 
         #### calculate the intermediate variables
         u = -self.dt * pTheta * dpdx
@@ -384,22 +421,23 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Remember: wcenter is container for dP/dpi and p2_nodes is Exner perturbation
         return self.mpv.wcenter * self.mpv.p2_nodes[inner_idx]
 
-    def _calculate_coefficient_pTheta(self):
+
+    def _calculate_coefficient_pTheta(self, cellvars: np.ndarray):
         """First part of coefficient calculation. Calculates P*Theta. See docstring of operator_coefficients_nodes for
         more information."""
 
         # Calculate (P*Theta): Coefficient of pressure term in momentum equation
         Y = (
-            self.variables.cell_vars[..., VI.RHOY]
-            / self.variables.cell_vars[..., VI.RHO]
+            cellvars[..., VI.RHOY]
+            / cellvars[..., VI.RHO]
         )
-        return self._calculate_P_over_Gamma() * Y
+        return self._calculate_P_over_Gamma(cellvars) * Y
 
-    def _calculate_P_over_Gamma(self):
+    def _calculate_P_over_Gamma(self, cellvars):
         """ Calculates P/Gamma. This is an intermediate function to avoid duplicate codes."""
-        return self.th.Gammainv * self.variables.cell_vars[..., VI.RHOY]
+        return self.th.Gammainv * cellvars[..., VI.RHOY]
 
-    def _calculate_coefficient_dPdpi(self):
+    def _calculate_coefficient_dPdpi(self, cellvars: np.ndarray):
         """Calculate the second part of the coefficient calculation. Calculate dP/dpi. See docstring of
         operator_coefficients_nodes for more information."""
 
@@ -408,7 +446,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         cexp = 2.0 - self.th.gamma
 
         # Temp variable for rhoTheta=P for readability
-        P = self.variables.cell_vars[..., VI.RHOY]
+        P = cellvars[..., VI.RHOY]
 
         # Averaging over the nodes and fill the mpv container
         kernel = np.ones([2] * self.ndim)

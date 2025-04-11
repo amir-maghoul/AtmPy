@@ -259,7 +259,7 @@ if __name__ == "__main__":
     print(x)
     print(y)
     print("-----------------------")
-    obj = DiscreteOperators(ndim, dxyz)
+    obj = ClassicalDiscreteOperator(ndim, dxyz)
     print(obj.derivative(x, 0))
     print(obj.derivative(y, 1))
     print("-------------------------")

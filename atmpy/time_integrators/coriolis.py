@@ -109,6 +109,9 @@ class CoriolisOperator:
         V[...] = new_v
         W[...] = new_w
 
+    def coriolis_coefficients(self):
+        pass
+
     def calculate_inverse_coriolis(
         self,
         direction: str,
