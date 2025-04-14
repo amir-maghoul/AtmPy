@@ -18,7 +18,9 @@ if TYPE_CHECKING:
     from atmpy.physics.gravity import Gravity
     from atmpy.physics.thermodynamics import Thermodynamics
     from atmpy.time_integrators.coriolis import CoriolisOperator
-    from atmpy.pressure_solver.pressure_solvers import TPressureSolver, ClassicalPressureSolver
+    from atmpy.pressure_solver.pressure_solvers import TPressureSolver
+
+from atmpy.pressure_solver.pressure_solvers import ClassicalPressureSolver
 
 from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
 from atmpy.time_integrators.utility import *
@@ -49,6 +51,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.mpv: "MPV" = mpv
         self.flux: "Flux" = flux
         self.pressure_solver: "TPressureSolver" = pressure_solver
+
+        if not isinstance(self.pressure_solver, ClassicalPressureSolver):
+            raise ValueError("The current implementation of IMEXTimeIntegrator only supports ClassicalPressureSolver.")
+
         self.boundary_manager: "BoundaryManager" = boundary_manager
         self.coriolis: "CoriolisOperator" = self.pressure_solver.coriolis
         self.gravity: "Gravity" = self.coriolis.gravity
@@ -64,6 +70,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.wind_speed: np.ndarray = np.array(wind_speed)
         self.ndim = self.grid.ndim
         self.vertical_momentum_index = self.coriolis.gravity.gravity_momentum_index
+
 
     def step(self):
         # 1. Explicit forward update (e.g. divergence, pressure gradient, momentum update)
@@ -432,7 +439,7 @@ def example_usage():
     linear_solver = LinearSolvers.BICGSTAB
 
     # Instantiate the pressure solver context by specifying enums for pressure solver and discrete operator.
-    ps_context: PressureContext["ClassicalPressureSolver"] = PressureContext(
+    ps_context: PressureContext[ClassicalPressureSolver] = PressureContext(
         solver_type=PressureSolvers.CLASSIC_PRESSURE_SOLVER,
         op_context=op_context,
         linear_solver_type=linear_solver,
