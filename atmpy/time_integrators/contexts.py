@@ -1,7 +1,7 @@
 """Context module for the time integrators"""
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, TypeVar, Generic, TYPE_CHECKING
+from typing import Dict, Any, Generic, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
@@ -10,9 +10,8 @@ if TYPE_CHECKING:
     from atmpy.boundary_conditions.boundary_manager import BoundaryManager
 from atmpy.infrastructure.enums import TimeIntegrators
 from atmpy.infrastructure.factory import get_time_integrator
-from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
+from atmpy.time_integrators.abstract_time_integrator import TTimeIntegrator
 
-TTimeIntegrator = TypeVar('TTimeIntegrator', bound=AbstractTimeIntegrator)
 
 @dataclass
 class TimeIntegratorContext(Generic[TTimeIntegrator]):
@@ -51,7 +50,6 @@ class TimeIntegratorContext(Generic[TTimeIntegrator]):
     variables: "Variables"
     flux: "Flux"
     boundary_manager: "BoundaryManager"
-    dt: float
     extra_dependencies: Dict[str, Any] = field(default_factory=dict)
 
     def instantiate(self) -> TTimeIntegrator:
@@ -64,7 +62,6 @@ class TimeIntegratorContext(Generic[TTimeIntegrator]):
             "variables": self.variables,
             "flux": self.flux,
             "boundary_manager": self.boundary_manager,
-            "dt": self.dt,
         }
         dependencies.update(self.extra_dependencies)
         return get_time_integrator(self.integrator_type, **dependencies)

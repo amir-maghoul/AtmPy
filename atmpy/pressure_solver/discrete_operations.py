@@ -2,9 +2,8 @@
 
 from abc import ABC, abstractmethod
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, TypeVar
 import itertools as it
-
 
 class AbstractDiscreteOperator(ABC):
     """Abstract class for discrete operators."""
@@ -53,6 +52,7 @@ class AbstractDiscreteOperator(ABC):
         """
         pass
 
+TDiscreteOperator = TypeVar("TDiscreteOperator", bound=AbstractDiscreteOperator)
 
 class ClassicalDiscreteOperator(AbstractDiscreteOperator):
     def __init__(self, ndim: int, dxyz: List[float]):

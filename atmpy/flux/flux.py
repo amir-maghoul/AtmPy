@@ -28,7 +28,7 @@ from atmpy.infrastructure.utility import (
     velocity_index,
     one_element_inner_slice,
 )
-from line_profiler import profile
+# from line_profiler import profile
 
 
 class Flux:
