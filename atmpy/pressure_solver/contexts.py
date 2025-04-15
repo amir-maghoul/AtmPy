@@ -1,7 +1,7 @@
 """Instantiation contexts for discrete operators and pressure solvers"""
 
 from dataclasses import dataclass, field
-from typing import List, TYPE_CHECKING, Generic, Dict, Any
+from typing import List, TYPE_CHECKING, Generic, Dict, Any, Tuple
 
 if TYPE_CHECKING:
     from atmpy.infrastructure.enums import (
@@ -9,7 +9,8 @@ if TYPE_CHECKING:
         DiscreteOperators,
         LinearSolvers,
     )
-from atmpy.pressure_solver.pressure_solvers import TPressureSolver
+    from atmpy.grid.kgrid import Grid
+from atmpy.pressure_solver.abstract_pressure_solver import TPressureSolver
 from atmpy.pressure_solver.discrete_operations import TDiscreteOperator
 
 from atmpy.infrastructure.factory import (
@@ -25,15 +26,13 @@ class DiscreteOperatorsContext:
     """Discrete Operators instantiation context"""
 
     operator_type: "DiscreteOperators"
-    ndim: int
-    dxyz: List[float]
+    grid: "Grid"
 
     def instantiate(self) -> TDiscreteOperator:
         """ Instantiate a discrete operator"""
         return get_discrete_operators(
             name=self.operator_type,
-            ndim=self.ndim,
-            dxyz=self.dxyz,
+            grid=self.grid
         )
 
 @dataclass

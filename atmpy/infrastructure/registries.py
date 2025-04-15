@@ -19,7 +19,7 @@ from atmpy.solver.advection_routines import *
 from atmpy.pressure_solver.linear_solvers import *
 from atmpy.time_integrators.imex_operator_splitting import IMEXTimeIntegrator
 from atmpy.pressure_solver.discrete_operations import *
-from atmpy.pressure_solver.pressure_solvers import *
+from atmpy.pressure_solver.classical_pressure_solvers import *
 
 SLOPE_LIMITERS = {
     SlopeLimiters.MINMOD: minmod,

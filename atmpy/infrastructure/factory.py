@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     )
     from atmpy.pressure_solver.linear_solvers import ILinearSolver
     from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
-    from atmpy.pressure_solver.pressure_solvers import AbstractPressureSolver
+    from atmpy.pressure_solver.abstract_pressure_solver import AbstractPressureSolver
     from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
     from atmpy.infrastructure.enums import (
         SlopeLimiters,

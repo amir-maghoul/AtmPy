@@ -18,9 +18,9 @@ if TYPE_CHECKING:
     from atmpy.physics.gravity import Gravity
     from atmpy.physics.thermodynamics import Thermodynamics
     from atmpy.time_integrators.coriolis import CoriolisOperator
-    from atmpy.pressure_solver.pressure_solvers import TPressureSolver
+    from atmpy.pressure_solver.abstract_pressure_solver import TPressureSolver
 
-from atmpy.pressure_solver.pressure_solvers import ClassicalPressureSolver
+from atmpy.pressure_solver.classical_pressure_solvers import ClassicalPressureSolver
 
 from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
 from atmpy.time_integrators.utility import *
@@ -435,7 +435,7 @@ def example_usage():
     gravity = Gravity(gravity_vec, grid.ndim)
     coriolis = CoriolisOperator([0.0, 1.0, 0.0], gravity)
 
-    op_context = DiscreteOperatorsContext(operator_type=DiscreteOperators.CLASSIC_OPERATOR, ndim=grid.ndim, dxyz=grid.dxyz)
+    op_context = DiscreteOperatorsContext(operator_type=DiscreteOperators.CLASSIC_OPERATOR, grid=grid)
     linear_solver = LinearSolvers.BICGSTAB
 
     # Instantiate the pressure solver context by specifying enums for pressure solver and discrete operator.
@@ -501,10 +501,20 @@ def example_usage():
     # )
     print(variables.cell_vars[..., VI.RHOU])
     # print(mpv.wcenter)
-    time_integrator.backward_explicit_update()
-    # print(mpv.wcenter)
-
+    # print(mpv.p2_nodes)
+    time_integrator.forward_update()
+    # contexts = [BCApplicationContext(is_nodal=True)] * grid.ndim * 2
+    #
+    # # Update the boundary nodes for pressure variable
+    # manager.apply_boundary_on_single_var_all_sides(
+    #     mpv.p2_nodes, contexts
+    # )
+    # pressure.correction_nodes(mpv.p2_nodes, 1.0)
+    # # print(mpv.wcenter)
+    # print(mpv.p2_nodes)
+    print(".......................................................")
     print(variables.cell_vars[..., VI.RHOU])
+
 
 
 if __name__ == "__main__":

@@ -1,15 +1,13 @@
 """This module handles solving the equation for the pressure variable including the Laplace/Poisson equation."""
 
-from abc import ABC, abstractmethod
 import numpy as np
 import scipy as sp
-from typing import TYPE_CHECKING, Union, TypeVar
+from typing import TYPE_CHECKING, Union, Tuple
 
 from atmpy.infrastructure.enums import VariableIndices as VI, BoundarySide as BdrySide, BoundaryConditions as BdryType
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
-from atmpy.infrastructure.utility import one_element_inner_slice
-from atmpy.physics import thermodynamics
 from atmpy.physics.thermodynamics import Thermodynamics
+from atmpy.pressure_solver.abstract_pressure_solver import AbstractPressureSolver
 
 if TYPE_CHECKING:
     from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
@@ -20,28 +18,6 @@ if TYPE_CHECKING:
     from atmpy.time_integrators.coriolis import CoriolisOperator
     from atmpy.physics.thermodynamics import Thermodynamics
 
-
-class AbstractPressureSolver(ABC):
-    """Create different definitions of pressure solvers."""
-
-    def __init__(
-        self,
-        discrete_operator: "AbstractDiscreteOperator",
-        linear_solver: "ILinearSolver",
-        coriolis: "CoriolisOperator",
-        thermodynamics: "Thermodynamics",
-        Msq: float,
-        dt: float,
-    ):
-        self.discrete_operator: "AbstractDiscreteOperator" = discrete_operator
-        self.linear_solver: "ILinearSolver" = linear_solver
-        self.coriolis: "CoriolisOperator" = coriolis
-        self.th: "Thermodynamics" = thermodynamics
-        self.Msq: float = Msq
-        self.dt: float = dt
-        self.vertical_momentum_index: int = self.coriolis.gravity.gravity_momentum_index
-
-TPressureSolver = TypeVar('TPressureSolver', bound=AbstractPressureSolver)
 
 class ClassicalPressureSolver(AbstractPressureSolver):
     """
@@ -136,6 +112,49 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             self.mpv.wcenter, boundary_operation
         )
 
+    def calculate_correction_increments_nodes(self, p: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Calculates the intermediate transformed flux increments based on pressure p. This would be an incremental update.
+
+        Parameters
+        ----------
+        p : np.ndarray
+            The nodal pressure vector (or perturbation).
+
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray, np.ndarray]
+            Tuple of updated momenta arrays
+        """
+        # Get necessary variables/coefficients
+        cellvars = self.variables.cell_vars
+
+        #### Calculate the needed values for the updates in the RHS of the momenta equations (the Exner pressure
+        #### perturbation (Pi^prime)_x, _y, _z (see RHS of momenta eq.) and the pTheta coefficients)
+        dpdx, dpdy, dpdz = self.discrete_operator.gradient(p)
+        pTheta = self._calculate_coefficient_pTheta(cellvars)
+
+        # Calculate initial flux increment (cell-centered)
+        u = -self.dt * pTheta * dpdx
+        v = -self.dt * pTheta * dpdy
+        w = -self.dt * pTheta * dpdz if self.ndim == 3 else np.zeros_like(dpdz)
+
+        # Apply Coriolis/Buoyancy transform (T_inv)
+        # This modifies u, v, w or stores results in self.mpv
+        self.coriolis.apply(
+            u,  # Pass initial flux components
+            v,
+            w,
+            self.variables,
+            self.mpv,  # Assume results are stored here
+            self.is_nongeostrophic,
+            self.is_nonhydrostatic,
+            self.Msq,
+            self.dt,
+        )
+
+        return u, v, w
+
     def correction_nodes(self, p: np.ndarray, updt_chi: Union[np.ndarray, float]):
         """ Adjust the momenta and Chi variables.
 
@@ -147,48 +166,24 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             The new updated value for Chi
         """
 
-        # Temporary variable for readability
+        # Calculate the increments of momenta
+        u_incr, v_incr, w_incr = self.calculate_correction_increments_nodes(p)
+
+        # Create the necessary variables
         cellvars = self.variables.cell_vars
-        dS = self.mpv.compute_dS_on_nodes()
-
-        #### Calculate the needed values for the updates in the RHS of the momenta equations (the Exner pressure
-        #### perturbation (Pi^prime)_x, _y, _z (see RHS of momenta eq.) and the pTheta coefficients)
-        dpdx, dpdy, dpdz = self.discrete_operator.gradient(p)
-        pTheta = self._calculate_coefficient_pTheta(cellvars)
-
-        #### calculate the intermediate variables
-        u = -self.dt * pTheta * dpdx
-        v = -self.dt * pTheta * dpdy
-        w = -self.dt * pTheta * dpdz
-
-        #### Adjust the intermediate variables using the coriolis update
-        self.coriolis.apply(
-            u,
-            v,
-            w,
-            self.variables,
-            self.mpv,
-            self.is_nongeostrophic,
-            self.is_nonhydrostatic,
-            self.Msq,
-            self.dt,
-        )
+        chi = cellvars[..., VI.RHO] / cellvars[..., VI.RHOY]
+        dS = self.mpv.compute_dS_on_nodes() # Assuming cell-centered dS/dy
 
         ### Update the full variables using the intermediate variables.
-        chi = cellvars[..., VI.RHO] / cellvars[..., VI.RHOY]
-        cellvars[..., VI.RHOU] += chi * self.mpv.u
-        cellvars[..., VI.RHOV] += chi * self.mpv.v if self.ndim == 2 else 0.0
-        cellvars[..., VI.RHOW] += chi * self.mpv.w if self.ndim == 3 else 0.0
+        cellvars[..., VI.RHOU] += chi * u_incr
+        cellvars[..., VI.RHOV] += chi * v_incr if self.ndim == 2 else 0.0
+        cellvars[..., VI.RHOW] += chi * w_incr if self.ndim == 3 else 0.0
         cellvars[..., VI.RHOX] += -updt_chi * self.dt * dS * cellvars[..., self.vertical_momentum_index]
 
-    def rhs_from_p_old(self):
-        """ Calculate the first time on RHS of the pressure equation: dP/dpi * pi^{prime} """
+    def laplacian(self):
+        pass
 
-        # Create node-to-cell index (slice(1, -1) in all directions)
-        inner_idx = one_element_inner_slice(self.ndim, full=False)
 
-        # Remember: wcenter is container for dP/dpi and p2_nodes is Exner perturbation
-        return self.mpv.wcenter * self.mpv.p2_nodes[inner_idx]
 
     def _calculate_coefficient_pTheta(self, cellvars: np.ndarray):
         """First part of coefficient calculation. Calculates P*Theta. See docstring of operator_coefficients_nodes for

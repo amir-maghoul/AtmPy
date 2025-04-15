@@ -2,28 +2,39 @@
 
 from abc import ABC, abstractmethod
 import numpy as np
-from typing import List, Tuple, TypeVar
-import itertools as it
+from typing import List, Tuple, TypeVar, Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from atmpy.grid.kgrid import Grid
+
+from atmpy.pressure_solver.utility import (
+    _gradient_1d_numba,
+    _gradient_2d_numba,
+    _gradient_3d_numba,
+    _divergence_1d_numba,
+    _divergence_2d_numba,
+    _divergence_3d_numba,
+)
+
 
 class AbstractDiscreteOperator(ABC):
     """Abstract class for discrete operators."""
 
-    def __init__(self, ndim: int, dxyz: List[float]):
-        self.ndim: int = ndim
-        self.dxyz: List[float] = dxyz
+    def __init__(self, grid: "Grid"):
+        self.grid = grid
 
-    @abstractmethod
-    def derivative(self, variable: np.ndarray, axis):
-        """Calculates the nodal derivative of the given cell variable in the given direction.
-
-        Parameters
-        ----------
-        variable : np.ndarray
-            The cell defined variable on which the derivative is computed.
-        axis : int
-            The axis along which the derivative is computed.
-        """
-        pass
+    # @abstractmethod
+    # def derivative(self, variable: np.ndarray, axis):
+    #     """Calculates the nodal derivative of the given cell variable in the given direction.
+    #
+    #     Parameters
+    #     ----------
+    #     variable : np.ndarray
+    #         The cell defined variable on which the derivative is computed.
+    #     axis : int
+    #         The axis along which the derivative is computed.
+    #     """
+    #     pass
 
     @abstractmethod
     def gradient(self, p: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -37,7 +48,7 @@ class AbstractDiscreteOperator(ABC):
         pass
 
     @abstractmethod
-    def divergence(self, vector: np.ndarray, *args, **kwargs):
+    def divergence(self, vector: np.ndarray):
         """Calculate the divergence of the given variables. The variables are defined cell-centered. The result is
         on the nodes. The number of arguments passed should be the same as the number of dimensions.
 
@@ -52,106 +63,91 @@ class AbstractDiscreteOperator(ABC):
         """
         pass
 
+
 TDiscreteOperator = TypeVar("TDiscreteOperator", bound=AbstractDiscreteOperator)
 
+
 class ClassicalDiscreteOperator(AbstractDiscreteOperator):
-    def __init__(self, ndim: int, dxyz: List[float]):
-        super().__init__(ndim, dxyz)
+    def __init__(self, grid: "Grid"):
+        super().__init__(grid)
+        self._gradient_kernel: Callable
+        self._gradient_kernel_args: Tuple
 
-    def derivative(self, variable: np.ndarray, axis: int):
-        """Calculates the nodal derivative of the given cell variable in the given direction. This specific derivative
-        is calculated by first finding values on the interfaces by averaging the cells and then use the interfaces around
-        the node to calculate the derivative. See BK19 paper equation (31a, b).
+        # --- Divergence Strategy Selection ---
+        self._divergence_kernel: Callable
+        self._divergence_kernel_args: Tuple
 
-        Parameters
-        ----------
-        variable : np.ndarray
-            The cell-centered values.
-        axis : int
-            Axis along which to differentiate.
+        dxyz = self.grid.dxyz
+        ndim = self.grid.ndim
 
-        Returns
-        -------
-          A numpy.ndarray containing the nodal derivative
+        self._select_gradient_kernel(ndim, dxyz)
+        self._select_divergence_kernel(ndim, dxyz)
+        self._precompile_kernels(ndim)
 
-        Notes
-        -----
-        The shape of the resulting array would be the same for derivative in any direction. The reason is simple:
-        The np.diff reduces one shape in direction of derivation. The averaging then reduces one shape in the remaining directions.
-        So the result would have shape (nx-1, [ny-1], [nz-1]).
-        """
-        # Discretization fineness
-        ds = self.dxyz[axis]
-
-        # Bring the differentiation axis to the front.
-        u_flat = np.moveaxis(variable, axis, 0)
-
-        # Compute the primary difference along the first axis.
-        d = np.diff(u_flat, axis=0) / ds
-
-        # Based on the dimensionality, average over the complementary axes.
-        if self.ndim == 1:
-            # 1D case: no additional averaging required.
-            result = d
-        elif self.ndim == 2:
-            # 2D case: average along the second axis.
-            # d has shape (n-1, m), so average adjacent values in m-direction.
-            result = 0.5 * (d[:, :-1] + d[:, 1:])
-        elif self.ndim == 3:
-            # 3D case: average along both the second and third axes.
-            # d has shape (n-1, m, p) and the nodal value is found by averaging
-            # four neighboring interface values.
-            result = (
-                d[:, :-1, :-1] + d[:, :-1, 1:] + d[:, 1:, :-1] + d[:, 1:, 1:]
-            ) / 4.0
+    def _select_gradient_kernel(self, ndim, dxyz):
+        """ Get the corresponding kernel for the dimension"""
+        if ndim == 1:
+            self._gradient_kernel = _gradient_1d_numba
+            self._gradient_kernel_args = (dxyz[0],)
+        elif ndim == 2:
+            self._gradient_kernel = _gradient_2d_numba
+            self._gradient_kernel_args = (dxyz[0], dxyz[1])
+        elif ndim == 3:
+            self._gradient_kernel = _gradient_3d_numba
+            self._gradient_kernel_args = (dxyz[0], dxyz[1], dxyz[2])
         else:
-            raise ValueError("Only 1D, 2D, or 3D arrays are supported.")
+            raise ValueError("Dimension must be 1, 2 or 3.")
 
-        # Move the differentiation axis back to its original location.
-        return np.moveaxis(result, 0, axis)
+    def _select_divergence_kernel(self, ndim, dxyz):
+        """ Get the corresponding kernel for the dimension"""
+        if ndim == 1:
+            self._divergence_kernel = _divergence_1d_numba
+            self._divergence_kernel_args = (dxyz[0],)
+        elif ndim == 2:
+            self._divergence_kernel = _divergence_2d_numba
+            self._divergence_kernel_args = (dxyz[0], dxyz[1])
+        elif ndim == 3:
+            self._divergence_kernel = _divergence_3d_numba
+            self._divergence_kernel_args = (dxyz[0], dxyz[1], dxyz[2])
+        else:
+            raise RuntimeError(
+                "Invalid ndim configuration for divergence."
+            )  # Should be unreachable
 
-    def divergence(self, vector: np.ndarray, *args, **kwargs) -> np.ndarray:
-        """Calculates the divergence of the pressured-momenta vector (Pu, Pv, Pw). This works as the right hand side
-        of the pressure equation in the euler steps.
 
-        Parameters
-        ----------
-        vector : np.ndarray
-            The momenta vector consisting of (u,v,w). The shape is (nx, [ny], [nz], num_components)
-
-
-        Returns
-        -------
-        np.ndarray of shape (nx-1, [ny-1], [nz-1])
-            The divergence of the velocity vector on the nodes.
-
-        Notes
-        -----
-        This function calculates the divergence of the pressured-momenta vector on the nodes. The result can fill
-        the inner nodes of a nodal variable as the result is of shape (nx-1, [ny-1], [nz-1]).
-        """
-
-        if vector.shape[-1] != self.ndim:
-            raise ValueError(
-                "The number of arguments passed to the method must be the same as the number of dimensions."
+    def _precompile_kernels(self, ndim):
+        """ Precompile all the kernels for speed-up of the main computation."""
+        print(f"Pre-compiling Numba gradient kernel for ndim={ndim}...")
+        try:
+            # Create dummy nodal data with minimal size but correct dimensions
+            # Nodal grid shape is cell grid shape + 1 in each dimension
+            dummy_nodal_shape = tuple(s + 1 for s in self.grid.nshape)
+            dummy_p = np.zeros(dummy_nodal_shape, dtype=np.float64)
+            _ = self._gradient_kernel(dummy_p, *self._gradient_kernel_args)
+            print(f"Numba gradient kernel for ndim={ndim} pre-compiled successfully.")
+        except Exception as e:
+            # Log or print a warning, as failure here might indicate issues later
+            print(
+                f"\nWARNING: Could not pre-compile Numba gradient kernel for ndim={ndim}."
+            )
+            print(f"Error during pre-compilation: {e}")
+            print(
+                "Execution might be slower on the first call or fail if incompatible.\n"
             )
 
-        if vector.shape[-1] > 3:
-            raise ValueError(
-                "The number of arguments passed to the method must be the same as the number of dimensions."
-            )
+        try:
+            # Divergence Pre-compilation
+            dummy_cell_shape = self.grid.cshape + (ndim,)
+            dummy_vec = np.zeros(dummy_cell_shape, dtype=np.float64)
+            _ = self._divergence_kernel(dummy_vec, *self._divergence_kernel_args)
+            print(f"  - Numba divergence kernel pre-compiled.")
+        except Exception as e:
+            print(f"\nWARNING: Could not pre-compile Numba divergence kernel for ndim={ndim}.")
+            print(f"Error: {e}\n")
 
-        # Pre-allocation. The result should have one less element in all directions.
-        Ux = np.zeros([nc - 1 for nc in vector[..., 0].shape])
-
-        for axis in range(vector.shape[-1]):
-            Ux += self.derivative(vector[..., axis], axis)
-
-        return Ux
 
     def gradient(self, p: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Taken from reference. See Notes.
-        Calculate the discrete gradient of a given scalar field in 1D, 2D, or 3D. The algorithm mimics the calculation of
+        """Calculate the discrete gradient of a given scalar field in 1D, 2D, or 3D. The algorithm mimics the calculation of
         nodal pressure gradient specified in eq. (30a) in BK19 paper.
 
 
@@ -159,108 +155,82 @@ class ClassicalDiscreteOperator(AbstractDiscreteOperator):
         ----------
         p : np.ndarray of shape (nx+1, [ny+1], [nz+1])
             The nodal scalar field on which the gradient is applied.
-        ndim : int
-            The number of dimensions of the scalar field (1, 2, or 3).
-        dxyz : List[float]
-            The list of discretization fineness [dx, (dy), (dz)]
 
         Returns
         -------
-        Tuple[np.ndarray, ...] of shape (nx, ny, nz)
+        Tuple[np.ndarray, ...]. Arrays are of shape (nx, ny, nz)
             The gradient components (Dpx, Dpy, Dpz). For ndim < 3, unused components are zero.
             The gradient is defined on cells.
 
-        Notes
-        -----
-        Taken from https://github.com/ray-chew/pyBELLA/blob/develop/src/dycore/physics/low_mach/second_projection.py
         """
-        dx, dy, dz = self.dxyz
-        ndim = self.ndim
+        ndim = self.grid.ndim
+        cshape = self.grid.cshape  # Nodal shape of the grid
 
-        # Compute the slices for differencing (for example p[:-1] - p[1:])
-        indices = [
-            idx for idx in it.product([slice(0, -1), slice(1, None)], repeat=ndim)
-        ]
+        grad_comps: Tuple[np.ndarray, ...] = self._gradient_kernel(p, *self._gradient_kernel_args)
+
+        # --- Pad the result for uniform output ---
         if ndim == 1:
-            # In 1D, gradient is (p[1:] - p[:-1]) / dx (centered difference)
-            signs_x: Tuple[float, ...] = (-1.0, +1.0)
-            signs_y: Tuple[float, ...] = (0.0, 0.0)
-            signs_z: Tuple[float, ...] = (0.0, 0.0)
-            scale: float = 1.0  # No averaging needed in 1D
-        if ndim == 2:
-            # Compute the sign factors of each neighboring cell to the center of calculation
-            # Basically in 2D we have for example in x-direction:
-            # Dpx = (-p00 - p01 + p10 + p11) * 0.5 / dx
-            signs_x: Tuple[float, ...] = (-1.0, -1.0, +1.0, +1.0)
-            signs_y: Tuple[float, ...] = (-1.0, +1.0, -1.0, +1.0)
-            signs_z: Tuple[float, ...] = (0.0, 0.0, 0.0, 0.0)
-            scale: float = 0.5
+            # Need placeholder shapes for Dpy, Dpz if they are zero arrays
+            return (
+                grad_comps[0],
+                np.zeros(cshape, dtype=p.dtype),
+                np.zeros(cshape, dtype=p.dtype),
+            )
+        elif ndim == 2:
+            return (grad_comps[0], grad_comps[1], np.zeros(cshape, dtype=p.dtype))
         elif ndim == 3:
-            # Compute the sign factors of each neighboring cell to the center of calculation
-            # Basically in 3D we have for example in x-direction:
-            # Dpx = (-p000 - p001 - p010 - p011 + p100 + p101 + p110 + p111) * 0.25 / dx
-            signs_x: Tuple[float, ...] = (
-                -1.0,
-                -1.0,
-                -1.0,
-                -1.0,
-                +1.0,
-                +1.0,
-                +1.0,
-                +1.0,
-            )
-            signs_y: Tuple[float, ...] = (
-                -1.0,
-                -1.0,
-                +1.0,
-                +1.0,
-                -1.0,
-                -1.0,
-                +1.0,
-                +1.0,
-            )
-            signs_z: Tuple[float, ...] = (
-                -1.0,
-                +1.0,
-                -1.0,
-                +1.0,
-                -1.0,
-                +1.0,
-                -1.0,
-                +1.0,
-            )
-            scale: float = 0.25
+            return grad_comps  # Already has 3 components
+        else:
+            # Should be unreachable
+            raise RuntimeError("Invalid ndim")
 
-        Dpx, Dpy, Dpz = 0.0, 0.0, 0.0
-        cnt = 0
+    def divergence(self, vector: np.ndarray) -> np.ndarray:
+        """
+        Calculates the divergence of a cell-centered vector field at the nodes.
 
-        # Compute the unfactored gradient
-        for index in indices:
-            Dpx += signs_x[cnt] * p[index]
-            Dpy += signs_y[cnt] * p[index]
-            Dpz += signs_z[cnt] * p[index]
-            cnt += 1
+        Parameters
+        ----------
+        vector : np.ndarray
+            The cell-centered vector field.
+            Shape: (nx, [ny], [nz], ndim)
 
-        Dpx *= scale / dx
-        Dpy *= scale / dy
-        Dpz *= scale / dz
+        Returns
+        -------
+        np.ndarray
+            The divergence evaluated at the nodes.
+            Shape: (nx-1, [ny-1], [nz-1])
+        """
+        div_result = self._divergence_kernel(vector, *self._divergence_kernel_args)
 
-        return Dpx, Dpy, Dpz
+        return div_result
+
 
 
 if __name__ == "__main__":
-    x = np.arange(30).reshape(5, 6)
-    y = np.random.rand(5, 6)
-    z = np.stack((x, y), axis=-1)
+    from atmpy.grid.utility import DimensionSpec, create_grid
 
-    ndim = 2
-    dxyz = [0.1] * ndim
+    np.set_printoptions(linewidth=300)
+    np.set_printoptions(suppress=True)
+    np.set_printoptions(precision=5)
 
-    print(x)
-    print(y)
-    print("-----------------------")
-    obj = ClassicalDiscreteOperator(ndim, dxyz)
-    print(obj.derivative(x, 0))
-    print(obj.derivative(y, 1))
-    print("-------------------------")
-    print(obj.divergence(z))
+    ############################################################################
+    ################### GRID ###################################################
+    nx = 6
+    ngx = 2
+    nnx = nx + 2 * ngx
+    ny = 5
+    ngy = 2
+    nny = ny + 2 * ngy
+
+    dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
+    grid = create_grid(dim)
+
+    discreteOp = ClassicalDiscreteOperator(grid)
+
+    #############################################################################
+
+    p_nodal_2d = np.random.rand(*grid.nshape)
+    print(p_nodal_2d)
+
+    dpx, dpy, dpz = discreteOp.gradient(p_nodal_2d)
+    print(dpx)
