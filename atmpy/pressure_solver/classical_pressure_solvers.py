@@ -4,7 +4,11 @@ import numpy as np
 import scipy as sp
 from typing import TYPE_CHECKING, Union, Tuple
 
-from atmpy.infrastructure.enums import VariableIndices as VI, BoundarySide as BdrySide, BoundaryConditions as BdryType
+from atmpy.infrastructure.enums import (
+    VariableIndices as VI,
+    BoundarySide as BdrySide,
+    BoundaryConditions as BdryType,
+)
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.infrastructure.utility import one_element_inner_slice
 from atmpy.physics.thermodynamics import Thermodynamics
@@ -42,18 +46,18 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         coriolis: "CoriolisOperator",
         thermodynamics: "Thermodynamics",
         Msq: float,
-
     ):
-        super().__init__(discrete_operator, linear_solver, coriolis, thermodynamics, Msq)
+        super().__init__(
+            discrete_operator, linear_solver, coriolis, thermodynamics, Msq
+        )
         self.variables: "Variables" = variables
         self.mpv: "MPV" = mpv
         self.boundary_manager: "BoundaryManager" = boundary_manager
         self.ndim = self.variables.ndim
         self.vertical_momentum_index: int = self.coriolis.gravity.gravity_momentum_index
 
-
     def pressure_coefficients_nodes(self, cellvars: np.ndarray, dt: float):
-        """ Calculate the coefficients for the pressure equation. Notice the coefficients are nodal.
+        """Calculate the coefficients for the pressure equation. Notice the coefficients are nodal.
 
         Basically it calculates there are two sets of coefficients needed to be calculated:
         1. alpha_h*(P*Theta) in Momentum equations (Coefficient of pressure term in Helmholtz equation)
@@ -87,8 +91,8 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         Helmholtz equation."""
 
         #################### Calculate the coefficients ###############################################################
-        pTheta = self._calculate_coefficient_pTheta(cellvars)   # Cell-centered
-        dPdpi = self._calculate_coefficient_dPdpi(cellvars, dt) # Node-centered
+        pTheta = self._calculate_coefficient_pTheta(cellvars)  # Cell-centered
+        dPdpi = self._calculate_coefficient_dPdpi(cellvars, dt)  # Node-centered
 
         ######### Fill wplux and wcenter containers with the corresponding values above ###############################
         for dim in range(self.ndim):
@@ -109,14 +113,17 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             self.mpv.wcenter, boundary_operation
         )
 
-    def calculate_correction_increments_nodes(self, p: np.ndarray, dt: float, is_nongeostrophic: bool, is_nonhydrostatic:bool) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def calculate_enthalpy_weighted_pressure_gradient(
+        self, p: np.ndarray, dt: float, is_nongeostrophic: bool, is_nonhydrostatic: bool
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Calculates the intermediate transformed flux increments based on pressure p. This would be an incremental update.
+        Calculate the M^(-1)*dt*pTheta*grad(pi), where M is the extended coriolis matrix. The divergence of this term
+        is the isentropic laplacian part of the Helmholtz operator. The whole operation takes place on cells.
 
         Parameters
         ----------
         p : np.ndarray
-            The nodal pressure vector (or perturbation).
+            The nodal pressure vector (or perturbation). The gradient bring this to cells.
         dt : float
             The time step
         is_nongeostrophic : bool
@@ -143,13 +150,12 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         w = -dt * pTheta * dpdz if self.ndim == 3 else np.zeros_like(dpdz)
 
         # Apply Coriolis/Buoyancy transform (T_inv)
-        # This modifies u, v, w or stores results in self.mpv
         self.coriolis.apply_inverse(
-            u,  # Pass initial flux components
+            u,
             v,
             w,
             self.variables,
-            self.mpv,  # Assume results are stored here
+            self.mpv,
             is_nongeostrophic,
             is_nonhydrostatic,
             self.Msq,
@@ -158,8 +164,16 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         return u, v, w
 
-    def correction_nodes(self, p: np.ndarray, updt_chi: Union[np.ndarray, float], dt: float):
-        """ Adjust the momenta and Chi variables.
+    def correction_nodes(
+        self,
+        p: np.ndarray,
+        updt_chi: Union[np.ndarray, float],
+        dt: float,
+        is_nongeostrophic: bool,
+        is_nonhydrostatic: bool,
+    ):
+        """Update the momenta and Chi variables using the pressure term with their coefficients on the RHS of the
+        momenta equation.
 
         Parameters
         ----------
@@ -167,42 +181,47 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             The pressure vector. Basically placeholder for the perturbation of the Exner pressure (pi')
         updt_chi : np.ndarray
             The new updated value for Chi
+        dt : float
+            The time step
+        is_nongeostrophic : bool
+            The switch between geostrophic and non-geostrophic regimes
+        is_nonhydrostatic : bool
+            The switch between hydrostatic and non-hydrostatic regimes
         """
 
         # Calculate the increments of momenta
-        u_incr, v_incr, w_incr = self.calculate_correction_increments_nodes(p, dt)
+        u_incr, v_incr, w_incr = self.calculate_enthalpy_weighted_pressure_gradient(
+            p, dt, is_nongeostrophic, is_nonhydrostatic
+        )
 
         # Create the necessary variables
         cellvars = self.variables.cell_vars
         chi = cellvars[..., VI.RHO] / cellvars[..., VI.RHOY]
-        dS = self.mpv.compute_dS_on_nodes() # Assuming cell-centered dS/dy
+        dS = self.mpv.compute_dS_on_nodes()  # Assuming cell-centered dS/dy
 
         ### Update the full variables using the intermediate variables.
         cellvars[..., VI.RHOU] += chi * u_incr
         cellvars[..., VI.RHOV] += chi * v_incr if self.ndim == 2 else 0.0
         cellvars[..., VI.RHOW] += chi * w_incr if self.ndim == 3 else 0.0
-        cellvars[..., VI.RHOX] += -updt_chi * dt * dS * cellvars[..., self.vertical_momentum_index]
+        cellvars[..., VI.RHOX] += (
+            -updt_chi * dt * dS * cellvars[..., self.vertical_momentum_index]
+        )
 
     def laplacian(self):
         pass
-
-
 
     def _calculate_coefficient_pTheta(self, cellvars: np.ndarray):
         """First part of coefficient calculation. Calculates P*Theta."""
 
         # Calculate (P*Theta): Coefficient of pressure term in momentum equation
-        Y = (
-                cellvars[..., VI.RHOY]
-                / cellvars[..., VI.RHO]
-        )
+        Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
         return self._calculate_P_over_Gamma(cellvars) * Y
 
     def _calculate_P_over_Gamma(self, cellvars):
-        """ Calculates P/Gamma. This is an intermediate function to avoid duplicate codes."""
+        """Calculates P/Gamma. This is an intermediate function to avoid duplicate codes."""
         return self.th.Gammainv * cellvars[..., VI.RHOY]
 
-    def _calculate_coefficient_dPdpi(self, cellvars: np.ndarray, dt:float):
+    def _calculate_coefficient_dPdpi(self, cellvars: np.ndarray, dt: float):
         """Calculate the second part of the coefficient calculation. Calculate dP/dpi. See docstring of
         operator_coefficients_nodes for more information.
 
@@ -213,7 +232,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         """
 
         # Calculate the coefficient and the exponent of the dP/dpi using the formula directly. (see the docstring)
-        ccenter = -self.Msq * self.th.gm1inv / (dt ** 2)
+        ccenter = -self.Msq * self.th.gm1inv / (dt**2)
         cexp = 2.0 - self.th.gamma
 
         # Temp variable for rhoTheta=P for readability
@@ -222,13 +241,10 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         # Averaging over the nodes and fill the mpv container
         kernel = np.ones([2] * self.ndim)
         return (
-                ccenter
-                * sp.signal.fftconvolve(P ** cexp, kernel, mode="valid")
-                / kernel.sum()
+            ccenter
+            * sp.signal.fftconvolve(P**cexp, kernel, mode="valid")
+            / kernel.sum()
         )
 
     def solve(self, variables, grid, dt):
         pass
-
-
-

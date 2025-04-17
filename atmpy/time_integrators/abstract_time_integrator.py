@@ -18,4 +18,4 @@ class AbstractTimeIntegrator(ABC):
         raise NotImplementedError("get_dt() must be implemented by subclasses")
 
 
-TTimeIntegrator = TypeVar('TTimeIntegrator', bound=AbstractTimeIntegrator)
+TTimeIntegrator = TypeVar("TTimeIntegrator", bound=AbstractTimeIntegrator)

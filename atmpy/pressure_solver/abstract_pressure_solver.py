@@ -28,4 +28,4 @@ class AbstractPressureSolver(ABC):
         self.vertical_momentum_index: int = self.coriolis.gravity.gravity_momentum_index
 
 
-TPressureSolver = TypeVar('TPressureSolver', bound=AbstractPressureSolver)
+TPressureSolver = TypeVar("TPressureSolver", bound=AbstractPressureSolver)

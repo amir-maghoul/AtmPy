@@ -72,7 +72,7 @@ class ClassicalDiscreteOperator(AbstractDiscreteOperator):
         self._precompile_kernels(ndim)
 
     def _select_gradient_kernel(self, ndim, dxyz):
-        """ Get the corresponding kernel for the dimension"""
+        """Get the corresponding kernel for the dimension"""
         if ndim == 1:
             self._gradient_kernel = _gradient_1d_numba
             self._gradient_kernel_args = (dxyz[0],)
@@ -86,7 +86,7 @@ class ClassicalDiscreteOperator(AbstractDiscreteOperator):
             raise ValueError("Dimension must be 1, 2 or 3.")
 
     def _select_divergence_kernel(self, ndim, dxyz):
-        """ Get the corresponding kernel for the dimension"""
+        """Get the corresponding kernel for the dimension"""
         if ndim == 1:
             self._divergence_kernel = _divergence_1d_numba
             self._divergence_kernel_args = (dxyz[0],)
@@ -101,9 +101,8 @@ class ClassicalDiscreteOperator(AbstractDiscreteOperator):
                 "Invalid ndim configuration for divergence."
             )  # Should be unreachable
 
-
     def _precompile_kernels(self, ndim):
-        """ Precompile all the kernels for speed-up of the main computation."""
+        """Precompile all the kernels for speed-up of the main computation."""
         print(f"Pre-compiling Numba gradient kernel for ndim={ndim}...")
         try:
             # Create dummy nodal data with minimal size but correct dimensions
@@ -129,9 +128,10 @@ class ClassicalDiscreteOperator(AbstractDiscreteOperator):
             _ = self._divergence_kernel(dummy_vec, *self._divergence_kernel_args)
             print(f"  - Numba divergence kernel pre-compiled.")
         except Exception as e:
-            print(f"\nWARNING: Could not pre-compile Numba divergence kernel for ndim={ndim}.")
+            print(
+                f"\nWARNING: Could not pre-compile Numba divergence kernel for ndim={ndim}."
+            )
             print(f"Error: {e}\n")
-
 
     def gradient(self, p: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Calculate the discrete gradient of a given scalar field in 1D, 2D, or 3D. The algorithm mimics the calculation of
@@ -153,7 +153,9 @@ class ClassicalDiscreteOperator(AbstractDiscreteOperator):
         ndim = self.grid.ndim
         cshape = self.grid.cshape  # Nodal shape of the grid
 
-        grad_comps: Tuple[np.ndarray, ...] = self._gradient_kernel(p, *self._gradient_kernel_args)
+        grad_comps: Tuple[np.ndarray, ...] = self._gradient_kernel(
+            p, *self._gradient_kernel_args
+        )
 
         # --- Pad the result for uniform output ---
         if ndim == 1:
@@ -190,7 +192,6 @@ class ClassicalDiscreteOperator(AbstractDiscreteOperator):
         div_result = self._divergence_kernel(vector, *self._divergence_kernel_args)
 
         return div_result
-
 
 
 if __name__ == "__main__":

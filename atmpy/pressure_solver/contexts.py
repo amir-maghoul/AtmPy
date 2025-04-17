@@ -29,11 +29,9 @@ class DiscreteOperatorsContext:
     grid: "Grid"
 
     def instantiate(self) -> TDiscreteOperator:
-        """ Instantiate a discrete operator"""
-        return get_discrete_operators(
-            name=self.operator_type,
-            grid=self.grid
-        )
+        """Instantiate a discrete operator"""
+        return get_discrete_operators(name=self.operator_type, grid=self.grid)
+
 
 @dataclass
 class PressureContext(Generic[TPressureSolver]):
@@ -52,13 +50,11 @@ class PressureContext(Generic[TPressureSolver]):
         linear_solver = get_linear_solver(self.linear_solver_type)
         dependencies = {
             "discrete_operator": discrete_operator,
-            "linear_solver":linear_solver,
+            "linear_solver": linear_solver,
         }
         dependencies.update(self.extra_dependencies)
         # Now create and return the pressure solver instance, passing the discrete operator and linear solver.
-        return get_pressure_solver(
-            self.solver_type, **dependencies
-        )
+        return get_pressure_solver(self.solver_type, **dependencies)
 
 
 def example_usage():
@@ -72,7 +68,7 @@ def example_usage():
         discrete_operator_type=DiscreteOperators.CLASSIC_OPERATOR,
         op_context=dc_context,
         linear_solver_type=LinearSolvers.BICGSTAB,
-        extra_dependencies={"tolerance": 1e-6, "max_iter": 1000}
+        extra_dependencies={"tolerance": 1e-6, "max_iter": 1000},
     )
 
     # Instantiate the pressure solver using the context.

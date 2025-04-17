@@ -54,7 +54,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.pressure_solver: "TPressureSolver" = pressure_solver
 
         if not isinstance(self.pressure_solver, ClassicalPressureSolver):
-            raise ValueError("The current implementation of IMEXTimeIntegrator only supports ClassicalPressureSolver.")
+            raise ValueError(
+                "The current implementation of IMEXTimeIntegrator only supports ClassicalPressureSolver."
+            )
 
         self.boundary_manager: "BoundaryManager" = boundary_manager
         self.coriolis: "CoriolisOperator" = self.pressure_solver.coriolis
@@ -71,7 +73,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.wind_speed: np.ndarray = np.array(wind_speed)
         self.ndim = self.grid.ndim
         self.vertical_momentum_index = self.coriolis.gravity.gravity_momentum_index
-
 
     def step(self):
         # 1. Explicit forward update (e.g. divergence, pressure gradient, momentum update)
@@ -170,7 +171,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
 
     def backward_update_implicit(self, dt: float, initial_vars: np.ndarray = None):
-        """ Compute the one step of the implicit part of the Euler backward scheme. This is a part of the BK19 algorithm.
+        """Compute the one step of the implicit part of the Euler backward scheme. This is a part of the BK19 algorithm.
         Notice before the call to this method, the coefficient variables must be created at half timestep. Then going back
         to the initial variables, we start anew to advance the time stepping in a implicit trapezoidal rule
 
@@ -205,7 +206,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # Update boundary
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
-
 
     def _forward_momenta_update(
         self,
@@ -446,7 +446,9 @@ def example_usage():
     gravity = Gravity(gravity_vec, grid.ndim)
     coriolis = CoriolisOperator([0.0, 1.0, 0.0], gravity)
 
-    op_context = DiscreteOperatorsContext(operator_type=DiscreteOperators.CLASSIC_OPERATOR, grid=grid)
+    op_context = DiscreteOperatorsContext(
+        operator_type=DiscreteOperators.CLASSIC_OPERATOR, grid=grid
+    )
     linear_solver = LinearSolvers.BICGSTAB
 
     # Instantiate the pressure solver context by specifying enums for pressure solver and discrete operator.
@@ -461,7 +463,7 @@ def example_usage():
             "coriolis": coriolis,
             "Msq": 1.0,
             "thermodynamics": th,
-        }
+        },
     )
 
     pressure = ps_context.instantiate()
@@ -528,7 +530,6 @@ def example_usage():
     print(mpv.wcenter)
     pressure.pressure_coefficients_nodes(variables.cell_vars, dt)
     print(mpv.wcenter)
-
 
 
 if __name__ == "__main__":

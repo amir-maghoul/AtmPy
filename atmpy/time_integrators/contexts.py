@@ -16,34 +16,34 @@ from atmpy.time_integrators.abstract_time_integrator import TTimeIntegrator
 @dataclass
 class TimeIntegratorContext(Generic[TTimeIntegrator]):
     """
-       A generic instantiation context for time integrators.
+    A generic instantiation context for time integrators.
 
-       This context collects the common dependencies required by a time integrator,
-       including the computational grid, variables, flux object, boundary manager, time step parameters, etc.
-       For integrators that need extra parameters (for example, the IMEX integrator additionally requires
-       a multiple-pressure-variables object (mpv), a Coriolis operator, pressure solver, thermodynamics, and a scaling parameter Msq),
-       these extra dependencies can be provided in the extra_dependencies dictionary.
+    This context collects the common dependencies required by a time integrator,
+    including the computational grid, variables, flux object, boundary manager, time step parameters, etc.
+    For integrators that need extra parameters (for example, the IMEX integrator additionally requires
+    a multiple-pressure-variables object (mpv), a Coriolis operator, pressure solver, thermodynamics, and a scaling parameter Msq),
+    these extra dependencies can be provided in the extra_dependencies dictionary.
 
-       Attributes
-       ----------
-       integrator_type:
-           The target time integrator type (as defined in the TimeIntegrators enum).
-       grid:
-           The computational grid.
-       variables:
-           The variables container.
-       flux:
-           The flux computation object.
-       boundary_manager:
-           The boundary condition manager.
-       dt:
-           The simulation time step.
-       t_end:
-           The simulation end time.
-       maxstep:
-           The maximum allowed time steps.
-       extra_dependencies: Additional parameters required by a specific integrator (e.g., mpv, coriolis_operator, pressure_solver, thermodynamics, Msq).
-       """
+    Attributes
+    ----------
+    integrator_type:
+        The target time integrator type (as defined in the TimeIntegrators enum).
+    grid:
+        The computational grid.
+    variables:
+        The variables container.
+    flux:
+        The flux computation object.
+    boundary_manager:
+        The boundary condition manager.
+    dt:
+        The simulation time step.
+    t_end:
+        The simulation end time.
+    maxstep:
+        The maximum allowed time steps.
+    extra_dependencies: Additional parameters required by a specific integrator (e.g., mpv, coriolis_operator, pressure_solver, thermodynamics, Msq).
+    """
 
     integrator_type: TimeIntegrators
     grid: "Grid"
@@ -67,4 +67,3 @@ class TimeIntegratorContext(Generic[TTimeIntegrator]):
         }
         dependencies.update(self.extra_dependencies)
         return get_time_integrator(self.integrator_type, **dependencies)
-
