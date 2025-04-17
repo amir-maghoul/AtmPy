@@ -23,19 +23,6 @@ class AbstractDiscreteOperator(ABC):
     def __init__(self, grid: "Grid"):
         self.grid = grid
 
-    # @abstractmethod
-    # def derivative(self, variable: np.ndarray, axis):
-    #     """Calculates the nodal derivative of the given cell variable in the given direction.
-    #
-    #     Parameters
-    #     ----------
-    #     variable : np.ndarray
-    #         The cell defined variable on which the derivative is computed.
-    #     axis : int
-    #         The axis along which the derivative is computed.
-    #     """
-    #     pass
-
     @abstractmethod
     def gradient(self, p: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Calculate the discrete gradient of a given scalar field in 1D, 2D, or 3D. The variable 'p' is defined on

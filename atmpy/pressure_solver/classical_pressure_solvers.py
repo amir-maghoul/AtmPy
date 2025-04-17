@@ -57,7 +57,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self.vertical_momentum_index: int = self.coriolis.gravity.gravity_momentum_index
 
 
-    def pressure_coefficients_nodes(self, cellvars: np.ndarray):
+    def pressure_coefficients_nodes(self, cellvars: np.ndarray, dt: float):
         """ Calculate the coefficients for the pressure equation. Notice the coefficients are nodal.
 
         Basically it calculates there are two sets of coefficients needed to be calculated:
@@ -71,6 +71,8 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         ----------
         cellvars: np.ndarray
             The array of variables on cells.
+        dt: float
+            The time step.
 
         Notes
         -----
@@ -91,7 +93,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         #################### Calculate the coefficients ###############################################################
         pTheta = self._calculate_coefficient_pTheta(cellvars)
-        dPdpi = self._calculate_coefficient_dPdpi(cellvars)
+        dPdpi = self._calculate_coefficient_dPdpi(cellvars, dt)
 
         ######### Fill wplux and wcenter containers with the corresponding values above ###############################
         for dim in range(self.ndim):

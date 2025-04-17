@@ -478,13 +478,14 @@ def example_usage():
     from atmpy.time_integrators.contexts import TimeIntegratorContext
     from atmpy.infrastructure.enums import TimeIntegrators
 
+    dt = 0.01
     context: TimeIntegratorContext[IMEXTimeIntegrator] = TimeIntegratorContext(
         integrator_type=TimeIntegrators.IMEX,
         grid=grid,
         variables=variables,
         flux=flux,
         boundary_manager=manager,
-        dt=0.01,
+        dt=dt,
         extra_dependencies={
             "mpv": mpv,
             "pressure_solver": pressure,
@@ -514,6 +515,7 @@ def example_usage():
     # print(mpv.wcenter)
     # print(mpv.p2_nodes)
     time_integrator.forward_update()
+    time_integrator.backward_explicit_update(dt)
     # contexts = [BCApplicationContext(is_nodal=True)] * grid.ndim * 2
     #
     # # Update the boundary nodes for pressure variable
