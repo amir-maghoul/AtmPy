@@ -41,9 +41,6 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         boundary_manager: "BoundaryManager",
         coriolis: "CoriolisOperator",
         thermodynamics: "Thermodynamics",
-        is_compressible: bool,
-        is_nongeostrophic: bool,
-        is_nonhydrostatic: bool,
         Msq: float,
 
     ):
@@ -52,9 +49,6 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self.mpv: "MPV" = mpv
         self.boundary_manager: "BoundaryManager" = boundary_manager
         self.ndim = self.variables.ndim
-        self.is_compressible: bool = is_compressible
-        self.is_nongeostrophic: bool = is_nongeostrophic
-        self.is_nonhydrostatic: bool = is_nonhydrostatic
         self.vertical_momentum_index: int = self.coriolis.gravity.gravity_momentum_index
 
 
@@ -115,7 +109,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             self.mpv.wcenter, boundary_operation
         )
 
-    def calculate_correction_increments_nodes(self, p: np.ndarray, dt: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def calculate_correction_increments_nodes(self, p: np.ndarray, dt: float, is_nongeostrophic: bool, is_nonhydrostatic:bool) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Calculates the intermediate transformed flux increments based on pressure p. This would be an incremental update.
 
@@ -124,7 +118,11 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         p : np.ndarray
             The nodal pressure vector (or perturbation).
         dt : float
-            The
+            The time step
+        is_nongeostrophic : bool
+            The switch between geostrophic and non-geostrophic regimes
+        is_nonhydrostatic : bool
+            The switch between hydrostatic and non-hydrostatic regimes
 
         Returns
         -------
@@ -152,8 +150,8 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             w,
             self.variables,
             self.mpv,  # Assume results are stored here
-            self.is_nongeostrophic,
-            self.is_nonhydrostatic,
+            is_nongeostrophic,
+            is_nonhydrostatic,
             self.Msq,
             dt,
         )

@@ -461,9 +461,6 @@ def example_usage():
             "coriolis": coriolis,
             "Msq": 1.0,
             "thermodynamics": th,
-            "is_nonhydrostatic": True,
-            "is_nongeostrophic": True,
-            "is_compressible": True,
         }
     )
 
@@ -511,22 +508,26 @@ def example_usage():
     #     dt=0.1,
     #     Msq=1.0
     # )
-    print(variables.cell_vars[..., VI.RHOU])
-    # print(mpv.wcenter)
-    # print(mpv.p2_nodes)
-    time_integrator.forward_update()
-    time_integrator.backward_explicit_update(dt)
-    # contexts = [BCApplicationContext(is_nodal=True)] * grid.ndim * 2
-    #
-    # # Update the boundary nodes for pressure variable
-    # manager.apply_boundary_on_single_var_all_sides(
-    #     mpv.p2_nodes, contexts
-    # )
-    # pressure.correction_nodes(mpv.p2_nodes, 1.0)
+    # print(variables.cell_vars[..., VI.RHOU])
     # # print(mpv.wcenter)
-    # print(mpv.p2_nodes)
-    print(".......................................................")
-    print(variables.cell_vars[..., VI.RHOU])
+    # # print(mpv.p2_nodes)
+    # time_integrator.forward_update()
+    # time_integrator.backward_explicit_update(dt)
+    # # contexts = [BCApplicationContext(is_nodal=True)] * grid.ndim * 2
+    # #
+    # # # Update the boundary nodes for pressure variable
+    # # manager.apply_boundary_on_single_var_all_sides(
+    # #     mpv.p2_nodes, contexts
+    # # )
+    # # pressure.correction_nodes(mpv.p2_nodes, 1.0)
+    # # # print(mpv.wcenter)
+    # # print(mpv.p2_nodes)
+    # print(".......................................................")
+    # print(variables.cell_vars[..., VI.RHOU])
+
+    print(mpv.wcenter)
+    pressure.pressure_coefficients_nodes(variables.cell_vars, dt)
+    print(mpv.wcenter)
 
 
 
