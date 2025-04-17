@@ -44,10 +44,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         is_nongeostrophic: bool,
         is_nonhydrostatic: bool,
         Msq: float,
-        dt: float,
 
     ):
-        super().__init__(discrete_operator, linear_solver, coriolis, thermodynamics, Msq, dt)
+        super().__init__(discrete_operator, linear_solver, coriolis, thermodynamics, Msq)
         self.variables: "Variables" = variables
         self.mpv: "MPV" = mpv
         self.boundary_manager: "BoundaryManager" = boundary_manager
@@ -112,7 +111,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             self.mpv.wcenter, boundary_operation
         )
 
-    def calculate_correction_increments_nodes(self, p: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def calculate_correction_increments_nodes(self, p: np.ndarray, dt: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Calculates the intermediate transformed flux increments based on pressure p. This would be an incremental update.
 
@@ -120,6 +119,8 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         ----------
         p : np.ndarray
             The nodal pressure vector (or perturbation).
+        dt : float
+            The
 
         Returns
         -------
@@ -135,9 +136,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         pTheta = self._calculate_coefficient_pTheta(cellvars)
 
         # Calculate initial flux increment (cell-centered)
-        u = -self.dt * pTheta * dpdx
-        v = -self.dt * pTheta * dpdy
-        w = -self.dt * pTheta * dpdz if self.ndim == 3 else np.zeros_like(dpdz)
+        u = -dt * pTheta * dpdx
+        v = -dt * pTheta * dpdy
+        w = -dt * pTheta * dpdz if self.ndim == 3 else np.zeros_like(dpdz)
 
         # Apply Coriolis/Buoyancy transform (T_inv)
         # This modifies u, v, w or stores results in self.mpv
@@ -150,12 +151,12 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             self.is_nongeostrophic,
             self.is_nonhydrostatic,
             self.Msq,
-            self.dt,
+            dt,
         )
 
         return u, v, w
 
-    def correction_nodes(self, p: np.ndarray, updt_chi: Union[np.ndarray, float]):
+    def correction_nodes(self, p: np.ndarray, updt_chi: Union[np.ndarray, float], dt: float):
         """ Adjust the momenta and Chi variables.
 
         Parameters
@@ -167,7 +168,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         """
 
         # Calculate the increments of momenta
-        u_incr, v_incr, w_incr = self.calculate_correction_increments_nodes(p)
+        u_incr, v_incr, w_incr = self.calculate_correction_increments_nodes(p, dt)
 
         # Create the necessary variables
         cellvars = self.variables.cell_vars
@@ -178,7 +179,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         cellvars[..., VI.RHOU] += chi * u_incr
         cellvars[..., VI.RHOV] += chi * v_incr if self.ndim == 2 else 0.0
         cellvars[..., VI.RHOW] += chi * w_incr if self.ndim == 3 else 0.0
-        cellvars[..., VI.RHOX] += -updt_chi * self.dt * dS * cellvars[..., self.vertical_momentum_index]
+        cellvars[..., VI.RHOX] += -updt_chi * dt * dS * cellvars[..., self.vertical_momentum_index]
 
     def laplacian(self):
         pass
@@ -200,12 +201,12 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         """ Calculates P/Gamma. This is an intermediate function to avoid duplicate codes."""
         return self.th.Gammainv * cellvars[..., VI.RHOY]
 
-    def _calculate_coefficient_dPdpi(self, cellvars: np.ndarray):
+    def _calculate_coefficient_dPdpi(self, cellvars: np.ndarray, dt:float):
         """Calculate the second part of the coefficient calculation. Calculate dP/dpi. See docstring of
         operator_coefficients_nodes for more information."""
 
         # Calculate the coefficient and the exponent of the dP/dpi using the formula directly. (see the docstring)
-        ccenter = -self.Msq * self.th.gm1inv / (self.dt ** 2)
+        ccenter = -self.Msq * self.th.gm1inv / (dt ** 2)
         cexp = 2.0 - self.th.gamma
 
         # Temp variable for rhoTheta=P for readability

@@ -19,14 +19,12 @@ class AbstractPressureSolver(ABC):
         coriolis: "CoriolisOperator",
         thermodynamics: "Thermodynamics",
         Msq: float,
-        dt: float,
     ):
         self.discrete_operator: "AbstractDiscreteOperator" = discrete_operator
         self.linear_solver: "ILinearSolver" = linear_solver
         self.coriolis: "CoriolisOperator" = coriolis
         self.th: "Thermodynamics" = thermodynamics
         self.Msq: float = Msq
-        self.dt: float = dt
         self.vertical_momentum_index: int = self.coriolis.gravity.gravity_momentum_index
 
 

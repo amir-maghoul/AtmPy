@@ -44,6 +44,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         is_nongeostrophic: bool,
         is_nonhydrostatic: bool,
         is_compressible: bool,
+        dt: float,
     ):
         # Inject dependencies
         self.grid: "Grid" = grid
@@ -62,7 +63,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.pressure_solver.discrete_operator
         )
         self.th: "Thermodynamics" = self.pressure_solver.th
-        self.dt: float = self.pressure_solver.dt
+        self.dt: float = dt
         self.Msq: float = self.pressure_solver.Msq
         self.is_nongeostrophic: bool = is_nongeostrophic
         self.is_nonhydrostatic: bool = is_nonhydrostatic
@@ -118,10 +119,16 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Update all other variables on the boundary.
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
 
-    def backward_explicit_update(self):
+    def backward_explicit_update(self, dt: float):
         """This is the first part of implicit Euler update. This method does the job to calculate the terms involving the
         n-th timestep in the implicit scheme. The method backward_implicit_update involves the terms evaluated at the
-        (n+1)-th timestep in the implicit scheme."""
+        (n+1)-th timestep in the implicit scheme.
+
+        Parameters
+        ----------
+        dt: float
+            The time step used for the update at this stage. It could be a full global step or half global step.
+        """
 
         cellvars = self.variables.cell_vars
 
@@ -132,9 +139,11 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # Update the corresponding vertical momentum explicitly
         g = self.gravity.strength
-        cellvars[..., self.vertical_momentum_index] -= self.dt * (
-            (g / self.Msq) * bouyoncy * self.is_nongeostrophic
-        )
+
+        if self.is_nonhydrostatic:
+            cellvars[..., self.vertical_momentum_index] -= dt * (
+                (g / self.Msq) * bouyoncy
+            )
 
         # Remove background wind
         self.variables.adjust_background_wind(
@@ -142,7 +151,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
         # Apply the solver inverse matrix (Matrix combining the switches, the coriolis force and the singular buoyancy term)
-        self.coriolis.apply(
+        self.coriolis.apply_inverse(
             cellvars[..., VI.RHOU],
             cellvars[..., VI.RHOV],
             cellvars[..., VI.RHOW],
@@ -151,7 +160,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.is_nongeostrophic,
             self.is_nonhydrostatic,
             self.Msq,
-            self.dt,
+            dt,
         )
 
         # Restore background wind
@@ -160,13 +169,15 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Update all other variables on the boundary.
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
 
-    def backward_update_implicit(self, initial_vars: np.ndarray = None):
+    def backward_update_implicit(self, dt: float, initial_vars: np.ndarray = None):
         """ Compute the one step of the implicit part of the Euler backward scheme. This is a part of the BK19 algorithm.
         Notice before the call to this method, the coefficient variables must be created at half timestep. Then going back
         to the initial variables, we start anew to advance the time stepping in a implicit trapezoidal rule
 
         Parameters
         ----------
+        dt: float
+            The time step used for this update. It could be a full global step or half global step.
         initial_vars: np.ndarray
             The initial variables of the problem before any changes were made by calculation of half-time step.
         """
@@ -453,7 +464,6 @@ def example_usage():
             "is_nonhydrostatic": True,
             "is_nongeostrophic": True,
             "is_compressible": True,
-            "dt":0.01
         }
     )
 
@@ -474,6 +484,7 @@ def example_usage():
         variables=variables,
         flux=flux,
         boundary_manager=manager,
+        dt=0.01,
         extra_dependencies={
             "mpv": mpv,
             "pressure_solver": pressure,

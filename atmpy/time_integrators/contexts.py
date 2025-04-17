@@ -50,6 +50,7 @@ class TimeIntegratorContext(Generic[TTimeIntegrator]):
     variables: "Variables"
     flux: "Flux"
     boundary_manager: "BoundaryManager"
+    dt: float
     extra_dependencies: Dict[str, Any] = field(default_factory=dict)
 
     def instantiate(self) -> TTimeIntegrator:
@@ -62,6 +63,7 @@ class TimeIntegratorContext(Generic[TTimeIntegrator]):
             "variables": self.variables,
             "flux": self.flux,
             "boundary_manager": self.boundary_manager,
+            "dt": self.dt,
         }
         dependencies.update(self.extra_dependencies)
         return get_time_integrator(self.integrator_type, **dependencies)

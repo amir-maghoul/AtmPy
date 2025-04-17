@@ -6,6 +6,7 @@ import numpy as np
 if TYPE_CHECKING:
     from atmpy.physics.gravity import Gravity
     from atmpy.variables.variables import Variables
+    from atmpy.variables.multiple_pressure_variables import MPV
 from atmpy.infrastructure.enums import VariableIndices as VI
 
 
@@ -23,7 +24,7 @@ class CoriolisOperator:
         self.strength: np.ndarray = np.array(coriolis_strength)
         self.gravity: "Gravity" = gravity
 
-    def apply(
+    def apply_inverse(
         self,
         u: np.ndarray,
         v: np.ndarray,
@@ -58,7 +59,7 @@ class CoriolisOperator:
         if self.strength is None or np.all(self.strength == 0):
             pass
         else:
-            self._apply(
+            self._apply_inverse(
                 u,
                 v,
                 w,
@@ -70,7 +71,7 @@ class CoriolisOperator:
                 dt,
             )
 
-    def _apply(
+    def _apply_inverse(
         self,
         U: np.ndarray,
         V: np.ndarray,
@@ -190,6 +191,7 @@ class CoriolisOperator:
         dChi: np.ndarray,
     ) -> Tuple[Any, Any, Any]:
         """calculate the first row of the inverse matrix."""
+        # Remember the input coriolis is actually dt*(coriolis_matrix)
         o1, o2, o3 = coriolis
 
         uu = nongeo * (nonhydro - dChi) + o1**2
@@ -207,6 +209,7 @@ class CoriolisOperator:
         dChi: np.ndarray,
     ) -> Tuple[Any, Any, Any]:
         """calculate the second row of the inverse matrix."""
+        # Remember the input coriolis is actually dt*(coriolis_matrix)
         o1, o2, o3 = coriolis
 
         vu = o1 * o2 - nongeo * o3
@@ -224,6 +227,7 @@ class CoriolisOperator:
         dChi: np.ndarray,
     ) -> Tuple[Any, Any, Any]:
         """Calculate the third row of the inverse matrix."""
+        # Remember the input coriolis is actually dt*(coriolis_matrix)
         o1, o2, o3 = coriolis
 
         wu = o1 * o3 + o2 * (nonhydro - dChi)
