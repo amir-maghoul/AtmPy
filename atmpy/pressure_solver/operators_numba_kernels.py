@@ -8,9 +8,11 @@ from typing import Tuple
 # 1. Numba Gradient Kernels (Defined outside the class for clarity)
 #    These are the core computational strategies.
 # =============================================================================
+# Cache=True speeds up subsequent runs after the first compilation
+_NJIT_OPTIONS = {"nogil": True, "cache": True, "fastmath": True}
 
 
-@nb.njit(cache=True, fastmath=True, nogil=True)
+@nb.njit(**_NJIT_OPTIONS)
 def _gradient_1d_numba(p: np.ndarray, dx: float) -> Tuple[np.ndarray]:
     """Numba kernel for 1D gradient (cell-centered).
 
@@ -38,7 +40,7 @@ def _gradient_1d_numba(p: np.ndarray, dx: float) -> Tuple[np.ndarray]:
     return (Dpx,)
 
 
-@nb.njit(cache=True, fastmath=True, nogil=True)
+@nb.njit(**_NJIT_OPTIONS)
 def _gradient_2d_numba(
     p: np.ndarray, dx: float, dy: float
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -81,7 +83,7 @@ def _gradient_2d_numba(
     return Dpx, Dpy
 
 
-@nb.njit(cache=True, fastmath=True, nogil=True)
+@nb.njit(**_NJIT_OPTIONS)
 def _gradient_3d_numba(
     p: np.ndarray, dx: float, dy: float, dz: float
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -143,7 +145,7 @@ def _gradient_3d_numba(
 # =============================================================================
 # 1D Numba Kernel for Node-Centered Divergence
 # =============================================================================
-@nb.njit(cache=True, fastmath=True, nogil=True)
+@nb.njit(**_NJIT_OPTIONS)
 def _divergence_1d_numba(
     vector_field: np.ndarray, dx: float  # Shape (nx, 1) - Cell-centered
 ) -> np.ndarray:
@@ -170,7 +172,7 @@ def _divergence_1d_numba(
 # =============================================================================
 # 2D Numba Kernel for Node-Centered Divergence
 # =============================================================================
-@nb.njit(cache=True, fastmath=True, nogil=True)
+@nb.njit(**_NJIT_OPTIONS)
 def _divergence_2d_numba(
     vector_field: np.ndarray, dx: float, dy: float  # Shape (nx, ny, 2) - Cell-centered
 ) -> np.ndarray:
@@ -214,7 +216,7 @@ def _divergence_2d_numba(
 # =============================================================================
 # 3D Numba Kernel for Node-Centered Divergence
 # =============================================================================
-@nb.njit(cache=True, fastmath=True, nogil=True)
+@nb.njit(**_NJIT_OPTIONS)
 def _divergence_3d_numba(
     vector_field: np.ndarray,  # Shape (nx, ny, nz, 3) - Cell-centered
     dx: float,

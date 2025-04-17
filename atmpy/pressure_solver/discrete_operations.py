@@ -7,7 +7,7 @@ from typing import List, Tuple, TypeVar, Callable, TYPE_CHECKING
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
 
-from atmpy.pressure_solver.utility import (
+from atmpy.pressure_solver.operators_numba_kernels import (
     _gradient_1d_numba,
     _gradient_2d_numba,
     _gradient_3d_numba,

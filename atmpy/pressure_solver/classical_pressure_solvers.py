@@ -139,17 +139,17 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         # Get necessary variables/coefficients
         cellvars = self.variables.cell_vars
 
-        #### Calculate the needed values for the updates in the RHS of the momenta equations (the Exner pressure
-        #### perturbation (Pi^prime)_x, _y, _z (see RHS of momenta eq.) and the pTheta coefficients)
+        #### Calculate the needed values for the updates in the RHS of the momenta equations (the Exner pressure #######
+        #### perturbation (Pi^prime)_x, _y, _z (see RHS of momenta eq.) and the pTheta coefficients)  ##################
         dpdx, dpdy, dpdz = self.discrete_operator.gradient(p)
         pTheta = self._calculate_coefficient_pTheta(cellvars)
 
-        # Calculate initial flux increment (cell-centered)
+        ##################### Calculate initial flux increment (cell-centered) #########################################
         u = -dt * pTheta * dpdx
         v = -dt * pTheta * dpdy
         w = -dt * pTheta * dpdz if self.ndim == 3 else np.zeros_like(dpdz)
 
-        # Apply Coriolis/Buoyancy transform (T_inv)
+        ##################### Apply Coriolis/Buoyancy transform (M_inv) ################################################
         self.coriolis.apply_inverse(
             u,
             v,
@@ -189,17 +189,17 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             The switch between hydrostatic and non-hydrostatic regimes
         """
 
-        # Calculate the increments of momenta
+        ################################ Calculate the RHS of momenta equations  #######################################
         u_incr, v_incr, w_incr = self.calculate_enthalpy_weighted_pressure_gradient(
             p, dt, is_nongeostrophic, is_nonhydrostatic
         )
 
-        # Create the necessary variables
+        ################################# Create the necessary variables  ##############################################
         cellvars = self.variables.cell_vars
         chi = cellvars[..., VI.RHO] / cellvars[..., VI.RHOY]
         dS = self.mpv.compute_dS_on_nodes()  # Assuming cell-centered dS/dy
 
-        ### Update the full variables using the intermediate variables.
+        ########################## Update the full variables using the intermediate variables. #########################
         cellvars[..., VI.RHOU] += chi * u_incr
         cellvars[..., VI.RHOV] += chi * v_incr if self.ndim == 2 else 0.0
         cellvars[..., VI.RHOW] += chi * w_incr if self.ndim == 3 else 0.0
@@ -207,7 +207,11 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             -updt_chi * dt * dS * cellvars[..., self.vertical_momentum_index]
         )
 
-    def laplacian(self):
+    def isentropic_laplacian(
+        self,
+        p: np.ndarray,
+    ):
+        """Compute the isentropic laplacian operator:  -∇⋅( M_inv ⋅ ( dt * (PΘ)° * ∇p ) )"""
         pass
 
     def _calculate_coefficient_pTheta(self, cellvars: np.ndarray):
