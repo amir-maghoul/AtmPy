@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Union, Tuple
 
 from atmpy.infrastructure.enums import VariableIndices as VI, BoundarySide as BdrySide, BoundaryConditions as BdryType
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
+from atmpy.infrastructure.utility import one_element_inner_slice
 from atmpy.physics.thermodynamics import Thermodynamics
 from atmpy.pressure_solver.abstract_pressure_solver import AbstractPressureSolver
 
@@ -92,14 +93,15 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         Helmholtz equation."""
 
         #################### Calculate the coefficients ###############################################################
-        pTheta = self._calculate_coefficient_pTheta(cellvars)
-        dPdpi = self._calculate_coefficient_dPdpi(cellvars, dt)
+        pTheta = self._calculate_coefficient_pTheta(cellvars)   # Cell-centered
+        dPdpi = self._calculate_coefficient_dPdpi(cellvars, dt) # Node-centered
 
         ######### Fill wplux and wcenter containers with the corresponding values above ###############################
         for dim in range(self.ndim):
             self.mpv.wplus[dim][...] = pTheta
 
-        self.mpv.wcenter = dPdpi
+        inner_slice = one_element_inner_slice(self.ndim, full=False)
+        self.mpv.wcenter[inner_slice] = dPdpi
 
         #################### Update the boundary nodes for the dP/dpi container. ######################################
         # Create the operation context to scale down the nodes. Notice the side is set to be BdrySide.ALL.
@@ -144,7 +146,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         # Apply Coriolis/Buoyancy transform (T_inv)
         # This modifies u, v, w or stores results in self.mpv
-        self.coriolis.apply(
+        self.coriolis.apply_inverse(
             u,  # Pass initial flux components
             v,
             w,
@@ -189,8 +191,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
 
     def _calculate_coefficient_pTheta(self, cellvars: np.ndarray):
-        """First part of coefficient calculation. Calculates P*Theta. See docstring of operator_coefficients_nodes for
-        more information."""
+        """First part of coefficient calculation. Calculates P*Theta."""
 
         # Calculate (P*Theta): Coefficient of pressure term in momentum equation
         Y = (
@@ -205,7 +206,13 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
     def _calculate_coefficient_dPdpi(self, cellvars: np.ndarray, dt:float):
         """Calculate the second part of the coefficient calculation. Calculate dP/dpi. See docstring of
-        operator_coefficients_nodes for more information."""
+        operator_coefficients_nodes for more information.
+
+        Notes
+        -----
+        The shape of the output is the same as the inner NODES, which incidently (but evidently) is equal to the cell
+        shape of the grid (cshape)
+        """
 
         # Calculate the coefficient and the exponent of the dP/dpi using the formula directly. (see the docstring)
         ccenter = -self.Msq * self.th.gm1inv / (dt ** 2)
