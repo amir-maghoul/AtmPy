@@ -457,6 +457,7 @@ def example_usage():
         op_context=op_context,
         linear_solver_type=linear_solver,
         extra_dependencies={
+            "grid": grid,
             "variables": variables,
             "mpv": mpv,
             "boundary_manager": manager,
@@ -529,7 +530,9 @@ def example_usage():
 
     print(mpv.wcenter)
     pressure.pressure_coefficients_nodes(variables.cell_vars, dt)
+    x = pressure.helmholtz_operator(mpv.wcenter,dt, True, True, True)
     print(mpv.wcenter)
+    print(x.reshape((nx+1, ny+1)))
 
 
 if __name__ == "__main__":

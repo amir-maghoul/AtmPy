@@ -13,6 +13,7 @@ from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.infrastructure.utility import one_element_inner_slice
 from atmpy.physics.thermodynamics import Thermodynamics
 from atmpy.pressure_solver.abstract_pressure_solver import AbstractPressureSolver
+from atmpy.pressure_solver.utility import laplacian_inner_slice
 
 if TYPE_CHECKING:
     from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
     from atmpy.boundary_conditions.boundary_manager import BoundaryManager
     from atmpy.time_integrators.coriolis import CoriolisOperator
     from atmpy.physics.thermodynamics import Thermodynamics
+    from atmpy.grid.kgrid import Grid
 
 
 class ClassicalPressureSolver(AbstractPressureSolver):
@@ -40,6 +42,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self,
         discrete_operator: "AbstractDiscreteOperator",
         linear_solver: "ILinearSolver",
+        grid: "Grid",
         variables: "Variables",
         mpv: "MPV",
         boundary_manager: "BoundaryManager",
@@ -50,6 +53,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         super().__init__(
             discrete_operator, linear_solver, coriolis, thermodynamics, Msq
         )
+        self.grid = grid
         self.variables: "Variables" = variables
         self.mpv: "MPV" = mpv
         self.boundary_manager: "BoundaryManager" = boundary_manager
@@ -210,9 +214,108 @@ class ClassicalPressureSolver(AbstractPressureSolver):
     def isentropic_laplacian(
         self,
         p: np.ndarray,
+        dt: float,
+        is_nongeostrophic: bool,
+        is_nonhydrostatic: bool,
+
     ):
-        """Compute the isentropic laplacian operator:  -∇⋅( M_inv ⋅ ( dt * (PΘ)° * ∇p ) )"""
-        pass
+        """Compute the isentropic laplacian operator:  -∇⋅( M_inv ⋅ ( dt * (PΘ)° * ∇p ) )
+
+        Parameters
+        ----------
+        p : np.ndarray
+            The input Exner pressure perturbation. This is the scalar field on which the laplacian is computed.
+        dt : float
+            The time step
+        is_nongeostrophic : bool
+            The switch between geostrophic and non-geostrophic regimes
+        is_nonhydrostatic : bool
+            The switch between hydrostatic and non-hydrostatic regimes
+
+        Returns
+        -------
+        np.ndarray (flattened)
+            The isentropic laplacian operator
+
+        Notes
+        -----
+        In order to pass the result to the linear solver (which only takes flattened input), we flatten the ONE ELEMENT
+        INTERNAL nodes. That means we ignore one layer of ghost cells in each direction and then flatten the output.
+        Therefore, notice the shapes:
+        - p is of shape (nx+1, ny+1, nz+1)
+        - grad(p) is of shape (nx, ny, nz)
+        - divergence(grad(p)) is of shape (nx-1, ny-1, nz-1)
+        """
+
+        ######### Calculate the needed term inside the divergence: M_inv ⋅ ( dt * (PΘ)° * ∇p )  ########################
+        # The results are cell-centered
+        u, v, w = self.calculate_enthalpy_weighted_pressure_gradient(p, dt, is_nongeostrophic, is_nonhydrostatic)
+
+        ######### Stack the values above so that they can be passed to the divergence ##################################
+        vector_field_cell = np.stack(
+            [u, v, w], axis=-1
+            )[..., :self.ndim] # Ensure correct dims
+
+        ######### Apply divergence #####################################################################################
+        divergence = self.discrete_operator.divergence(vector_field_cell)
+
+        ######### Negate the result and flatten for future usage in scipy LinearOperator ###############################
+        laplacian = -divergence
+        inner_slice = laplacian_inner_slice(self.grid.ng)
+        result_flat = laplacian[inner_slice].flatten()
+
+        return result_flat
+
+    def helmholtz_operator(
+        self,
+        p: np.ndarray,
+        dt: float,
+        is_nongeostrophic: bool,
+        is_nonhydrostatic: bool,
+        is_compressible: bool,
+    ):
+        """ Calculate the full Helmholtz operator:
+        [α_p * (∂P/∂π)°] * pi + IsentropicLaplacian(pi)
+
+        Parameters
+        ----------
+        p : np.ndarray
+            The input Exner pressure perturbation. This is the scalar field on which the laplacian is computed.
+        dt : float
+            The time step
+        is_nongeostrophic : bool
+            The switch between geostrophic and non-geostrophic regimes
+        is_nonhydrostatic : bool
+            The switch between hydrostatic and non-hydrostatic regimes
+        is_compressible : bool
+            The switch between compressible and incompressible regimes
+        """
+        ############### Calculate the Laplacian ########################################################################
+        laplacian_flat = self.isentropic_laplacian(p, dt, is_nongeostrophic, is_nonhydrostatic)
+
+
+        ####### Creating the pressure term corresponding to the dPdpi and add it to the laplacian ######################
+        inner_slice = tuple(self.grid.inner_slice)
+        if is_compressible:
+            wcenter_flat = self.mpv.wcenter[inner_slice].flatten()
+            helmholtz_result_flat = laplacian_flat + wcenter_flat * p[inner_slice].flatten()
+        else:
+            helmholtz_result_flat = laplacian_flat
+
+        return helmholtz_result_flat
+
+    def _calculate_P_over_Gamma(self, cellvars: np.ndarray):
+        """Calculates P/Gamma. This is an intermediate function to avoid duplicate codes.
+
+        Parameters
+        ----------
+        cellvars : np.ndarray
+            The full variable container for cell-centered variables
+        th: Thermodynamics
+            The object of thermodynamics class
+
+        """
+        return self.th.Gammainv * cellvars[..., VI.RHOY]
 
     def _calculate_coefficient_pTheta(self, cellvars: np.ndarray):
         """First part of coefficient calculation. Calculates P*Theta."""
@@ -221,22 +324,18 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
         return self._calculate_P_over_Gamma(cellvars) * Y
 
-    def _calculate_P_over_Gamma(self, cellvars):
-        """Calculates P/Gamma. This is an intermediate function to avoid duplicate codes."""
-        return self.th.Gammainv * cellvars[..., VI.RHOY]
-
     def _calculate_coefficient_dPdpi(self, cellvars: np.ndarray, dt: float):
         """Calculate the second part of the coefficient calculation. Calculate dP/dpi. See docstring of
         operator_coefficients_nodes for more information.
 
         Notes
         -----
-        The shape of the output is the same as the inner NODES, which incidently (but evidently) is equal to the cell
+        The shape of the output is the same as the inner NODES, which incidentally (but evidently) is equal to the cell
         shape of the grid (cshape)
         """
 
         # Calculate the coefficient and the exponent of the dP/dpi using the formula directly. (see the docstring)
-        ccenter = -self.Msq * self.th.gm1inv / (dt**2)
+        ccenter = -self.Msq * self.th.gm1inv / (dt ** 2)
         cexp = 2.0 - self.th.gamma
 
         # Temp variable for rhoTheta=P for readability
@@ -245,10 +344,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         # Averaging over the nodes and fill the mpv container
         kernel = np.ones([2] * self.ndim)
         return (
-            ccenter
-            * sp.signal.fftconvolve(P**cexp, kernel, mode="valid")
-            / kernel.sum()
+                ccenter
+                * sp.signal.fftconvolve(P ** cexp, kernel, mode="valid")
+                / kernel.sum()
         )
-
-    def solve(self, variables, grid, dt):
-        pass

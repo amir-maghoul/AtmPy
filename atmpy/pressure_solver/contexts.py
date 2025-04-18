@@ -56,24 +56,3 @@ class PressureContext(Generic[TPressureSolver]):
         # Now create and return the pressure solver instance, passing the discrete operator and linear solver.
         return get_pressure_solver(self.solver_type, **dependencies)
 
-
-def example_usage():
-    # Create a discrete operator instantiation context for 2D and grid spacing [0.1, 0.1]
-    dc_context = DiscreteOperatorsContext(ndim=2, dxyz=[0.1, 0.1])
-
-    # Create the pressure solver instantiation context.
-    # Here we choose "ClassicalPressureSolver" and "ClassicalDiscreteOperator" as identifiers.
-    ps_context = PressureContext(
-        solver_type=PressureSolvers.CLASSIC_PRESSURE_SOLVER,
-        discrete_operator_type=DiscreteOperators.CLASSIC_OPERATOR,
-        op_context=dc_context,
-        linear_solver_type=LinearSolvers.BICGSTAB,
-        extra_dependencies={"tolerance": 1e-6, "max_iter": 1000},
-    )
-
-    # Instantiate the pressure solver using the context.
-    pressure_solver = ps_context.instantiate()
-
-
-if __name__ == "__main__":
-    example_usage()

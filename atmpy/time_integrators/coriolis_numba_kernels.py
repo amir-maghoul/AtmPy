@@ -2,9 +2,8 @@
 
 import numba as nb
 import numpy as np
-from typing import Tuple, Any  # Use Any for numba compatibility if needed
+from typing import Tuple, Any
 
-# Cache=True speeds up subsequent runs after the first compilation
 _JIT_OPTIONS = {"nopython": True, "nogil": True, "cache": True}
 
 

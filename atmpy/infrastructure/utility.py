@@ -76,12 +76,12 @@ def directional_indices(
 
 
 def one_element_inner_slice(ndim: int, full: bool = True) -> Tuple[slice, ...]:
+    """ Create the slice of the one layer inner point, meaning slice(1, -1) in each direction."""
     inner_idx = [slice(1, -1)] * (ndim + 1)
     if full:
         return tuple(inner_idx)
     else:
         return tuple(inner_idx[:-1])
-
 
 def direction_axis(direction: str) -> int:
     """Utility function to map the string direction to its indices in variables."""

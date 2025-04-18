@@ -44,9 +44,6 @@ class AbstractDiscreteOperator(ABC):
         vector : np.ndarray
             The vector consisting on which the divergence is calculated. The shape is (nx, [ny], [nz], num_components).
 
-        Notes
-        -----
-        The order of the passed arguments matter. The divergence is calculated as follows: arg[0]_x + arg[1]_y + arg[2]_z
         """
         pass
 
