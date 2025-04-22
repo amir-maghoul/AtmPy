@@ -3,11 +3,13 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Union, List, Any
 
+from rfc3986_validator import RELATIVE_REF_RE
+
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.boundary_conditions.contexts import BCApplicationContext
 from atmpy.infrastructure.utility import directional_indices, one_element_inner_slice
 from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
-from atmpy.infrastructure.enums import VariableIndices as VI
+from atmpy.infrastructure.enums import VariableIndices as VI, Preconditioners
 
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
@@ -19,7 +21,6 @@ if TYPE_CHECKING:
     from atmpy.physics.thermodynamics import Thermodynamics
     from atmpy.time_integrators.coriolis import CoriolisOperator
     from atmpy.pressure_solver.abstract_pressure_solver import TPressureSolver
-
 from atmpy.pressure_solver.classical_pressure_solvers import ClassicalPressureSolver
 
 from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
@@ -359,25 +360,80 @@ def example_usage():
     dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
     grid = create_grid(dim)
 
+    th = Thermodynamics()
+
     ####################################################################################################################
     ######### MPV ######################################################################################################
     ####################################################################################################################
     from atmpy.variables.multiple_pressure_variables import MPV
 
     Msq = 0.115
-    gravity_vec = [0.0, 10.0, 0.0]
+    gravity_vec = [0.0, 9.81, 0.0]
 
     mpv = MPV(grid)
     mpv.state(gravity_vec, Msq)
     Y_bar = mpv.hydrostate.cell_vars[..., HI.Y0]
+    rhobar = mpv.hydrostate.cell_vars[..., HI.RHO0]
 
     ####################################################################################################################
     ########## Prepare some thermodynamic constant for initialization ##################################################
     ####################################################################################################################
     A0 = 0.1/100
+    t_ref = 100.0
+    T_ref = 300.0
+    R_gas = 287.4
+    cp = th.gamma * R_gas /(th.gm1)
+    N_ref = 9.81 / np.sqrt(cp * T_ref)
+    Nsq_ref = N_ref * N_ref
     rhobar_n = mpv.hydrostate.node_vars[..., HI.RHOY0]
     Y_bar_n = mpv.hydrostate.node_vars[..., HI.Y0]
-    oorhobarsqrt_n = 1.0 / np.sqrt(rhobar_n.T)
+    oorhobarsqrt = (1.0 / np.sqrt(rhobar))
+    oorhobarsqrt_n = (1.0 / np.sqrt(rhobar_n))
+
+    Cs = np.sqrt(th.gamma / Msq)
+    N = t_ref * np.sqrt(Nsq_ref)
+
+    k = N / Cs
+
+    omega = 7.292 * 1e-5
+    coriolis = [0.0, 0.0, 0.0]
+    coriolis[2] = 2.0 * omega * t_ref
+    F = coriolis[2]
+
+    G = np.sqrt(9. / 40.)
+    Gamma = G * N / Cs
+    mu = -Gamma
+
+    matrix = -np.array([[0, F, 0, 1j * Cs * k],
+                        [-F, 0, -N, Cs * (mu + Gamma)],
+                        [0, N, 0, 0],
+                        [1j * Cs * k, Cs * (mu - Gamma), 0, 0]])
+
+    eigval, eigvec = np.linalg.eig(matrix)
+    ind = np.argmax(np.real(eigval))
+    x = grid.x_cells.reshape(-1,1)
+    y = grid.y_cells.reshape(-1,1)
+    X, Y = np.meshgrid(x, y)
+    t = 0
+    s = 1
+    exponentials = np.exp(1j * k * X + mu * Y
+                          + (eigval[ind]) * (t) + 1j * s * t)
+    chi_Y = A0 * np.real(eigvec[2, ind] * exponentials).T
+    Y_p = oorhobarsqrt * N / 9.81 * Y_bar * chi_Y
+
+    Theta = Y_bar + Y_p
+
+
+    x = grid.x_nodes.reshape(-1,1)
+    y = grid.y_nodes.reshape(-1,1)
+    X, Y = np.meshgrid(x, y)
+    t = 0
+    s = 1
+    exponentials = np.exp(1j * k * X + mu * Y
+                          + (eigval[ind]) * (t) + 1j * s * t)
+    chi_pi = A0 * np.real(eigvec[3, ind] * exponentials).T
+    pi_n = oorhobarsqrt_n * Cs / Y_bar_n / th.Gammainv * chi_pi
+
 
     ####################################################################################################################
     ## VARIABLE DATA ###################################################################################################
@@ -389,17 +445,18 @@ def example_usage():
     array = arr.reshape(nnx, nny)
 
     variables = Variables(grid, 6, 1)
-    variables.cell_vars[..., VI.RHO] = mpv.hydrostate.cell_vars[..., HI.RHO0]
-    variables.cell_vars[..., VI.RHO][1:-1, 1:-1] = 4
+    variables.cell_vars[..., VI.RHO] = rhobar
+    # variables.cell_vars[..., VI.RHO][1:-1, 1:-1] = 4
     variables.cell_vars[..., VI.RHOU] = array
-    variables.cell_vars[..., VI.RHOY] = 2
+    variables.cell_vars[..., VI.RHOY] = rhobar * Theta
     variables.cell_vars[..., VI.RHOW] = 3
 
     rng.shuffle(arr)
     array = arr.reshape(nnx, nny)
     variables.cell_vars[..., VI.RHOV] = array
-    gravity = np.array([0.0, 1.0, 0.0])
-    th = Thermodynamics()
+
+    mpv.p2_nodes[...] = pi_n
+
 
 
     ####################################################################################################################
@@ -469,6 +526,7 @@ def example_usage():
         solver_type=PressureSolvers.CLASSIC_PRESSURE_SOLVER,
         op_context=op_context,
         linear_solver_type=linear_solver,
+        precondition_type=Preconditioners.DIAGONAL,
         extra_dependencies={
             "grid": grid,
             "variables": variables,
@@ -524,7 +582,7 @@ def example_usage():
     #     dt=0.1,
     #     Msq=1.0
     # )
-    print(variables.cell_vars[..., VI.RHO])
+    # print(variables.cell_vars[..., VI.RHOY])
     # # print(mpv.wcenter)
     # # print(mpv.p2_nodes)
     # time_integrator.forward_update()
@@ -541,11 +599,13 @@ def example_usage():
     # print(".......................................................")
     # print(variables.cell_vars[..., VI.RHOU])
 
-    # print(mpv.wcenter)
-    # pressure.pressure_coefficients_nodes(variables.cell_vars, dt)
-    # x = pressure.helmholtz_operator(mpv.wcenter,dt, True, True, True)
-    # print(mpv.wcenter)
-    # print(x.reshape((nx+1, ny+1)))
+    print(mpv.p2_nodes)
+    pressure.pressure_coefficients_nodes(variables.cell_vars, dt)
+    time_integrator.forward_update()
+    x = pressure.helmholtz_operator(mpv.p2_nodes,dt, True, True, True)
+    print(mpv.p2_nodes)
+    print(x)
+
 
 
 if __name__ == "__main__":

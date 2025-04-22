@@ -248,30 +248,30 @@ def simple_test():
     mpv.state(gravity, Msq)
     hydrostatics = Variables(grid, num_vars_cell=7, num_vars_node=7)
     hydrostatics2 = Variables(grid, num_vars_cell=7, num_vars_node=7)
-    compute_stratification(hydrostatics, Y, Yn, grid, axis, gravity, Msq)
+    # compute_stratification(hydrostatics, Y, Yn, grid, axis, gravity, Msq)
     print(hydrostatics.cell_vars[4, :, HI.P0])
 
     # End of compute_stratification method
 
 
 if __name__ == "__main__":
-    simple_test()
-    # dt = 0.1
-    #
-    # nx = 1
-    # ngx = 2
-    # nnx = nx + 2 * ngx
-    # ny = 2
-    # ngy = 2
-    # nny = ny + 2 * ngy
-    #
-    # dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
-    # grid = create_grid(dim)
+    # simple_test()
+    dt = 0.1
+
+    nx = 1
+    ngx = 2
+    nnx = nx + 2 * ngx
+    ny = 2
+    ngy = 2
+    nny = ny + 2 * ngy
+
+    dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
+    grid = create_grid(dim)
     # rng = np.random.default_rng()
     # arr = np.arange(nnx * nny)
     # rng.shuffle(arr)
-    #
-    # mvp = MPV(grid)
-    #
-    # mvp.state([0, 1, 0], 1.)
-    # print(mvp.hydrostate.cell_vars[...])
+
+    mvp = MPV(grid)
+
+    mvp.state([0, 1, 0], 1.)
+    print(mvp.hydrostate.cell_vars[..., HI.RHO0].reshape((1, -1)))

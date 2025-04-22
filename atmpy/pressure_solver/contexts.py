@@ -8,6 +8,7 @@ if TYPE_CHECKING:
         PressureSolvers,
         DiscreteOperators,
         LinearSolvers,
+        Preconditioners
     )
     from atmpy.grid.kgrid import Grid
 from atmpy.pressure_solver.abstract_pressure_solver import TPressureSolver
@@ -41,6 +42,7 @@ class PressureContext(Generic[TPressureSolver]):
     solver_type: "PressureSolvers"
     op_context: DiscreteOperatorsContext  # instance of the DiscreteOperatorContext
     linear_solver_type: "LinearSolvers"
+    precondition_type: "Preconditioners"
     extra_dependencies: Dict[str, Any] = field(default_factory=dict)
 
     def instantiate(self) -> TPressureSolver:
@@ -51,6 +53,7 @@ class PressureContext(Generic[TPressureSolver]):
         dependencies = {
             "discrete_operator": discrete_operator,
             "linear_solver": linear_solver,
+            "precondition_type": self.precondition_type,
         }
         dependencies.update(self.extra_dependencies)
         # Now create and return the pressure solver instance, passing the discrete operator and linear solver.

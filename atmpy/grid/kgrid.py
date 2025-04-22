@@ -52,6 +52,10 @@ class Grid:
         The total shape of the cell grid
     nshape : Tuple[int, ...]
         The total shape of the node grid
+    icshape : Tuple[int, ...]
+        The shape of inner cells
+    inshape : Tuple[int, ...]
+        The shape of inner nodes
     x_cells : ndarray
         Coordinate array of cell centers in x-direction
     y_cells : ndarray, optional
@@ -155,6 +159,8 @@ class Grid:
         self.nnx_total: int = self.ncx_total + 1
         self.cshape: Tuple[int, ...] = (self.ncx_total,)
         self.nshape: Tuple[int, ...] = (self.nnx_total,)
+        self.icshape: Tuple[int, ...] = (self.nx,)
+        self.inshape: Tuple[int, ...] = (self.nx + 1,)
         self.ng: List[Tuple[int, int]] = [None]
         self.inner_slice = [None]
 
@@ -205,6 +211,8 @@ class Grid:
             self.nny_total: int = self.ncy_total + 1
             self.cshape = (self.ncx_total, self.ncy_total)
             self.nshape = (self.nnx_total, self.nny_total)
+            self.icshape = (self.nx, self.ny)
+            self.inshape = (self.nx+1, self.ny+1)
 
             # Generate y-coordinate arrays
             self.y_cells: np.ndarray = np.linspace(
@@ -258,6 +266,8 @@ class Grid:
 
             self.cshape = (self.ncx_total, self.ncy_total, self.ncz_total)
             self.nshape = (self.nnx_total, self.nny_total, self.nnz_total)
+            self.icshape = (self.nx, self.ny, self.nz)
+            self.inshape = (self.nx + 1, self.ny + 1, self.nz + 1)
 
             # Generate z-coordinate arrays
             self.z_cells: np.ndarray = np.linspace(

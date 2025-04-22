@@ -2,7 +2,7 @@
 
 import numpy as np
 import scipy as sp
-from typing import TYPE_CHECKING, Union, Tuple
+from typing import TYPE_CHECKING, Union, Tuple, Optional, Callable, Dict
 
 from atmpy.infrastructure.enums import (
     VariableIndices as VI,
@@ -12,8 +12,8 @@ from atmpy.infrastructure.enums import (
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.infrastructure.utility import one_element_inner_slice
 from atmpy.physics.thermodynamics import Thermodynamics
+from atmpy.pressure_solver import preconditioners
 from atmpy.pressure_solver.abstract_pressure_solver import AbstractPressureSolver
-from atmpy.pressure_solver.utility import laplacian_inner_slice
 
 if TYPE_CHECKING:
     from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from atmpy.time_integrators.coriolis import CoriolisOperator
     from atmpy.physics.thermodynamics import Thermodynamics
     from atmpy.grid.kgrid import Grid
+    from atmpy.infrastructure.enums import Preconditioners
 
 
 class ClassicalPressureSolver(AbstractPressureSolver):
@@ -42,6 +43,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self,
         discrete_operator: "AbstractDiscreteOperator",
         linear_solver: "ILinearSolver",
+        precondition_type: "Preconditioners",
         grid: "Grid",
         variables: "Variables",
         mpv: "MPV",
@@ -51,7 +53,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         Msq: float,
     ):
         super().__init__(
-            discrete_operator, linear_solver, coriolis, thermodynamics, Msq
+            discrete_operator, linear_solver, precondition_type, coriolis, thermodynamics, Msq
         )
         self.grid = grid
         self.variables: "Variables" = variables
@@ -59,6 +61,20 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self.boundary_manager: "BoundaryManager" = boundary_manager
         self.ndim = self.variables.ndim
         self.vertical_momentum_index: int = self.coriolis.gravity.gravity_momentum_index
+        self.precondition_type: "Preconditioners" = precondition_type
+        self.precon_apply: Callable = self.get_preconditioner()
+        self.precon_data: Dict
+
+    def get_preconditioner(self):
+        """ Get the precondtioning function. The sole raison d'être of this method is to avoid circular import
+            issues from factory."""
+        from atmpy.infrastructure.factory import get_preconditioner
+        return get_preconditioner(self.precondition_type)
+
+    def get_precon_data(self):
+        """ Fills the precon_data attribute to pass to preconditioner function."""
+        pass
+
 
     def pressure_coefficients_nodes(self, cellvars: np.ndarray, dt: float):
         """Calculate the coefficients for the pressure equation. Notice the coefficients are nodal.
@@ -82,17 +98,10 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         1. A variable container is passed to the method to decouple it from the attribute variable to be able to use the
             method on the initial variables in the trapezoidal rule.
 
-        2. Two minor differences in calculation of alpha_p*(dP/dpi):
-
-        - First, it considers that the alpha_p = 1, since for incompressible case, we handle the case elsewhere in the
-        time update.
-        - Second, it calculates this term for the Helmholtz equation of pressure. Therefore, it calculates the term after
-        bringing dP/dpi to the right hand side of the Helmholtz equation for pressure:
-
-        Remember the P and pi are connected to each other through the following formula:
-        pi = (1/Msq) * P^(gamma - 1). Therefore, dpi/dP = (gamma - 1)/Msq * P^(gamma - 2). Since we need the inverse
-        (dP/dpi), every part of this will be inverted in the code. The -dt**2 is due to the right-hand side of the
-        Helmholtz equation."""
+        2. A difference in calculation of alpha_p*(dP/dpi):
+            it considers that the alpha_p = 1, since for incompressible case, we handle the case elsewhere in the
+            time update.
+        """
 
         #################### Calculate the coefficients ###############################################################
         pTheta = self._calculate_coefficient_pTheta(cellvars)  # Cell-centered
@@ -205,7 +214,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         ########################## Update the full variables using the intermediate variables. #########################
         cellvars[..., VI.RHOU] += chi * u_incr
-        cellvars[..., VI.RHOV] += chi * v_incr if self.ndim == 2 else 0.0
+        cellvars[..., VI.RHOV] += chi * v_incr if self.ndim > 2 else 0.0
         cellvars[..., VI.RHOW] += chi * w_incr if self.ndim == 3 else 0.0
         cellvars[..., VI.RHOX] += (
             -updt_chi * dt * dS * cellvars[..., self.vertical_momentum_index]
@@ -234,14 +243,12 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         Returns
         -------
-        np.ndarray (flattened)
+        np.ndarray
             The isentropic laplacian operator
 
         Notes
         -----
-        In order to pass the result to the linear solver (which only takes flattened input), we flatten the ONE ELEMENT
-        INTERNAL nodes. That means we ignore one layer of ghost cells in each direction and then flatten the output.
-        Therefore, notice the shapes:
+        The output is of shape (nx-1, ny-1, nz-1):
         - p is of shape (nx+1, ny+1, nz+1)
         - grad(p) is of shape (nx, ny, nz)
         - divergence(grad(p)) is of shape (nx-1, ny-1, nz-1)
@@ -260,11 +267,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         divergence = self.discrete_operator.divergence(vector_field_cell)
 
         ######### Negate the result and flatten for future usage in scipy LinearOperator ###############################
-        laplacian = -divergence
-        inner_slice = laplacian_inner_slice(self.grid.ng)
-        result_flat = laplacian[inner_slice].flatten()
+        laplacian = -divergence         # This is the sign between the first and second term in the Helmholtz equation
 
-        return result_flat
+        return laplacian
 
     def helmholtz_operator(
         self,
@@ -275,7 +280,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         is_compressible: bool,
     ):
         """ Calculate the full Helmholtz operator:
-        [α_p * (∂P/∂π)°] * pi + IsentropicLaplacian(pi)
+        [α_p * (∂P/∂π)°/dt]p₂ + ∇⋅(M_inv⋅(dt*CΘ*∇p₂))
 
         Parameters
         ----------
@@ -291,18 +296,139 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             The switch between compressible and incompressible regimes
         """
         ############### Calculate the Laplacian ########################################################################
-        laplacian_flat = self.isentropic_laplacian(p, dt, is_nongeostrophic, is_nonhydrostatic)
-
+        laplacian = self.isentropic_laplacian(p, dt, is_nongeostrophic, is_nonhydrostatic)
 
         ####### Creating the pressure term corresponding to the dPdpi and add it to the laplacian ######################
-        inner_slice = tuple(self.grid.inner_slice)
+        inner_slice = one_element_inner_slice(self.ndim, full=False)
+        helmholtz_result = laplacian
         if is_compressible:
-            wcenter_flat = self.mpv.wcenter[inner_slice].flatten()
-            helmholtz_result_flat = laplacian_flat + wcenter_flat * p[inner_slice].flatten()
-        else:
-            helmholtz_result_flat = laplacian_flat
+            helmholtz_result += self.mpv.wcenter[inner_slice] * p[inner_slice]
 
-        return helmholtz_result_flat
+        return helmholtz_result
+
+    def helmholtz_operator_linear_wrapper(
+            self,
+            dt: float,
+            is_nongeostrophic: bool,
+            is_nonhydrostatic: bool,
+            is_compressible: bool,
+    ) -> sp.sparse.linalg.LinearOperator:
+        """
+        Wraps the Helmholtz operator and return in as Scipy LinearOperator.
+        """
+
+        # Get inner slice and inner shape of node grid
+        inner_slice = one_element_inner_slice(self.ndim, full=False)
+        inshape = self.mpv.wcenter[inner_slice].shape
+
+        ######## Create the shape of the flat vector containing the inner nodes ########################################
+        flat_size = np.prod(inshape)
+
+        ######## The operator (matrix) shape needed for sp.LinearOperator ##############################################
+        operator_shape = (flat_size, flat_size)
+
+        ######## Helmholtz operator wrapper ############################################################################
+        def _matvec(p_flat):
+            ############## Pad p_flat to the full nodal shape expected by helmholtz_operator ###########################
+            p_full = np.zeros(self.grid.nshape, dtype=p_flat.dtype)
+            p_full[inner_slice] = p_flat.reshape(inshape)
+
+            # Apply the physics-based Helmholtz operator
+            result = self.helmholtz_operator(
+                p_full, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
+            )
+            return result.flatten()
+
+        return sp.sparse.linalg.LinearOperator(operator_shape, matvec=_matvec)
+
+
+    def _solve_helmholtz(
+            self,
+            rhs_flat: np.ndarray,  # Expect flattened RHS corresponding to inner grid
+            dt: float,
+            is_nongeostrophic: bool,
+            is_nonhydrostatic: bool,
+            is_compressible: bool,
+            tol: float = 1e-6,
+            max_iter: Optional[int] = None,
+    ) -> Tuple[np.ndarray, int]:
+        """
+        Solves the Helmholtz equation Ax = b using the configured linear solver
+        and preconditioner.
+
+        Parameters:
+            rhs_flat: Flattened right-hand side vector (divergence term, size matching inner grid).
+            dt, flags: Current time step and regime flags.
+            tol, max_iter: Solver tolerance and maximum iterations.
+
+        Returns:
+            Tuple containing the flattened solution vector (size matching inner grid)
+            and solver info code.
+        """
+        # 1. Get the Helmholtz operator as a LinearOperator
+        # This operator expects a flattened inner vector and returns a flattened inner vector
+        A = self.helmholtz_operator_linear_wrapper(
+            dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
+        )
+
+        # 2. Prepare the Preconditioner (compute data and get apply function)
+        M_op = None
+        apply_prec_inv = None  # Function z = M^{-1}r
+
+        if self.precondition_type == Preconditioners.DIAGONAL:
+            # Compute the inverse diagonal (unflattened, shape of inner grid)
+            # using the updated preconditioners.compute_inverse_diagonal
+            self.preconditioner_data = preconditioners.compute_inverse_diagonal(
+                self, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
+            )
+            # Define the application function
+            # Capture the computed diagonal data for the closure
+            diag_inv_data_unflat = self.preconditioner_data
+
+            def apply_prec_inv_diag(r_flat):
+                # apply_inverse_diagonal takes unflattened diag_inv, flattened r
+                # and returns flattened z
+                return preconditioners.apply_inverse_diagonal(diag_inv_data_unflat, r_flat)
+
+            apply_prec_inv = apply_prec_inv_diag
+
+        # elif self.preconditioner_type == Preconditioners.COLUMN:
+        # # Compute tridiagonal components (result might be tuple of arrays)
+        # self.preconditioner_data = preconditioners.compute_tridiagonal_components(
+        #    self, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
+        # )
+        # tridiag_data = self.preconditioner_data
+        # def apply_prec_inv_col(r_flat):
+        #     # apply_inverse_tridiagonal would take components, flattened r,
+        #     # potentially grid info for reshaping, and return flattened z
+        #     return preconditioners.apply_inverse_tridiagonal(tridiag_data, r_flat, self.grid) # Example
+        # apply_prec_inv = apply_prec_inv_col
+
+        # 3. Wrap the preconditioner application function in a LinearOperator for SciPy
+        if apply_prec_inv is not None:
+            if A.shape[0] != rhs_flat.shape[0]:
+                raise ValueError(f"Shape mismatch: Operator A rows {A.shape[0]} vs RHS {rhs_flat.shape[0]}")
+            # The preconditioner M^{-1} must operate on vectors of the same size as the RHS/solution
+            precon_shape = A.shape
+            # matvec performs the M^{-1} * r operation
+            M_op = sp.sparse.linalg.LinearOperator(precon_shape, matvec=apply_prec_inv)
+
+        # 4. Call the configured linear solver
+        # Ensure linear_solver.solve handles M=None correctly
+        solution_flat, info = self.linear_solver.solve(
+            A, rhs_flat, tol=tol, max_iter=max_iter, M=M_op
+        )
+
+        # --- Logging (Optional) ---
+        # You might want to track iterations or convergence status
+        if info > 0:
+            print(f"WARNING: Linear solver did not converge in {info} iterations.")
+        elif info < 0:
+            print(f"ERROR: Linear solver failed with error code {info}.")
+        # else: # info == 0
+        #    print(f"Linear solver converged.")
+
+        return solution_flat, info
 
     def _calculate_P_over_Gamma(self, cellvars: np.ndarray):
         """Calculates P/Gamma. This is an intermediate function to avoid duplicate codes.
@@ -325,17 +451,26 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         return self._calculate_P_over_Gamma(cellvars) * Y
 
     def _calculate_coefficient_dPdpi(self, cellvars: np.ndarray, dt: float):
-        """Calculate the second part of the coefficient calculation. Calculate dP/dpi. See docstring of
-        operator_coefficients_nodes for more information.
+        """Calculate the second part of the coefficient calculation. Calculate dP/dpi. See the docstring of
+        pressure_coefficients_nodes for more information.
 
         Notes
         -----
         The shape of the output is the same as the inner NODES, which incidentally (but evidently) is equal to the cell
-        shape of the grid (cshape)
-        """
+        shape of the grid (cshape).
+
+        It calculates this term for the Helmholtz equation of pressure.
+        Remember the P and pi are connected to each other through the following formula:
+        pi = (1/Msq) * P^(gamma - 1). Therefore, dpi/dP = (gamma - 1)/Msq * P^(gamma - 2). Since we need the inverse
+        (dP/dpi), every part of this will be inverted in the code.
+
+        The dt**2 in the denominator has an obvious reason: This will be part of the Helmholtz equation operator, the
+        laplacian and this term should be created as an overall operator, the dt (which basically belongs to the
+        laplacian update) should be divided before we create the operator ([C/dt]p₂ + ∇⋅(M_inv⋅(dt*CΘ*∇p₂)) = DivV). """
+
 
         # Calculate the coefficient and the exponent of the dP/dpi using the formula directly. (see the docstring)
-        ccenter = -self.Msq * self.th.gm1inv / (dt ** 2)
+        ccenter = -self.Msq * self.th.gm1inv / (dt)
         cexp = 2.0 - self.th.gamma
 
         # Temp variable for rhoTheta=P for readability

@@ -1,12 +1,16 @@
 """ This module contains the abstract class for the pressure solvers."""
 
-from abc import ABC
-from typing import TypeVar
+from abc import ABC, abstractmethod
+from typing import TypeVar, TYPE_CHECKING, Callable
 
-from atmpy.physics.thermodynamics import Thermodynamics
-from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
-from atmpy.pressure_solver.linear_solvers import ILinearSolver
-from atmpy.time_integrators.coriolis import CoriolisOperator
+
+if TYPE_CHECKING:
+    from atmpy.physics.thermodynamics import Thermodynamics
+    from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
+    from atmpy.pressure_solver.linear_solvers import ILinearSolver
+    from atmpy.time_integrators.coriolis import CoriolisOperator
+    from atmpy.infrastructure.enums import Preconditioners
+
 
 
 class AbstractPressureSolver(ABC):
@@ -16,6 +20,7 @@ class AbstractPressureSolver(ABC):
         self,
         discrete_operator: "AbstractDiscreteOperator",
         linear_solver: "ILinearSolver",
+        precondition_type: "Preconditioners",
         coriolis: "CoriolisOperator",
         thermodynamics: "Thermodynamics",
         Msq: float,
@@ -26,6 +31,8 @@ class AbstractPressureSolver(ABC):
         self.th: "Thermodynamics" = thermodynamics
         self.Msq: float = Msq
         self.vertical_momentum_index: int = self.coriolis.gravity.gravity_momentum_index
+        self.precondition_type: "Preconditioners" = precondition_type
+        self.precon_apply: Callable
 
 
 TPressureSolver = TypeVar("TPressureSolver", bound=AbstractPressureSolver)

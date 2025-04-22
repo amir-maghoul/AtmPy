@@ -1,5 +1,5 @@
 """Internal module to test whether a given name exists in the function registry."""
-
+from atmpy.infrastructure.enums import Preconditioners
 # factories.py
 
 from atmpy.infrastructure.registries import (
@@ -12,6 +12,7 @@ from atmpy.infrastructure.registries import (
     TIME_INTEGRATORS,
     DISCRETE_OPERATORS,
     PRESSURE_SOLVERS,
+    PRECONDITIONERS,
 )
 from typing import TYPE_CHECKING
 
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
         TimeIntegrators,
         DiscreteOperators,
         PressureSolvers,
+        Preconditioners,
     )
 
 
@@ -241,3 +243,25 @@ def get_time_integrator(
         raise ValueError(f"Unknown time integrator type: {name}")
 
     return integrator_class(**dependencies)
+
+
+def get_preconditioner(name: "Preconditioners") -> callable:
+    """
+    Retrieves the pre-conditioner based on the provided enum member.
+
+    Parameters
+    ----------
+    name: Preconditioners (enum)
+        The enum member specifying the desired pre-conditioner.
+
+    Returns
+    -------
+    Callable: The corresponding pre-conditioner function.
+    """
+    preconditioner = PRECONDITIONERS.get(name)
+
+    if preconditioner is None:
+        raise ValueError(f"Unknown preconditioner routine: {name}")
+
+    return preconditioner
+
