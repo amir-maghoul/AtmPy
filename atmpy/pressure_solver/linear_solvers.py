@@ -11,18 +11,39 @@ if TYPE_CHECKING:
 
 class ILinearSolver(ABC):
     @abstractmethod
-    def solve(self, A: "np.ndarray", b: "np.ndarray", rtol: float, max_iter: int, M:"np.ndarray"):
+    def solve(
+        self,
+        A: "np.ndarray",
+        b: "np.ndarray",
+        rtol: float,
+        max_iter: int,
+        M: "np.ndarray",
+    ):
         pass
 
 
 class BiCGStabSolver(ILinearSolver):
-    def solve(self, A: "np.ndarray", b: "np.ndarray", rtol: float, max_iter: int, M:"np.ndarray"):
+    def solve(
+        self,
+        A: "np.ndarray",
+        b: "np.ndarray",
+        rtol: float,
+        max_iter: int,
+        M: "np.ndarray",
+    ):
         # ... Use sp.sparse.linalg.bicgstab ...
         x, info = sp.sparse.linalg.bicgstab(A, b, rtol=rtol, maxiter=max_iter, M=M)
         return x, info
 
 
 class GMRESSolver(ILinearSolver):
-    def solve(self, A: "np.ndarray", b: "np.ndarray", rtol: float, max_iter: int, M:"np.ndarray"):
+    def solve(
+        self,
+        A: "np.ndarray",
+        b: "np.ndarray",
+        rtol: float,
+        max_iter: int,
+        M: "np.ndarray",
+    ):
         x, info = sp.sparse.linalg.gmres(A, b, rtol=rtol, maxiter=max_iter, M=M)
         return x, info

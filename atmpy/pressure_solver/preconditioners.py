@@ -14,12 +14,14 @@ if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
     from atmpy.variables.multiple_pressure_variables import MPV
     from atmpy.pressure_solver.classical_pressure_solvers import ClassicalPressureSolver
+
     # Assuming utility function is accessible
     from atmpy.pressure_solver.utility import one_element_inner_slice
 
-#==============================================================================
+# ==============================================================================
 # Utility: Matrix Probing
-#==============================================================================
+# ==============================================================================
+
 
 def _perform_operator_probing(
     pressure_solver: "ClassicalPressureSolver",
@@ -27,9 +29,9 @@ def _perform_operator_probing(
     is_nongeostrophic: bool,
     is_nonhydrostatic: bool,
     is_compressible: bool,
-    inner_shape: Tuple[int, ...], # Shape of the inner grid (operator domain)
-    inner_slice_nodes: Tuple[slice, ...] # Slice to get inner nodes from full grid
-) -> List[Tuple[Tuple[int,...], np.ndarray]]:
+    inner_shape: Tuple[int, ...],  # Shape of the inner grid (operator domain)
+    inner_slice_nodes: Tuple[slice, ...],  # Slice to get inner nodes from full grid
+) -> List[Tuple[Tuple[int, ...], np.ndarray]]:
     """
     Helper function to probe the Helmholtz operator numerically.
 
@@ -118,6 +120,7 @@ def _perform_operator_probing(
 # Diagonal Preconditioner Components & Application
 # =============================================================================
 
+
 def compute_inverse_diagonal_components(
     pressure_solver: "ClassicalPressureSolver",
     dt: float,
@@ -136,8 +139,13 @@ def compute_inverse_diagonal_components(
 
     ################################### Perform the probing ############################################################
     probe_results = _perform_operator_probing(
-        pressure_solver, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible,
-        inner_shape, inner_slice
+        pressure_solver,
+        dt,
+        is_nongeostrophic,
+        is_nonhydrostatic,
+        is_compressible,
+        inner_shape,
+        inner_slice,
     )
 
     ######################### Assemble the results from probing to get the diagonal ####################################
@@ -155,7 +163,8 @@ def compute_inverse_diagonal_components(
     non_zero_mask = np.abs(diag_inner) > 1e-15
     diag_inv_inner[non_zero_mask] = 1.0 / diag_inner[non_zero_mask]
 
-    return {'diag_inv': diag_inv_inner}
+    return {"diag_inv": diag_inv_inner}
+
 
 def apply_inverse_diagonal(r_flat: np.ndarray, *, diag_inv: np.ndarray) -> np.ndarray:
     """
@@ -164,15 +173,19 @@ def apply_inverse_diagonal(r_flat: np.ndarray, *, diag_inv: np.ndarray) -> np.nd
     """
     original_shape = diag_inv.shape
     if r_flat.shape[0] != np.prod(original_shape):
-         raise ValueError(f"Shape mismatch: r flat {r_flat.shape} vs diag_inv {original_shape}")
+        raise ValueError(
+            f"Shape mismatch: r flat {r_flat.shape} vs diag_inv {original_shape}"
+        )
 
     r_unflat = r_flat.reshape(original_shape)
     z_unflat = diag_inv * r_unflat
     return z_unflat.flatten()
 
+
 # =================================================================================
 # Column (Tridiagonal) Preconditioner Components & Application (Example Structure)
 # =================================================================================
+
 
 def compute_tridiagonal_components(
     pressure_solver: "ClassicalPressureSolver",
@@ -192,8 +205,13 @@ def compute_tridiagonal_components(
 
     # Perform the probing
     probe_results = _perform_operator_probing(
-        pressure_solver, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible,
-        inner_shape, inner_slice_nodes
+        pressure_solver,
+        dt,
+        is_nongeostrophic,
+        is_nonhydrostatic,
+        is_compressible,
+        inner_shape,
+        inner_slice_nodes,
     )
 
     # Process results to get tridiagonal bands
@@ -211,34 +229,44 @@ def compute_tridiagonal_components(
         diag_band[mask_j] += helmholtz_op_unflat[mask_j]
 
         # Lower: Result at j+1 where input was at j
-        if np.any(mask_j[..., :-1, :]): # Check if shift is possible within mask bounds
-             mask_jp1 = np.roll(mask_j, shift=1, axis=gravity_axis)
-             valid_points_lower = mask_j & mask_jp1 # Ensure both j and j+1 are valid inner points hit by the probe
-             # Add result at j+1 locations where input was at j
-             lower_band[valid_points_lower] += helmholtz_op_unflat[valid_points_lower]
+        if np.any(mask_j[..., :-1, :]):  # Check if shift is possible within mask bounds
+            mask_jp1 = np.roll(mask_j, shift=1, axis=gravity_axis)
+            valid_points_lower = (
+                mask_j & mask_jp1
+            )  # Ensure both j and j+1 are valid inner points hit by the probe
+            # Add result at j+1 locations where input was at j
+            lower_band[valid_points_lower] += helmholtz_op_unflat[valid_points_lower]
 
         # Upper: Result at j-1 where input was at j
-        if np.any(mask_j[..., 1:, :]): # Check if shift is possible
-             mask_jm1 = np.roll(mask_j, shift=-1, axis=gravity_axis)
-             valid_points_upper = mask_j & mask_jm1
-             # Add result at j-1 locations where input was at j
-             upper_band[valid_points_upper] += helmholtz_op_unflat[valid_points_upper]
-
+        if np.any(mask_j[..., 1:, :]):  # Check if shift is possible
+            mask_jm1 = np.roll(mask_j, shift=-1, axis=gravity_axis)
+            valid_points_upper = mask_j & mask_jm1
+            # Add result at j-1 locations where input was at j
+            upper_band[valid_points_upper] += helmholtz_op_unflat[valid_points_upper]
 
     # --- Optional: Add horizontal probing for diagonal refinement ---
     # If needed, add loops similar to BK19's ii/kk here, calling the operator
     # again with horizontally staggered p_test vectors and adding ONLY
     # helmholtz_op_unflat[mask_horiz] to diag_band.
 
-    return {'lower': lower_band, 'diag': diag_band, 'upper': upper_band, 'grid': grid, 'gravity_axis': gravity_axis}
+    return {
+        "lower": lower_band,
+        "diag": diag_band,
+        "upper": upper_band,
+        "grid": grid,
+        "gravity_axis": gravity_axis,
+    }
 
 
-def apply_inverse_tridiagonal(r_flat: np.ndarray, *,
-                              lower: np.ndarray,
-                              diag: np.ndarray,
-                              upper: np.ndarray,
-                              grid: "Grid",
-                              gravity_axis: int) -> np.ndarray:
+def apply_inverse_tridiagonal(
+    r_flat: np.ndarray,
+    *,
+    lower: np.ndarray,
+    diag: np.ndarray,
+    upper: np.ndarray,
+    grid: "Grid",
+    gravity_axis: int,
+) -> np.ndarray:
     """
     Applies the inverse tridiagonal preconditioner by solving column-wise systems
     using scipy.linalg.solve_banded.
@@ -246,14 +274,18 @@ def apply_inverse_tridiagonal(r_flat: np.ndarray, *,
     Accepts keyword arguments matching the output of compute_tridiagonal_components.
     """
     inner_slice = one_element_inner_slice(grid.ndim, full=False)
-    inner_shape = tuple(len(range(*s.indices(dim))) for s, dim in zip(inner_slice, grid.nshape))
+    inner_shape = tuple(
+        len(range(*s.indices(dim))) for s, dim in zip(inner_slice, grid.nshape)
+    )
     num_inner_vert = inner_shape[gravity_axis]
 
     # Check shapes
     if not (lower.shape == diag.shape == upper.shape == inner_shape):
-         raise ValueError("Shape mismatch between bands and inner grid shape.")
+        raise ValueError("Shape mismatch between bands and inner grid shape.")
     if r_flat.shape[0] != np.prod(inner_shape):
-         raise ValueError(f"Shape mismatch: r_flat {r_flat.shape} vs inner_shape {inner_shape}")
+        raise ValueError(
+            f"Shape mismatch: r_flat {r_flat.shape} vs inner_shape {inner_shape}"
+        )
 
     r_unflat = r_flat.reshape(inner_shape)
     z_unflat = np.zeros_like(r_unflat)
@@ -279,7 +311,7 @@ def apply_inverse_tridiagonal(r_flat: np.ndarray, *,
         # Assemble banded matrix for scipy.linalg.solve_banded
         ab = np.zeros((3, num_inner_vert), dtype=r_col.dtype)
         ab[0, 1:] = u_col[:-1]  # Upper diagonal u_j -> row j-1
-        ab[1, :]  = d_col       # Main diagonal d_j -> row j
+        ab[1, :] = d_col  # Main diagonal d_j -> row j
         ab[2, :-1] = l_col[1:]  # Lower diagonal l_j -> row j+1
 
         # Solve
@@ -289,11 +321,14 @@ def apply_inverse_tridiagonal(r_flat: np.ndarray, *,
         except np.linalg.LinAlgError:
             # Handle singularity - check if diagonal is near zero
             if np.any(np.abs(d_col) < 1e-15):
-                 print(f"Warning: Near-zero diagonal found in tridiagonal solve for column {col_slice}. Setting result to zero.")
-                 z_unflat[col_slice] = 0.0
+                print(
+                    f"Warning: Near-zero diagonal found in tridiagonal solve for column {col_slice}. Setting result to zero."
+                )
+                z_unflat[col_slice] = 0.0
             else:
-                 print(f"Warning: LinAlgError (possibly singular) in tridiagonal solve for column {col_slice}. Setting result to zero.")
-                 z_unflat[col_slice] = 0.0 # Fallback
+                print(
+                    f"Warning: LinAlgError (possibly singular) in tridiagonal solve for column {col_slice}. Setting result to zero."
+                )
+                z_unflat[col_slice] = 0.0  # Fallback
 
     return z_unflat.flatten()
-

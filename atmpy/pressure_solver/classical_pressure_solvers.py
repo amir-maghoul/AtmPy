@@ -68,9 +68,13 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self.ndim = self.variables.ndim
         self.vertical_momentum_index: int = self.coriolis.gravity.gravity_momentum_index
         self.precondition_type: "Preconditioners" = precondition_type
-        self.precon_compute: Optional[Callable] = self._get_preconditioner_compute_components()
-        self.precon_apply_inverse: Optional[Callable] = self._get_preconditioner_apply_inverse()
-        self.precon_data: Optional[Dict[str, Any]] = None # Initialize
+        self.precon_compute: Optional[Callable] = (
+            self._get_preconditioner_compute_components()
+        )
+        self.precon_apply_inverse: Optional[Callable] = (
+            self._get_preconditioner_apply_inverse()
+        )
+        self.precon_data: Optional[Dict[str, Any]] = None  # Initialize
 
         if self.precondition_type is None:
             raise ValueError("The preconditioner type must be specified")
@@ -79,12 +83,14 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         """Get the precondtioning compute function. The sole raison d'être of this method is to avoid circular import
         issues from factory."""
         from atmpy.infrastructure.factory import get_preconditioner_components
+
         return get_preconditioner_components(self.precondition_type)
 
     def _get_preconditioner_apply_inverse(self):
         """Get the precondtioning function. The sole raison d'être of this method is to avoid circular import
         issues from factory."""
         from atmpy.infrastructure.factory import get_preconditioner
+
         return get_preconditioner(self.precondition_type)
 
     def _compute_and_store_precondition_data(
@@ -102,7 +108,6 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self.precon_data = self.precon_compute(
             self, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
         )
-
 
     def pressure_coefficients_nodes(self, cellvars: np.ndarray, dt: float):
         """Calculate the coefficients for the pressure equation. Notice the coefficients are nodal.
@@ -359,7 +364,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         # Get inner slice and inner shape of node grid
         inner_slice = one_element_inner_slice(self.ndim, full=False)
-        inshape = self.mpv.wcenter[inner_slice].shape # wcenter is an example array. Can be something else
+        inshape = self.mpv.wcenter[
+            inner_slice
+        ].shape  # wcenter is an example array. Can be something else
 
         ######## Create the shape of the flat vector containing the inner nodes ########################################
         flat_size = np.prod(inshape)
@@ -376,22 +383,20 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             # Apply the physics-based Helmholtz operator
             result = self.helmholtz_operator(
                 p_full, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
-            ) # Shape is (nx-1, ny-1, nz-1)
+            )  # Shape is (nx-1, ny-1, nz-1)
             return result.flatten()
 
         return sp.sparse.linalg.LinearOperator(operator_shape, matvec=_matvec)
 
-
-
     def solve_helmholtz(
-            self,
-            rhs_flat: np.ndarray,
-            dt: float,
-            is_nongeostrophic: bool,
-            is_nonhydrostatic: bool,
-            is_compressible: bool,
-            rtol: float = 1e-6,
-            max_iter: Optional[int] = None,
+        self,
+        rhs_flat: np.ndarray,
+        dt: float,
+        is_nongeostrophic: bool,
+        is_nonhydrostatic: bool,
+        is_compressible: bool,
+        rtol: float = 1e-6,
+        max_iter: Optional[int] = None,
     ) -> Tuple[np.ndarray, int]:
         """
         Solve the Helmholtz equation Ax = b using the configured linear solver and preconditioner.
@@ -443,8 +448,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             precon_shape = A.shape
             M_op = sp.sparse.linalg.LinearOperator(precon_shape, matvec=matvec_M_inv)
         else:
-             print(f"Warning: Preconditioner data for {self.precondition_type} was not computed.")
-
+            print(
+                f"Warning: Preconditioner data for {self.precondition_type} was not computed."
+            )
 
         ########################## 3. Call the configured linear solver ################################################
         solution_flat, info = self.linear_solver.solve(
@@ -458,7 +464,6 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             print(f"ERROR: Linear solver failed with error code {info}.")
 
         return solution_flat, info
-
 
     def _calculate_P_over_Gamma(self, cellvars: np.ndarray):
         """Calculates P/Gamma. This is an intermediate function to avoid duplicate codes.

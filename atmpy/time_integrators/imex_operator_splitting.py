@@ -610,7 +610,7 @@ def example_usage():
     rhs = np.ones_like(x).flatten()
     print(mpv.wcenter.shape)
     y, info = pressure.solve_helmholtz(rhs, dt, True, True, True)
-    print(y.reshape((grid.ncx_total-1, grid.ncy_total-1)))
+    print(y.reshape((grid.ncx_total - 1, grid.ncy_total - 1)))
     print(info)
 
 

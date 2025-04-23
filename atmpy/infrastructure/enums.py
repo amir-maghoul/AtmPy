@@ -141,4 +141,3 @@ class Preconditioners(Enum):
 
     DIAGONAL = "diagonal"
     COLUMN = "column"
-
