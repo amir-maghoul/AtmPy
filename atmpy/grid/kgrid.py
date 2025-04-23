@@ -212,7 +212,7 @@ class Grid:
             self.cshape = (self.ncx_total, self.ncy_total)
             self.nshape = (self.nnx_total, self.nny_total)
             self.icshape = (self.nx, self.ny)
-            self.inshape = (self.nx+1, self.ny+1)
+            self.inshape = (self.nx + 1, self.ny + 1)
 
             # Generate y-coordinate arrays
             self.y_cells: np.ndarray = np.linspace(

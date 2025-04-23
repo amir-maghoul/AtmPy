@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from atmpy.infrastructure.enums import Preconditioners
 
 
-
 class AbstractPressureSolver(ABC):
     """Create different definitions of pressure solvers."""
 

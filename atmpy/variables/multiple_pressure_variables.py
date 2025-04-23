@@ -273,5 +273,5 @@ if __name__ == "__main__":
 
     mvp = MPV(grid)
 
-    mvp.state([0, 1, 0], 1.)
+    mvp.state([0, 1, 0], 1.0)
     print(mvp.hydrostate.cell_vars[..., HI.RHO0].reshape((1, -1)))

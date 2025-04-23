@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 import scipy as sp
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -10,18 +11,18 @@ if TYPE_CHECKING:
 
 class ILinearSolver(ABC):
     @abstractmethod
-    def solve(self, A: "np.ndarray", b: "np.ndarray", tol: float, max_iter: int):
+    def solve(self, A: "np.ndarray", b: "np.ndarray", rtol: float, max_iter: int, M:"np.ndarray"):
         pass
 
 
 class BiCGStabSolver(ILinearSolver):
-    def solve(self, A: "np.ndarray", b: "np.ndarray", tol: float, max_iter: int):
+    def solve(self, A: "np.ndarray", b: "np.ndarray", rtol: float, max_iter: int, M:"np.ndarray"):
         # ... Use sp.sparse.linalg.bicgstab ...
-        x, info = sp.sparse.linalg.bicgstab(A, b, tol=tol, maxiter=max_iter)
+        x, info = sp.sparse.linalg.bicgstab(A, b, rtol=rtol, maxiter=max_iter, M=M)
         return x, info
 
 
 class GMRESSolver(ILinearSolver):
-    def solve(self, A: "np.ndarray", b: "np.ndarray", tol: float, max_iter: int):
-        x, info = sp.sparse.linalg.gmres(A, b, tol=tol, maxiter=max_iter)
+    def solve(self, A: "np.ndarray", b: "np.ndarray", rtol: float, max_iter: int, M:"np.ndarray"):
+        x, info = sp.sparse.linalg.gmres(A, b, rtol=rtol, maxiter=max_iter, M=M)
         return x, info

@@ -135,7 +135,10 @@ class PressureSolvers(Enum):
 
     CLASSIC_PRESSURE_SOLVER = "classical_pressure_solver"
 
+
 class Preconditioners(Enum):
     """Map name to function for the preconditioner"""
 
     DIAGONAL = "diagonal"
+    COLUMN = "column"
+

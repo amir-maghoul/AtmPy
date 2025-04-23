@@ -1,5 +1,7 @@
 """Internal module to test whether a given name exists in the function registry."""
+
 from atmpy.infrastructure.enums import Preconditioners
+
 # factories.py
 
 from atmpy.infrastructure.registries import (
@@ -13,6 +15,7 @@ from atmpy.infrastructure.registries import (
     DISCRETE_OPERATORS,
     PRESSURE_SOLVERS,
     PRECONDITIONERS,
+    PRECONDITIONER_COMPONENTS,
 )
 from typing import TYPE_CHECKING
 
@@ -265,3 +268,22 @@ def get_preconditioner(name: "Preconditioners") -> callable:
 
     return preconditioner
 
+def get_preconditioner_components(name: "Preconditioners") -> callable:
+    """
+    Retrieves the pre-conditioner component function based on the provided enum member.
+
+    Parameters
+    ----------
+    name: Preconditioners (enum)
+        The enum member specifying the desired pre-conditioner compute function.
+
+    Returns
+    -------
+    Callable: The corresponding pre-conditioner compute function.
+    """
+    preconditioner_components = PRECONDITIONER_COMPONENTS.get(name)
+
+    if preconditioner_components is None:
+        raise ValueError(f"Unknown preconditioner routine: {name}")
+
+    return preconditioner_components

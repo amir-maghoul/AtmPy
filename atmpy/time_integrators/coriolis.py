@@ -136,7 +136,9 @@ class CoriolisOperator:
         # Get elements of the inverse combined matrix (combination of switches, coriolis matrix and the buoyancy term)
         # See docstrings for more details.
         u_new, v_new, w_new = self.coriolis_inverse_kernel(
-            U, V, W,
+            U,
+            V,
+            W,
             dChi_full_term,
             bool(nonhydro),  # Cast to bool for better handling in Numba
             bool(nongeo),  # Cast to bool for better handling in Numba

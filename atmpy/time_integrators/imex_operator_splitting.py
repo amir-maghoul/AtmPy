@@ -336,7 +336,10 @@ def example_usage():
     from atmpy.physics.thermodynamics import Thermodynamics
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.variables.variables import Variables
-    from atmpy.infrastructure.enums import VariableIndices as VI, HydrostateIndices as HI
+    from atmpy.infrastructure.enums import (
+        VariableIndices as VI,
+        HydrostateIndices as HI,
+    )
     from atmpy.boundary_conditions.bc_extra_operations import (
         WallAdjustment,
         PeriodicAdjustment,
@@ -378,17 +381,17 @@ def example_usage():
     ####################################################################################################################
     ########## Prepare some thermodynamic constant for initialization ##################################################
     ####################################################################################################################
-    A0 = 0.1/100
+    A0 = 0.1 / 100
     t_ref = 100.0
     T_ref = 300.0
     R_gas = 287.4
-    cp = th.gamma * R_gas /(th.gm1)
+    cp = th.gamma * R_gas / (th.gm1)
     N_ref = 9.81 / np.sqrt(cp * T_ref)
     Nsq_ref = N_ref * N_ref
     rhobar_n = mpv.hydrostate.node_vars[..., HI.RHOY0]
     Y_bar_n = mpv.hydrostate.node_vars[..., HI.Y0]
-    oorhobarsqrt = (1.0 / np.sqrt(rhobar))
-    oorhobarsqrt_n = (1.0 / np.sqrt(rhobar_n))
+    oorhobarsqrt = 1.0 / np.sqrt(rhobar)
+    oorhobarsqrt_n = 1.0 / np.sqrt(rhobar_n)
 
     Cs = np.sqrt(th.gamma / Msq)
     N = t_ref * np.sqrt(Nsq_ref)
@@ -400,40 +403,40 @@ def example_usage():
     coriolis[2] = 2.0 * omega * t_ref
     F = coriolis[2]
 
-    G = np.sqrt(9. / 40.)
+    G = np.sqrt(9.0 / 40.0)
     Gamma = G * N / Cs
     mu = -Gamma
 
-    matrix = -np.array([[0, F, 0, 1j * Cs * k],
-                        [-F, 0, -N, Cs * (mu + Gamma)],
-                        [0, N, 0, 0],
-                        [1j * Cs * k, Cs * (mu - Gamma), 0, 0]])
+    matrix = -np.array(
+        [
+            [0, F, 0, 1j * Cs * k],
+            [-F, 0, -N, Cs * (mu + Gamma)],
+            [0, N, 0, 0],
+            [1j * Cs * k, Cs * (mu - Gamma), 0, 0],
+        ]
+    )
 
     eigval, eigvec = np.linalg.eig(matrix)
     ind = np.argmax(np.real(eigval))
-    x = grid.x_cells.reshape(-1,1)
-    y = grid.y_cells.reshape(-1,1)
+    x = grid.x_cells.reshape(-1, 1)
+    y = grid.y_cells.reshape(-1, 1)
     X, Y = np.meshgrid(x, y)
     t = 0
     s = 1
-    exponentials = np.exp(1j * k * X + mu * Y
-                          + (eigval[ind]) * (t) + 1j * s * t)
+    exponentials = np.exp(1j * k * X + mu * Y + (eigval[ind]) * (t) + 1j * s * t)
     chi_Y = A0 * np.real(eigvec[2, ind] * exponentials).T
     Y_p = oorhobarsqrt * N / 9.81 * Y_bar * chi_Y
 
     Theta = Y_bar + Y_p
 
-
-    x = grid.x_nodes.reshape(-1,1)
-    y = grid.y_nodes.reshape(-1,1)
+    x = grid.x_nodes.reshape(-1, 1)
+    y = grid.y_nodes.reshape(-1, 1)
     X, Y = np.meshgrid(x, y)
     t = 0
     s = 1
-    exponentials = np.exp(1j * k * X + mu * Y
-                          + (eigval[ind]) * (t) + 1j * s * t)
+    exponentials = np.exp(1j * k * X + mu * Y + (eigval[ind]) * (t) + 1j * s * t)
     chi_pi = A0 * np.real(eigvec[3, ind] * exponentials).T
     pi_n = oorhobarsqrt_n * Cs / Y_bar_n / th.Gammainv * chi_pi
-
 
     ####################################################################################################################
     ## VARIABLE DATA ###################################################################################################
@@ -456,8 +459,6 @@ def example_usage():
     variables.cell_vars[..., VI.RHOV] = array
 
     mpv.p2_nodes[...] = pi_n
-
-
 
     ####################################################################################################################
     ######### FLUX #####################################################################################################
@@ -526,7 +527,7 @@ def example_usage():
         solver_type=PressureSolvers.CLASSIC_PRESSURE_SOLVER,
         op_context=op_context,
         linear_solver_type=linear_solver,
-        precondition_type=Preconditioners.DIAGONAL,
+        precondition_type=Preconditioners.COLUMN,
         extra_dependencies={
             "grid": grid,
             "variables": variables,
@@ -602,10 +603,15 @@ def example_usage():
     print(mpv.p2_nodes)
     pressure.pressure_coefficients_nodes(variables.cell_vars, dt)
     time_integrator.forward_update()
-    x = pressure.helmholtz_operator(mpv.p2_nodes,dt, True, True, True)
+    x = pressure.helmholtz_operator(mpv.p2_nodes, dt, True, True, True)
     print(mpv.p2_nodes)
     print(x)
 
+    rhs = np.ones_like(x).flatten()
+    print(mpv.wcenter.shape)
+    y, info = pressure.solve_helmholtz(rhs, dt, True, True, True)
+    print(y.reshape((grid.ncx_total-1, grid.ncy_total-1)))
+    print(info)
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ from atmpy.infrastructure.utility import one_element_inner_slice
 from atmpy.physics.thermodynamics import Thermodynamics
 from atmpy.pressure_solver import preconditioners
 from atmpy.pressure_solver.abstract_pressure_solver import AbstractPressureSolver
+from atmpy.pressure_solver.preconditioners import *
 
 if TYPE_CHECKING:
     from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
@@ -53,7 +54,12 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         Msq: float,
     ):
         super().__init__(
-            discrete_operator, linear_solver, precondition_type, coriolis, thermodynamics, Msq
+            discrete_operator,
+            linear_solver,
+            precondition_type,
+            coriolis,
+            thermodynamics,
+            Msq,
         )
         self.grid = grid
         self.variables: "Variables" = variables
@@ -62,18 +68,40 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self.ndim = self.variables.ndim
         self.vertical_momentum_index: int = self.coriolis.gravity.gravity_momentum_index
         self.precondition_type: "Preconditioners" = precondition_type
-        self.precon_apply: Callable = self.get_preconditioner()
-        self.precon_data: Dict
+        self.precon_compute: Optional[Callable] = self._get_preconditioner_compute_components()
+        self.precon_apply_inverse: Optional[Callable] = self._get_preconditioner_apply_inverse()
+        self.precon_data: Optional[Dict[str, Any]] = None # Initialize
 
-    def get_preconditioner(self):
-        """ Get the precondtioning function. The sole raison d'être of this method is to avoid circular import
-            issues from factory."""
+        if self.precondition_type is None:
+            raise ValueError("The preconditioner type must be specified")
+
+    def _get_preconditioner_compute_components(self):
+        """Get the precondtioning compute function. The sole raison d'être of this method is to avoid circular import
+        issues from factory."""
+        from atmpy.infrastructure.factory import get_preconditioner_components
+        return get_preconditioner_components(self.precondition_type)
+
+    def _get_preconditioner_apply_inverse(self):
+        """Get the precondtioning function. The sole raison d'être of this method is to avoid circular import
+        issues from factory."""
         from atmpy.infrastructure.factory import get_preconditioner
         return get_preconditioner(self.precondition_type)
 
-    def get_precon_data(self):
-        """ Fills the precon_data attribute to pass to preconditioner function."""
-        pass
+    def _compute_and_store_precondition_data(
+        self,
+        dt: float,
+        is_nongeostrophic: bool,
+        is_nonhydrostatic: bool,
+        is_compressible: bool,
+    ) -> None:
+        """
+        Computes the necessary data for the selected preconditioner based on the
+        current state and stores it in self.precon_data.
+        """
+
+        self.precon_data = self.precon_compute(
+            self, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
+        )
 
 
     def pressure_coefficients_nodes(self, cellvars: np.ndarray, dt: float):
@@ -157,12 +185,14 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         dpdx, dpdy, dpdz = self.discrete_operator.gradient(p)
         pTheta = self._calculate_coefficient_pTheta(cellvars)
 
-        ##################### Calculate initial flux increment (cell-centered) #########################################
+        ##################### Calculate exner pressure gradient times coefficient (cell-centered) ######################
+        ##################### These are the nominator terms under the divergence in the Helmholtz equation #############
         u = -dt * pTheta * dpdx
         v = -dt * pTheta * dpdy
         w = -dt * pTheta * dpdz if self.ndim == 3 else np.zeros_like(dpdz)
 
         ##################### Apply Coriolis/Buoyancy transform (M_inv) ################################################
+        ##################### Result are the full terms under the divergence in the Helmholtz equation #################
         self.coriolis.apply_inverse(
             u,
             v,
@@ -226,7 +256,6 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         dt: float,
         is_nongeostrophic: bool,
         is_nonhydrostatic: bool,
-
     ):
         """Compute the isentropic laplacian operator:  -∇⋅( M_inv ⋅ ( dt * (PΘ)° * ∇p ) )
 
@@ -256,18 +285,22 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         ######### Calculate the needed term inside the divergence: M_inv ⋅ ( dt * (PΘ)° * ∇p )  ########################
         # The results are cell-centered
-        u, v, w = self.calculate_enthalpy_weighted_pressure_gradient(p, dt, is_nongeostrophic, is_nonhydrostatic)
+        u, v, w = self.calculate_enthalpy_weighted_pressure_gradient(
+            p, dt, is_nongeostrophic, is_nonhydrostatic
+        )
 
         ######### Stack the values above so that they can be passed to the divergence ##################################
-        vector_field_cell = np.stack(
-            [u, v, w], axis=-1
-            )[..., :self.ndim] # Ensure correct dims
+        vector_field_cell = np.stack([u, v, w], axis=-1)[
+            ..., : self.ndim
+        ]  # Ensure correct dims
 
         ######### Apply divergence #####################################################################################
         divergence = self.discrete_operator.divergence(vector_field_cell)
 
         ######### Negate the result and flatten for future usage in scipy LinearOperator ###############################
-        laplacian = -divergence         # This is the sign between the first and second term in the Helmholtz equation
+        laplacian = (
+            -divergence
+        )  # This is the sign between the first and second term in the Helmholtz equation
 
         return laplacian
 
@@ -279,7 +312,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         is_nonhydrostatic: bool,
         is_compressible: bool,
     ):
-        """ Calculate the full Helmholtz operator:
+        """Calculate the full Helmholtz operator:
         [α_p * (∂P/∂π)°/dt]p₂ + ∇⋅(M_inv⋅(dt*CΘ*∇p₂))
 
         Parameters
@@ -294,9 +327,16 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             The switch between hydrostatic and non-hydrostatic regimes
         is_compressible : bool
             The switch between compressible and incompressible regimes
+
+        Returns
+        -------
+        np.ndarray
+            The full Helmholtz operator of shape (nx-1, ny-1, nz-1)
         """
         ############### Calculate the Laplacian ########################################################################
-        laplacian = self.isentropic_laplacian(p, dt, is_nongeostrophic, is_nonhydrostatic)
+        laplacian = self.isentropic_laplacian(
+            p, dt, is_nongeostrophic, is_nonhydrostatic
+        )
 
         ####### Creating the pressure term corresponding to the dPdpi and add it to the laplacian ######################
         inner_slice = one_element_inner_slice(self.ndim, full=False)
@@ -307,11 +347,11 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         return helmholtz_result
 
     def helmholtz_operator_linear_wrapper(
-            self,
-            dt: float,
-            is_nongeostrophic: bool,
-            is_nonhydrostatic: bool,
-            is_compressible: bool,
+        self,
+        dt: float,
+        is_nongeostrophic: bool,
+        is_nonhydrostatic: bool,
+        is_compressible: bool,
     ) -> sp.sparse.linalg.LinearOperator:
         """
         Wraps the Helmholtz operator and return in as Scipy LinearOperator.
@@ -319,7 +359,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         # Get inner slice and inner shape of node grid
         inner_slice = one_element_inner_slice(self.ndim, full=False)
-        inshape = self.mpv.wcenter[inner_slice].shape
+        inshape = self.mpv.wcenter[inner_slice].shape # wcenter is an example array. Can be something else
 
         ######## Create the shape of the flat vector containing the inner nodes ########################################
         flat_size = np.prod(inshape)
@@ -336,99 +376,89 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             # Apply the physics-based Helmholtz operator
             result = self.helmholtz_operator(
                 p_full, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
-            )
+            ) # Shape is (nx-1, ny-1, nz-1)
             return result.flatten()
 
         return sp.sparse.linalg.LinearOperator(operator_shape, matvec=_matvec)
 
 
-    def _solve_helmholtz(
+
+    def solve_helmholtz(
             self,
-            rhs_flat: np.ndarray,  # Expect flattened RHS corresponding to inner grid
+            rhs_flat: np.ndarray,
             dt: float,
             is_nongeostrophic: bool,
             is_nonhydrostatic: bool,
             is_compressible: bool,
-            tol: float = 1e-6,
+            rtol: float = 1e-6,
             max_iter: Optional[int] = None,
     ) -> Tuple[np.ndarray, int]:
         """
-        Solves the Helmholtz equation Ax = b using the configured linear solver
-        and preconditioner.
+        Solve the Helmholtz equation Ax = b using the configured linear solver and preconditioner.
 
-        Parameters:
-            rhs_flat: Flattened right-hand side vector (divergence term, size matching inner grid).
-            dt, flags: Current time step and regime flags.
-            tol, max_iter: Solver tolerance and maximum iterations.
+        Parameters
+        ----------
+        rhs_flat : np.ndarray
+            The RHS of the pressure equation. In BK19 corresponds to R^n. The shape of the array before
+            flattening should have been (nx-1, ny-1, nz-1).
 
-        Returns:
-            Tuple containing the flattened solution vector (size matching inner grid)
-            and solver info code.
+        dt : float
+            The time step
+        is_nongeostrophic : bool
+            The switch between geostrophic and non-geostrophic regimes
+        is_nonhydrostatic : bool
+            The switch between hydrostatic and non-hydrostatic regimes
+        is_compressible : bool
+            The switch between compressible and incompressible regimes
+
+        Returns
+        -------
+        Tuple[np.ndarray, int]
+            The output of the scipy linear solver.
         """
-        # 1. Get the Helmholtz operator as a LinearOperator
-        # This operator expects a flattened inner vector and returns a flattened inner vector
+        ######################## 1. Get the Helmholtz operator A #######################################################
         A = self.helmholtz_operator_linear_wrapper(
             dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
         )
 
-        # 2. Prepare the Preconditioner (compute data and get apply function)
+        ######################### 2. Prepare the Preconditioner Operator M_op (representing M^-1) ######################
         M_op = None
-        apply_prec_inv = None  # Function z = M^{-1}r
 
-        if self.precondition_type == Preconditioners.DIAGONAL:
-            # Compute the inverse diagonal (unflattened, shape of inner grid)
-            # using the updated preconditioners.compute_inverse_diagonal
-            self.preconditioner_data = preconditioners.compute_inverse_diagonal(
-                self, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
-            )
-            # Define the application function
-            # Capture the computed diagonal data for the closure
-            diag_inv_data_unflat = self.preconditioner_data
-
-            def apply_prec_inv_diag(r_flat):
-                # apply_inverse_diagonal takes unflattened diag_inv, flattened r
-                # and returns flattened z
-                return preconditioners.apply_inverse_diagonal(diag_inv_data_unflat, r_flat)
-
-            apply_prec_inv = apply_prec_inv_diag
-
-        # elif self.preconditioner_type == Preconditioners.COLUMN:
-        # # Compute tridiagonal components (result might be tuple of arrays)
-        # self.preconditioner_data = preconditioners.compute_tridiagonal_components(
-        #    self, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
-        # )
-        # tridiag_data = self.preconditioner_data
-        # def apply_prec_inv_col(r_flat):
-        #     # apply_inverse_tridiagonal would take components, flattened r,
-        #     # potentially grid info for reshaping, and return flattened z
-        #     return preconditioners.apply_inverse_tridiagonal(tridiag_data, r_flat, self.grid) # Example
-        # apply_prec_inv = apply_prec_inv_col
-
-        # 3. Wrap the preconditioner application function in a LinearOperator for SciPy
-        if apply_prec_inv is not None:
-            if A.shape[0] != rhs_flat.shape[0]:
-                raise ValueError(f"Shape mismatch: Operator A rows {A.shape[0]} vs RHS {rhs_flat.shape[0]}")
-            # The preconditioner M^{-1} must operate on vectors of the same size as the RHS/solution
-            precon_shape = A.shape
-            # matvec performs the M^{-1} * r operation
-            M_op = sp.sparse.linalg.LinearOperator(precon_shape, matvec=apply_prec_inv)
-
-        # 4. Call the configured linear solver
-        # Ensure linear_solver.solve handles M=None correctly
-        solution_flat, info = self.linear_solver.solve(
-            A, rhs_flat, tol=tol, max_iter=max_iter, M=M_op
+        # Compute/update preconditioner data for the current state
+        self._compute_and_store_precondition_data(
+            dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
         )
 
-        # --- Logging (Optional) ---
-        # You might want to track iterations or convergence status
+        if self.precon_data is not None:
+
+            # Capture the current data and the specific apply function
+            current_data = self.precon_data
+            apply_func = self.precon_apply_inverse
+
+            # Define the matvec for M^-1
+            def matvec_M_inv(r_flat: np.ndarray) -> np.ndarray:
+                return apply_func(r_flat, **current_data)
+
+            # Wrap in SciPy LinearOperator
+            precon_shape = A.shape
+            M_op = sp.sparse.linalg.LinearOperator(precon_shape, matvec=matvec_M_inv)
+        else:
+             print(f"Warning: Preconditioner data for {self.precondition_type} was not computed.")
+
+
+        ########################## 3. Call the configured linear solver ################################################
+        solution_flat, info = self.linear_solver.solve(
+            A, rhs_flat, rtol=rtol, max_iter=max_iter, M=M_op
+        )
+
+        # Optional Logging
         if info > 0:
             print(f"WARNING: Linear solver did not converge in {info} iterations.")
         elif info < 0:
             print(f"ERROR: Linear solver failed with error code {info}.")
-        # else: # info == 0
-        #    print(f"Linear solver converged.")
 
         return solution_flat, info
+
 
     def _calculate_P_over_Gamma(self, cellvars: np.ndarray):
         """Calculates P/Gamma. This is an intermediate function to avoid duplicate codes.
@@ -466,8 +496,8 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         The dt**2 in the denominator has an obvious reason: This will be part of the Helmholtz equation operator, the
         laplacian and this term should be created as an overall operator, the dt (which basically belongs to the
-        laplacian update) should be divided before we create the operator ([C/dt]p₂ + ∇⋅(M_inv⋅(dt*CΘ*∇p₂)) = DivV). """
-
+        laplacian update) should be divided before we create the operator ([C/dt]p₂ + ∇⋅(M_inv⋅(dt*CΘ*∇p₂)) = DivV).
+        """
 
         # Calculate the coefficient and the exponent of the dP/dpi using the formula directly. (see the docstring)
         ccenter = -self.Msq * self.th.gm1inv / (dt)
@@ -479,7 +509,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         # Averaging over the nodes and fill the mpv container
         kernel = np.ones([2] * self.ndim)
         return (
-                ccenter
-                * sp.signal.fftconvolve(P ** cexp, kernel, mode="valid")
-                / kernel.sum()
+            ccenter
+            * sp.signal.fftconvolve(P**cexp, kernel, mode="valid")
+            / kernel.sum()
         )
