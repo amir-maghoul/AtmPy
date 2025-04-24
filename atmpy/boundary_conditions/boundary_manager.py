@@ -102,7 +102,8 @@ class BoundaryManager:
         for side, context in zip(sides, contexts):
             if side in self.boundary_conditions.keys():
                 condition = self.boundary_conditions[side]
-                condition.apply(cells, context)
+                # TODO: Include Context in apply
+                condition.apply(cells)
 
     def apply_boundary_on_all_sides(self, cells: "np.ndarray"):
         """Apply the boundary conditions on all sides."""

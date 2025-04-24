@@ -7,7 +7,7 @@ from rfc3986_validator import RELATIVE_REF_RE
 
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.boundary_conditions.contexts import BCApplicationContext
-from atmpy.infrastructure.utility import directional_indices, one_element_inner_slice
+from atmpy.infrastructure.utility import directional_indices, one_element_inner_slice, one_element_inner_nodal_shape
 from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
 from atmpy.infrastructure.enums import VariableIndices as VI, Preconditioners
 
@@ -121,7 +121,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Update all other variables on the boundary.
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
 
-    def backward_explicit_update(self, dt: float):
+    def backward_update_explicit(self, dt: float):
         """This is the first part of implicit Euler update. This method does the job to calculate the terms involving the
         n-th timestep in the implicit scheme. The method backward_implicit_update involves the terms evaluated at the
         (n+1)-th timestep in the implicit scheme.
@@ -183,16 +183,14 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         initial_vars: np.ndarray
             The initial variables of the problem before any changes were made by calculation of half-time step.
         """
-        cellvars = self.variables.cell_vars
+        cellvars = self.variables.cell_vars if initial_vars is None else initial_vars
 
-        # First update the boundary and calculate the coefficients of the pressure equation
-        if initial_vars:
-            self.boundary_manager.apply_boundary_on_all_sides(initial_vars)
-            self.pressure_solver.pressure_coefficients_nodes(initial_vars)
-        else:
-            self.boundary_manager.apply_boundary_on_all_sides(cellvars)
-            self.pressure_solver.pressure_coefficients_nodes(cellvars)
+        ################################ 1. Preparation ################################################################
+        # Update the boundary value from current variables/initial variable and compute the pressure coefficients
+        self.boundary_manager.apply_boundary_on_all_sides(cellvars)
+        self.pressure_solver.pressure_coefficients_nodes(cellvars, dt)
 
+        ################################ 2. Apply boundary conditions on pi' ###########################################
         # First create the application context for the boundary manager. That is setting the flag is_nodal for all
         # dimensions and all sides (therefore ndim*2) to True since p2_nodes is nodal.
         contexts = [BCApplicationContext(is_nodal=True)] * self.grid.ndim * 2
@@ -202,11 +200,79 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.mpv.p2_nodes, contexts
         )
 
-        # Adjust the variables using the pressure variable
-        self.pressure_solver.correction_nodes(self.mpv.p2_nodes, 0.0)
+        ################################ 3. "Pre-Correction" using Current Pressure p^k ################################
+        # This modifies self.variables.cell_vars based on the *current* pressure guess.
+        # The buoyancy term is NOT adjusted in this preparatory step (updt_chi=0.0).
+        CHI_UPDT_VALUE = 0.0
+        self.pressure_solver.apply_pressure_gradient_update(
+            p=self.mpv.p2_nodes, # Use current pressure
+            updt_chi=CHI_UPDT_VALUE,        # Don't adjust buoyancy here
+            dt=dt,
+            is_nongeostrophic=self.is_nongeostrophic,
+            is_nonhydrostatic=self.is_nonhydrostatic,
+        )
 
-        # Update boundary
-        self.boundary_manager.apply_boundary_on_all_sides(cellvars)
+        ############################# 4. Apply BCs to Pre-Corrected State ##############################################
+        # TODO: Check if necessary
+        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
+
+        ############################# 5. Compute RHS (Divergence of Pre-Corrected Momenta) #############################
+        # Get the precorrected variables
+        cellvars = self.variables.cell_vars
+
+        # Calculate pressure-weighted momenta P*v = (rhoY/rho) * rho*v
+        pressure_weighted_momenta = self._calculate_pressure_weighted_momenta(cellvars)
+
+        # Calculate divergence on one element inner nodes [shape: (nx-1, ny-1, nz-1)]
+        divergence_inner = self.discrete_operator.divergence(pressure_weighted_momenta)
+
+        # Final RHS for A * delta_p = rhs
+        rhs_flat = divergence_inner.flatten()
+
+        # Adjust the coefficients of the pressure gradient term for the solver as a result of compressibility regime
+        self.mpv.wcenter *= self.is_compressible
+
+        ############################ 6. Solve the elliptic helmholtz equation ##########################################
+        p2_inner_flat, solver_info = self.pressure_solver.solve_helmholtz(
+            rhs_flat, dt, self.is_nongeostrophic, self.is_nonhydrostatic, self.is_compressible,
+            # Add tol/max_iter if needed, e.g., tol=1e-7
+        )
+
+        ############################ 7. Prepare p2 for Correction Step #################################################
+        inner_slice = one_element_inner_slice(self.ndim, full=False)
+        inner_shape = one_element_inner_nodal_shape(self.grid.nshape)
+        p_unflat = p2_inner_flat.reshape(inner_shape)
+
+        # Pad increment to full nodal shape
+        p2_full = np.zeros_like(self.mpv.p2_nodes)
+        p2_full[inner_slice] = p_unflat
+
+        ############################ 8. Update boundary with the new values ############################################
+        # Use the current existing context (is_nodal for all sides)
+        self.boundary_manager.apply_boundary_on_single_var_all_sides(p2_full, contexts)
+
+        ############################ 9. Final Correction using Pressure Increment delta_p ##############################
+        # Apply the update using the *solved increment*.
+        # The buoyancy *is* adjusted now (updt_chi=1.0).
+        CHI_UPDT_VALUE = 1.0
+        self.pressure_solver.apply_pressure_gradient_update(
+            p=p2_full,      # Use solved increment
+            updt_chi=CHI_UPDT_VALUE,   # Adjust buoyancy now
+            dt=dt,
+            is_nongeostrophic=self.is_nongeostrophic,
+            is_nonhydrostatic=self.is_nonhydrostatic,
+        )
+
+        ############################ 10. Update The Main Exner Pressure ################################################
+        self.mpv.p2_nodes += p2_full
+
+        ############################ 11. Apply Final Boundary Conditions ###############################################
+        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
+
+        # Use the current existing contexts (is_nodal for all sides)
+        self.boundary_manager.apply_boundary_on_single_var_all_sides(
+            self.mpv.p2_nodes, contexts
+        )
 
     def _forward_momenta_update(
         self,
@@ -274,10 +340,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # Compute the divergence of the pressure-weighted momenta: (Pu)_x + (Pv)_y + (Pw)_z where
         # P = rho*Y = rho*Theta
-        momenta_indices = [VI.RHOU, VI.RHOV, VI.RHOW][: self.grid.ndim]
+        pressure_weighted_momenta = self._calculate_pressure_weighted_momenta(self.variables.cell_vars)
         inner_slice = one_element_inner_slice(self.grid.ndim, full=False)
         self.mpv.rhs[inner_slice] = self.discrete_operator.divergence(
-            self.variables.cell_vars[..., momenta_indices] * Y[..., np.newaxis],
+            pressure_weighted_momenta,
         )
 
         # Adjust wall boundary nodes (scale). Notice the side is set to be BdrySide.ALL.
@@ -328,6 +394,13 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             * cellvars[..., VI.RHO]
         )
 
+    def _calculate_pressure_weighted_momenta(self, cellvars: np.ndarray):
+        """ Calculate the vector [Pu, [Pv], [Pw]] which is equal to rho*Theta*velocities. This is needed in multiple
+        parts of the code"""
+        Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
+        momenta_indices = [VI.RHOU, VI.RHOV, VI.RHOW][:self.grid.ndim]
+        return cellvars[..., momenta_indices] * Y[..., np.newaxis]
+
     def get_dt(self):
         return self.dt
 
@@ -347,7 +420,7 @@ def example_usage():
 
     np.set_printoptions(linewidth=300)
     np.set_printoptions(suppress=True)
-    np.set_printoptions(precision=5)
+    np.set_printoptions(precision=10)
 
     ####################################################################################################################
     # GRID DATA ########################################################################################################
@@ -429,6 +502,12 @@ def example_usage():
 
     Theta = Y_bar + Y_p
 
+    chi_u = A0 * np.real(eigvec[0, ind] * exponentials).T
+    chi_w = A0 * np.real(eigvec[1, ind] * exponentials).T
+
+    up = oorhobarsqrt * chi_u
+    vp = oorhobarsqrt * chi_w
+
     x = grid.x_nodes.reshape(-1, 1)
     y = grid.y_nodes.reshape(-1, 1)
     X, Y = np.meshgrid(x, y)
@@ -436,7 +515,11 @@ def example_usage():
     s = 1
     exponentials = np.exp(1j * k * X + mu * Y + (eigval[ind]) * (t) + 1j * s * t)
     chi_pi = A0 * np.real(eigvec[3, ind] * exponentials).T
+
+
     pi_n = oorhobarsqrt_n * Cs / Y_bar_n / th.Gammainv * chi_pi
+
+
 
     ####################################################################################################################
     ## VARIABLE DATA ###################################################################################################
@@ -450,13 +533,13 @@ def example_usage():
     variables = Variables(grid, 6, 1)
     variables.cell_vars[..., VI.RHO] = rhobar
     # variables.cell_vars[..., VI.RHO][1:-1, 1:-1] = 4
-    variables.cell_vars[..., VI.RHOU] = array
+    variables.cell_vars[..., VI.RHOU] = up
     variables.cell_vars[..., VI.RHOY] = rhobar * Theta
-    variables.cell_vars[..., VI.RHOW] = 3
+    variables.cell_vars[..., VI.RHOW] = 0.0
 
     rng.shuffle(arr)
     array = arr.reshape(nnx, nny)
-    variables.cell_vars[..., VI.RHOV] = array
+    variables.cell_vars[..., VI.RHOV] = vp
 
     mpv.p2_nodes[...] = pi_n
 
@@ -468,6 +551,23 @@ def example_usage():
 
     eos = ExnerBasedEOS()
     flux = Flux(grid, variables, eos)
+
+    ########## STRATIFICATION ##########################################################################################
+    def stratification_function(y, dy):
+        g = gravity_vec[1]
+
+        Hex = 1.0 / (th.Gamma * g)
+        pi_m = np.exp(-(y - 0.5 * dy) / Hex)
+        pi_p = np.exp(-(y + 0.5 * dy) / Hex)
+
+        Theta = - (Gamma * g * dy) / (pi_p - pi_m)
+
+        return Theta
+
+    def stratification_wrapper(dy):
+        return lambda y : stratification_function(y, dy)
+
+    stratification = stratification_wrapper(grid.dy)
 
     ####################################################################################################################
     ######### BOUNDARY MANAGER #########################################################################################
@@ -481,22 +581,25 @@ def example_usage():
 
     direction = "y"
 
+
     bc = BCInstantiationOptions(
-        side=BdrySide.BOTTOM, type=BdryType.WALL, direction=direction, grid=grid
+        side=BdrySide.BOTTOM, type=BdryType.REFLECTIVE_GRAVITY, direction=direction, grid=grid, stratification=stratification,
     )
     bc2 = BCInstantiationOptions(
-        side=BdrySide.TOP, type=BdryType.WALL, direction=direction, grid=grid
+        side=BdrySide.TOP, type=BdryType.REFLECTIVE_GRAVITY, direction=direction, grid=grid, stratification=stratification,
     )
-    # bc3 = RFBCInstantiationOptions(
-    #     side=BdrySide.LEFT, type=BdryType.WALL, direction="x", grid=grid
-    # )
-    # bc4 = RFBCInstantiationOptions(
-    #     side=BdrySide.RIGHT, type=BdryType.PERIODIC, direction="x", grid=grid
-    # )
+    bc3 = BCInstantiationOptions(
+        side=BdrySide.LEFT, type=BdryType.PERIODIC, direction="x", grid=grid
+    )
+    bc4 = BCInstantiationOptions(
+        side=BdrySide.RIGHT, type=BdryType.PERIODIC, direction="x", grid=grid
+    )
     # options = [bc, bc2, bc3, bc4]
     options = [bc, bc2]
+
     bc_conditions = BoundaryConditionsConfiguration(options)
     manager = BoundaryManager(bc_conditions)
+    manager.apply_boundary_on_all_sides(variables.cell_vars)
 
     ####################################################################################################################
     ########## DISCRETE OPERATOR AND PRESSURE SOLVER ###################################################################
@@ -527,7 +630,7 @@ def example_usage():
         solver_type=PressureSolvers.CLASSIC_PRESSURE_SOLVER,
         op_context=op_context,
         linear_solver_type=linear_solver,
-        precondition_type=Preconditioners.COLUMN,
+        precondition_type=Preconditioners.DIAGONAL,
         extra_dependencies={
             "grid": grid,
             "variables": variables,
@@ -596,22 +699,29 @@ def example_usage():
     # # )
     # # pressure.correction_nodes(mpv.p2_nodes, 1.0)
     # # # print(mpv.wcenter)
-    # # print(mpv.p2_nodes)
-    # print(".......................................................")
+    # print(mpv.p2_nodes)
     # print(variables.cell_vars[..., VI.RHOU])
+    # print(".......................................................")
+    # print(variables.cell_vars[..., VI.RHOV])
+    # print(".......................................................")
 
     print(mpv.p2_nodes)
-    pressure.pressure_coefficients_nodes(variables.cell_vars, dt)
+    # # pressure.pressure_coefficients_nodes(variables.cell_vars, dt)
     time_integrator.forward_update()
-    x = pressure.helmholtz_operator(mpv.p2_nodes, dt, True, True, True)
+    time_integrator.backward_update_explicit(dt)
+    time_integrator.backward_update_implicit(dt)
+    # # x = pressure.helmholtz_operator(mpv.p2_nodes, dt, True, True, True)
     print(mpv.p2_nodes)
-    print(x)
-
-    rhs = np.ones_like(x).flatten()
-    print(mpv.wcenter.shape)
-    y, info = pressure.solve_helmholtz(rhs, dt, True, True, True)
-    print(y.reshape((grid.ncx_total - 1, grid.ncy_total - 1)))
-    print(info)
+    # print(x)
+    #
+    # rhs = np.ones_like(x).flatten()
+    # print(mpv.wcenter.shape)
+    # y, info = pressure.solve_helmholtz(rhs, dt, True, True, True)
+    # print(y.reshape((grid.ncx_total - 1, grid.ncy_total - 1)))
+    # print(info)
+    # print(variables.cell_vars[..., VI.RHOU])
+    # manager.apply_boundary_on_all_sides(variables.cell_vars)
+    # print(variables.cell_vars[..., VI.RHOU])
 
 
 if __name__ == "__main__":

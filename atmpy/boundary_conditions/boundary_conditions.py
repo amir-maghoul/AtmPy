@@ -237,8 +237,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
 
     def apply(self, cell_vars: np.ndarray):
         """Apply the reflective boundary condition for the given side of the gravity axis. If self.side is top, this means
-        that the boundary condition for the top side of the vertical axis is the 'Lid' boundary. The sponge BC should be
-        implemented separately in another class."""
+        that the boundary condition for the top side of the vertical axis is the 'Lid' boundary."""
 
         # calculate the boundary indices
         nsource, nlast, nimage = self._create_boundary_indices()
@@ -261,7 +260,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         ]  # discretization fineness in the gravity direction
 
         # Calculate the derivative of Pi (Exner pressure) in existence/nonexistence of lamb boundary
-        dpi = sign * self.th.Gamma * 0.5 * dr * (1.0 / Y_last + strat)
+        dpi = sign * self.th.Gamma * 0.5 * self.gravity.strength * dr * (1.0 / Y_last + strat)
 
         # Calculate the P = rho Theta on the nlast indices in compressible or pseudo-incompressible regimes
         if self.is_compressible:

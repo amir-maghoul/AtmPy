@@ -3,7 +3,7 @@
 import numpy as np
 import scipy as sp
 
-from atmpy.infrastructure.utility import one_element_inner_slice, directional_indices
+from atmpy.infrastructure.utility import one_element_inner_slice, directional_indices, one_element_inner_nodal_shape
 from typing import Callable, TYPE_CHECKING, Dict, Tuple, Any, List
 
 if TYPE_CHECKING:
@@ -199,6 +199,8 @@ def compute_tridiagonal_components(
     mpv = pressure_solver.mpv
     gravity_axis = pressure_solver.coriolis.gravity.axis
 
+    raise NotImplementedError("The correct version of tridiagonal preconditioner is not yet implemented.")
+
     inner_slice_nodes = one_element_inner_slice(grid.ndim, full=False)
     inner_shape = mpv.wcenter[inner_slice_nodes].shape
     num_inner_vert = inner_shape[gravity_axis]
@@ -273,10 +275,7 @@ def apply_inverse_tridiagonal(
 
     Accepts keyword arguments matching the output of compute_tridiagonal_components.
     """
-    inner_slice = one_element_inner_slice(grid.ndim, full=False)
-    inner_shape = tuple(
-        len(range(*s.indices(dim))) for s, dim in zip(inner_slice, grid.nshape)
-    )
+    inner_shape = one_element_inner_nodal_shape(grid.ndim)
     num_inner_vert = inner_shape[gravity_axis]
 
     # Check shapes

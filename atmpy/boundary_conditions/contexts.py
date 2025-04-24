@@ -28,7 +28,7 @@ class BCInstantiationOptions:
     type: "BdryType"
     direction: str
     grid: "Grid"
-    gravity: Tuple[float] = (0.0, 1.0, 0.0)
+    gravity: Tuple[float] = (0.0, 10.0, 0.0)
     stratification: callable = lambda x: x
     thermodynamics: Thermodynamics = field(default_factory=Thermodynamics)
     is_compressible: bool = field(default=True)

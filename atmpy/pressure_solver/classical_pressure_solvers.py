@@ -10,7 +10,7 @@ from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
 )
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
-from atmpy.infrastructure.utility import one_element_inner_slice
+from atmpy.infrastructure.utility import one_element_inner_slice, one_element_inner_nodal_shape
 from atmpy.physics.thermodynamics import Thermodynamics
 from atmpy.pressure_solver import preconditioners
 from atmpy.pressure_solver.abstract_pressure_solver import AbstractPressureSolver
@@ -212,7 +212,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         return u, v, w
 
-    def correction_nodes(
+    def apply_pressure_gradient_update(
         self,
         p: np.ndarray,
         updt_chi: Union[np.ndarray, float],
@@ -364,9 +364,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         # Get inner slice and inner shape of node grid
         inner_slice = one_element_inner_slice(self.ndim, full=False)
-        inshape = self.mpv.wcenter[
-            inner_slice
-        ].shape  # wcenter is an example array. Can be something else
+        inshape = one_element_inner_nodal_shape(self.grid.nshape)
 
         ######## Create the shape of the flat vector containing the inner nodes ########################################
         flat_size = np.prod(inshape)
@@ -436,7 +434,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         if self.precon_data is not None:
 
-            # Capture the current data and the specific apply function
+            # Capture the current preconditioner data and the specific apply function
             current_data = self.precon_data
             apply_func = self.precon_apply_inverse
 
@@ -518,3 +516,4 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             * sp.signal.fftconvolve(P**cexp, kernel, mode="valid")
             / kernel.sum()
         )
+
