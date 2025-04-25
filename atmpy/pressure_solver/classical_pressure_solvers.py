@@ -186,22 +186,22 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         cellvars = self.variables.cell_vars
 
         #### Calculate the needed values for the updates in the RHS of the momenta equations (the Exner pressure #######
-        #### perturbation (Pi^prime)_x, _y, _z (see RHS of momenta eq.) and the pTheta coefficients)  ##################
+        #### perturbation (Pi^prime)_x, _y, _z (see RHS of momenta eq.) and the P*Theta coefficients)  ##################
         dpdx, dpdy, dpdz = self.discrete_operator.gradient(p)
-        pTheta = self._calculate_coefficient_pTheta(cellvars)
+        pTheta = self._calculate_coefficient_pTheta(cellvars) # Capital P. it is written small for naming in Python.
 
         ##################### Calculate exner pressure gradient times coefficient (cell-centered) ######################
         ##################### These are the nominator terms under the divergence in the Helmholtz equation #############
-        u = -dt * pTheta * dpdx
-        v = -dt * pTheta * dpdy
-        w = -dt * pTheta * dpdz if self.ndim == 3 else np.zeros_like(dpdz)
+        Pu = -dt * pTheta * dpdx
+        Pv = -dt * pTheta * dpdy
+        Pw = -dt * pTheta * dpdz if self.ndim == 3 else np.zeros_like(dpdz)
 
         ##################### Apply Coriolis/Buoyancy transform (M_inv) ################################################
         ##################### Result are the full terms under the divergence in the Helmholtz equation #################
         self.coriolis.apply_inverse(
-            u,
-            v,
-            w,
+            Pu,
+            Pv,
+            Pw,
             self.variables,
             self.mpv,
             is_nongeostrophic,
@@ -210,7 +210,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             dt,
         )
 
-        return u, v, w
+        return Pu, Pv, Pw
 
     def apply_pressure_gradient_update(
         self,
@@ -238,19 +238,22 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         """
 
         ################################ Calculate the RHS of momenta equations  #######################################
-        u_incr, v_incr, w_incr = self.calculate_enthalpy_weighted_pressure_gradient(
+        Pu_incr, Pv_incr, Pw_incr = self.calculate_enthalpy_weighted_pressure_gradient(
             p, dt, is_nongeostrophic, is_nonhydrostatic
         )
 
         ################################# Create the necessary variables  ##############################################
         cellvars = self.variables.cell_vars
+        # Theta inverse to convert update of Pu, Pv and Pw to updates of rhou, rhov and rhow
         chi = cellvars[..., VI.RHO] / cellvars[..., VI.RHOY]
         dS = self.mpv.compute_dS_on_nodes()  # Assuming cell-centered dS/dy
 
         ########################## Update the full variables using the intermediate variables. #########################
-        cellvars[..., VI.RHOU] += chi * u_incr
-        cellvars[..., VI.RHOV] += chi * v_incr if self.ndim > 2 else 0.0
-        cellvars[..., VI.RHOW] += chi * w_incr if self.ndim == 3 else 0.0
+        # Notice the u_incr, v_incr and w_incr are update of Pu, Pv and Pw, where P = rho*Theta. In order to update the
+        # main momenta variables (rhou, rhov and rhow) we need to multiply the result by 1.0/Theta = chi.
+        cellvars[..., VI.RHOU] += chi * Pu_incr
+        cellvars[..., VI.RHOV] += chi * Pv_incr if self.ndim > 2 else 0.0
+        cellvars[..., VI.RHOW] += chi * Pw_incr if self.ndim == 3 else 0.0
         cellvars[..., VI.RHOX] += (
             -updt_chi * dt * dS * cellvars[..., self.vertical_momentum_index]
         )

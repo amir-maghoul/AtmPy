@@ -187,6 +187,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ################################ 1. Preparation ################################################################
         # Update the boundary value from current variables/initial variable and compute the pressure coefficients
+        # The coefficient values depend on the current values in the variables. Therefore, they are pre update coefficients
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
         self.pressure_solver.pressure_coefficients_nodes(cellvars, dt)
 
@@ -201,8 +202,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
         ################################ 3. "Pre-Correction" using Current Pressure p^k ################################
-        # This modifies self.variables.cell_vars based on the *current* pressure guess.
-        # The buoyancy term is NOT adjusted in this preparatory step (updt_chi=0.0).
+        # This method will put M_inv⋅(dt*CΘ*∇p₂)/Θ in the momenta container, where M is extended coriolis inverse.
+        # In a couple of steps the divergence will be applied on [Pu, Pv, Pw], using these values.
+        # The buoyancy term is NOT adjusted in this preparatory step (updt_chi=0.0). Only the momenta is needed for div.
         CHI_UPDT_VALUE = 0.0
         self.pressure_solver.apply_pressure_gradient_update(
             p=self.mpv.p2_nodes, # Use current pressure
@@ -217,13 +219,16 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
 
         ############################# 5. Compute RHS (Divergence of Pre-Corrected Momenta) #############################
-        # Get the precorrected variables
+        # Get the pre-corrected variables
         cellvars = self.variables.cell_vars
 
         # Calculate pressure-weighted momenta P*v = (rhoY/rho) * rho*v
-        pressure_weighted_momenta = self._calculate_pressure_weighted_momenta(cellvars)
+        # [Pu, Pv, Pw]
+        pressure_weighted_momenta = self._calculate_enthalpy_weighted_momenta(cellvars)
 
         # Calculate divergence on one element inner nodes [shape: (nx-1, ny-1, nz-1)]
+        # Since the current momenta contain the pressure gradient update, this divergence
+        # is basically ∇⋅(M_inv⋅(dt*(PΘ)*∇p₂)) where M is extended coriolis inverse
         divergence_inner = self.discrete_operator.divergence(pressure_weighted_momenta)
 
         # Final RHS for A * delta_p = rhs
@@ -340,7 +345,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # Compute the divergence of the pressure-weighted momenta: (Pu)_x + (Pv)_y + (Pw)_z where
         # P = rho*Y = rho*Theta
-        pressure_weighted_momenta = self._calculate_pressure_weighted_momenta(self.variables.cell_vars)
+        pressure_weighted_momenta = self._calculate_enthalpy_weighted_momenta(self.variables.cell_vars)
         inner_slice = one_element_inner_slice(self.grid.ndim, full=False)
         self.mpv.rhs[inner_slice] = self.discrete_operator.divergence(
             pressure_weighted_momenta,
@@ -394,7 +399,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             * cellvars[..., VI.RHO]
         )
 
-    def _calculate_pressure_weighted_momenta(self, cellvars: np.ndarray):
+    def _calculate_enthalpy_weighted_momenta(self, cellvars: np.ndarray):
         """ Calculate the vector [Pu, [Pv], [Pw]] which is equal to rho*Theta*velocities. This is needed in multiple
         parts of the code"""
         Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
