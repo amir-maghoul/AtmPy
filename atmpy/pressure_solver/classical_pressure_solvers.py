@@ -348,9 +348,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         ####### Creating the pressure term corresponding to the dPdpi and add it to the laplacian ######################
         inner_slice = one_element_inner_slice(self.ndim, full=False)
-        helmholtz_result = laplacian
-        if is_compressible:
-            helmholtz_result += self.mpv.wcenter[inner_slice] * p[inner_slice]
+        helmholtz_result = laplacian + self.mpv.wcenter[inner_slice] * p[inner_slice]
 
         return helmholtz_result
 

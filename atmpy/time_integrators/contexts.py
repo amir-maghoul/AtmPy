@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from atmpy.variables.variables import Variables
     from atmpy.flux.flux import Flux
     from atmpy.boundary_conditions.boundary_manager import BoundaryManager
+    from atmpy.infrastructure.enums import AdvectionRoutines
 from atmpy.infrastructure.enums import TimeIntegrators
 from atmpy.infrastructure.factory import get_time_integrator
 from atmpy.time_integrators.abstract_time_integrator import TTimeIntegrator
@@ -50,6 +51,7 @@ class TimeIntegratorContext(Generic[TTimeIntegrator]):
     variables: "Variables"
     flux: "Flux"
     boundary_manager: "BoundaryManager"
+    advection_routine: "AdvectionRoutines"
     dt: float
     extra_dependencies: Dict[str, Any] = field(default_factory=dict)
 
@@ -63,6 +65,7 @@ class TimeIntegratorContext(Generic[TTimeIntegrator]):
             "variables": self.variables,
             "flux": self.flux,
             "boundary_manager": self.boundary_manager,
+            "advection_routine": self.advection_routine,
             "dt": self.dt,
         }
         dependencies.update(self.extra_dependencies)
