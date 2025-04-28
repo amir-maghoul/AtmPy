@@ -16,12 +16,12 @@ from atmpy.infrastructure.enums import (
     Preconditioners,
 )
 from atmpy.boundary_conditions.boundary_conditions import *
-from atmpy.solver.advection_routines import *
+from atmpy.time_integrators.advection_routines import *
 from atmpy.pressure_solver.linear_solvers import *
 from atmpy.time_integrators.imex_operator_splitting import IMEXTimeIntegrator
 from atmpy.pressure_solver.discrete_operations import *
-from atmpy.pressure_solver.classical_pressure_solvers import ClassicalPressureSolver
 from atmpy.pressure_solver.preconditioners import *
+from atmpy.pressure_solver.classical_pressure_solvers import ClassicalPressureSolver
 
 SLOPE_LIMITERS = {
     SlopeLimiters.MINMOD: minmod,
