@@ -257,7 +257,7 @@ class BoundaryManager:
                 for condition in target_dict.values():
                     # Check if the operation's target_type matches the condition's type
                     if (
-                        operation.target_type is None
+                        operation.target_type is not None
                         or condition.type == operation.target_type
                     ):
                         condition.apply_extra(variable, operation)
@@ -275,7 +275,7 @@ class BoundaryManager:
                 if condition:
                     # Check if operation's target type matches condition's type
                     if (
-                        operation.target_type is None
+                        operation.target_type is not None
                         or condition.type == operation.target_type
                     ):
                         condition.apply_extra(variable, operation)
@@ -354,7 +354,7 @@ def boundary_manager_2d_updated():
     # Left: Periodic for main vars, Periodic for MPV vars (MPV type could be None to default)
     bc_left = BCInstantiationOptions(
         side=BdrySide.LEFT,
-        type=BdryType.PERIODIC,
+        type=BdryType.WALL,
         mpv_boundary_type=BdryType.PERIODIC,
         direction="x",
         grid=grid,
@@ -362,7 +362,7 @@ def boundary_manager_2d_updated():
     # Right: Periodic for main vars, Periodic for MPV vars
     bc_right = BCInstantiationOptions(
         side=BdrySide.RIGHT,
-        type=BdryType.PERIODIC,
+        type=BdryType.WALL,
         # mpv_boundary_type=BdryType.PERIODIC,
         direction="x",
         grid=grid,
@@ -393,12 +393,14 @@ def boundary_manager_2d_updated():
     )
     print("P2 Cells (WALL applied on Y boundaries, PERIODIC on X):\n", mpv.p2_cells)
 
-    # Example Extra Op application (e.g., scale boundary nodal velocity)
-    # Assume nodal_velocity exists and WallAdjustment applies to primary BCs
-    # nodal_velocity = np.ones(grid.nshape) # Example nodal data
-    # operations = [WallAdjustment(target_side=BdrySide.BOTTOM, factor=0.5)]
-    # manager.apply_extra_all_sides(nodal_velocity, operations, target_mpv=False)
-    # print("\nNodal Velocity after extra op:\n", nodal_velocity)
+    boundary_operation = [
+        WallAdjustment(
+            target_side=BdrySide.LEFT, target_type=BdryType.WALL, factor=100
+        )
+    ]
+    manager.apply_extra_all_sides( variables.cell_vars[..., VI.RHO], boundary_operation, target_mpv=False)
+    print(" RHO (EXTRA applied on Y boundaries, PERIODIC on X):\n",  variables.cell_vars[..., VI.RHO])
+
 
 
 if __name__ == "__main__":
