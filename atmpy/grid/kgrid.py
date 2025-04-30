@@ -384,22 +384,6 @@ class Grid:
         else:
             raise ValueError("Invalid grid dimension. Must be 1, 2, or 3.")
 
-    def get_inner_nodes(self) -> Tuple[slice, ...]:
-        """
-        Get slices corresponding to the inner nodes (excluding ghost nodes).
-
-        Returns:
-            Tuple[slice, ...]: Slices for indexing inner nodes.
-        """
-        if self.ndim == 1:
-            return (self.inner_slice_x,)
-        elif self.ndim == 2:
-            return self.inner_slice_x, self.inner_slice_y
-        elif self.ndim == 3:
-            return self.inner_slice_x, self.inner_slice_y, self.inner_slice_z
-        else:
-            raise ValueError("Invalid grid dimension")
-
     def get_boundary_nodes(self) -> Tuple[slice, ...]:
         """
         Get slices corresponding to the boundary nodes (ghost nodes).

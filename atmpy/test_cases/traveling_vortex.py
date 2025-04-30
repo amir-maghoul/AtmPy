@@ -2,12 +2,17 @@ import numpy as np
 from dataclasses import field  # Removed dataclass, not needed here
 from typing import List, Tuple, Dict, Any, TYPE_CHECKING
 
-from atmpy.infrastructure.utility import one_element_inner_nodal_shape, one_element_inner_slice, directional_indices
+from atmpy.infrastructure.utility import (
+    one_element_inner_nodal_shape,
+    one_element_inner_slice,
+    directional_indices,
+)
 from atmpy.test_cases.base_test_case import BaseTestCase
 from atmpy.configuration.simulation_configuration import SimulationConfig
 from atmpy.infrastructure.enums import BoundaryConditions as BdryType, BoundarySide
 from atmpy.infrastructure.enums import (
-    VariableIndices as VI, HydrostateIndices as HI,
+    VariableIndices as VI,
+    HydrostateIndices as HI,
     SlopeLimiters as LimiterType,
 )
 from atmpy.physics.thermodynamics import Thermodynamics
@@ -295,9 +300,7 @@ class TravelingVortex(BaseTestCase):
         variables.cell_vars[inner_slice + (VI.RHO,)] = rho_total
         variables.cell_vars[inner_slice + (VI.RHOU,)] = rho_total * u_total
         variables.cell_vars[inner_slice + (VI.RHOV,)] = rho_total * v_total
-        variables.cell_vars[inner_slice + (VI.RHOW,)] = (
-            rho_total * w_total
-        )
+        variables.cell_vars[inner_slice + (VI.RHOW,)] = rho_total * w_total
 
         rhoY0_cells = mpv.hydrostate.cell_vars[..., HI.RHOY0]
         # Calculate rhoY (Potential Temperature * Density)
@@ -305,13 +308,9 @@ class TravelingVortex(BaseTestCase):
             p_total = self.p0 + dp2c  # Add perturbation to base pressure
             # Ensure pressure is positive before taking power
             p_total_safe = np.maximum(p_total, 1e-9)
-            variables.cell_vars[inner_slice + (VI.RHOY,)] = (
-                p_total_safe**thermo.gamminv
-            )
+            variables.cell_vars[inner_slice + (VI.RHOY,)] = p_total_safe**thermo.gamminv
         else:
-            variables.cell_vars[inner_slice + (VI.RHOY,)] = (
-                rho_total * rhoY0_cells
-            )
+            variables.cell_vars[inner_slice + (VI.RHOY,)] = rho_total * rhoY0_cells
 
         # Calculate rhoX (Tracers) - Set to zero if not used
         if VI.RHOX < variables.num_vars_cell:
@@ -368,11 +367,11 @@ class TravelingVortex(BaseTestCase):
             self.alpha * p2_nodes_unscaled + self.alpha_const * p2n_const_unscaled
         )
 
-        ngy = self.config.grid.ng[1][0] # get number of ghost cells in y direction.
+        ngy = self.config.grid.ng[1][0]  # get number of ghost cells in y direction.
         mpv.p2_nodes[inner_slice] = (
             thermo.Gamma
             * self.fac**2
-            * np.divide(p2_nodes_unscaled, rhoY0_cells[ngy:-ngy+1])  # Divide by 1.0
+            * np.divide(p2_nodes_unscaled, rhoY0_cells[ngy : -ngy + 1])  # Divide by 1.0
         )
 
         # --- Set dp2_nodes (used in pressure solver) ---
@@ -391,24 +390,33 @@ class TravelingVortex(BaseTestCase):
         print("Solution initialization complete.")
 
 
-
 if __name__ == "__main__":
     # 1. Create the test case instance
     vortex_case = TravelingVortex()
 
     # 2. The configuration is now set inside vortex_case.config
     #    Access config like:
-    print("Grid dimensions (inner cells):", vortex_case.config.spatial_grid.nx, vortex_case.config.spatial_grid.ny)
-    print("Boundary condition Left:", vortex_case.config.boundary_conditions.conditions[BoundarySide.LEFT])
+    print(
+        "Grid dimensions (inner cells):",
+        vortex_case.config.spatial_grid.nx,
+        vortex_case.config.spatial_grid.ny,
+    )
+    print(
+        "Boundary condition Left:",
+        vortex_case.config.boundary_conditions.conditions[BoundarySide.LEFT],
+    )
     print("Msq:", vortex_case.config.model_regimes.Msq)
 
     # 3. Create the necessary simulation objects based on the config
     #    (This would happen in your main solver script)
     from atmpy.variables.variables import Variables
     from atmpy.variables.multiple_pressure_variables import MPV
-    grid = vortex_case.config.grid # Get the grid object
-    sim_vars = Variables(grid, num_vars_cell=6, num_vars_node=1) # Example: 6 cell vars
-    sim_mpv = MPV(grid, num_vars=6, direction='y') # Example: 6 hydro vars, hydro dir y (though unused here)
+
+    grid = vortex_case.config.grid  # Get the grid object
+    sim_vars = Variables(grid, num_vars_cell=6, num_vars_node=1)  # Example: 6 cell vars
+    sim_mpv = MPV(
+        grid, num_vars=6, direction="y"
+    )  # Example: 6 hydro vars, hydro dir y (though unused here)
 
     # 4. Initialize the solution variables using the test case method
     vortex_case.initialize_solution(sim_vars, sim_mpv)
@@ -419,12 +427,24 @@ if __name__ == "__main__":
     print("\nExample initialized values (center slice):")
     center_x = grid.nx // 2 + grid.ngx
     center_y = grid.ny // 2 + grid.ngy
-    print(f"Rho @ ({center_x}, {center_y}): {sim_vars.cell_vars[center_x, center_y, VI.RHO]:.4f}")
-    print(f"RhoU @ ({center_x}, {center_y}): {sim_vars.cell_vars[center_x, center_y, VI.RHOU]:.4f}")
-    print(f"RhoV @ ({center_x}, {center_y}): {sim_vars.cell_vars[center_x, center_y, VI.RHOV]:.4f}")
-    print(f"RhoY @ ({center_x}, {center_y}): {sim_vars.cell_vars[center_x, center_y, VI.RHOY]:.4f}")
-    print(f"p2_cells @ ({center_x}, {center_y}): {sim_mpv.p2_cells[center_x, center_y]:.4f}")
+    print(
+        f"Rho @ ({center_x}, {center_y}): {sim_vars.cell_vars[center_x, center_y, VI.RHO]:.4f}"
+    )
+    print(
+        f"RhoU @ ({center_x}, {center_y}): {sim_vars.cell_vars[center_x, center_y, VI.RHOU]:.4f}"
+    )
+    print(
+        f"RhoV @ ({center_x}, {center_y}): {sim_vars.cell_vars[center_x, center_y, VI.RHOV]:.4f}"
+    )
+    print(
+        f"RhoY @ ({center_x}, {center_y}): {sim_vars.cell_vars[center_x, center_y, VI.RHOY]:.4f}"
+    )
+    print(
+        f"p2_cells @ ({center_x}, {center_y}): {sim_mpv.p2_cells[center_x, center_y]:.4f}"
+    )
     # Note: Node indexing might differ slightly
     node_center_x = grid.nx // 2 + grid.ngx
     node_center_y = grid.ny // 2 + grid.ngy
-    print(f"p2_nodes @ ({node_center_x}, {node_center_y}): {sim_mpv.p2_nodes[node_center_x, node_center_y]:.4f}")
+    print(
+        f"p2_nodes @ ({node_center_x}, {node_center_y}): {sim_mpv.p2_nodes[node_center_x, node_center_y]:.4f}"
+    )

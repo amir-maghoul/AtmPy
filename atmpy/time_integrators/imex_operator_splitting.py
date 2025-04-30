@@ -101,7 +101,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         self.advection_routine = get_advection_routines(advection_routine_name)
 
-
     def step(self) -> None:
         """
         Performs a single time step using the semi-implicit predictor-corrector

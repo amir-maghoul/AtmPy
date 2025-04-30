@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, TYPE_CHECKING
+from typing import Dict, List, Tuple, TYPE_CHECKING, Optional
 
 from mypy.stubtest import get_mypy_type_of_runtime_value
 
@@ -7,10 +7,6 @@ if TYPE_CHECKING:
         BaseBoundaryCondition as BaseBC,
     )
     import numpy as np
-    from atmpy.boundary_conditions.contexts import (
-        BoundaryConditionsConfiguration,
-        BCApplicationContext,
-    )
     from atmpy.boundary_conditions.bc_extra_operations import (
         ExtraBCOperation,
         PeriodicAdjustment,
@@ -21,6 +17,10 @@ from atmpy.infrastructure.enums import (
     BoundarySide as BdrySide,
 )
 from atmpy.infrastructure.utility import side_direction_mapping
+from atmpy.boundary_conditions.contexts import (
+    BoundaryConditionsConfiguration,
+    BCApplicationContext,
+)
 
 
 class BoundaryManager:
@@ -29,19 +29,33 @@ class BoundaryManager:
     def __init__(self, bc_config: "BoundaryConditionsConfiguration") -> None:
         # The keys will be the boundary sides and the values are the created BC instances.
         self.boundary_conditions: Dict[BdrySide, "BaseBC"] = {}
+        self.mpv_boundary_conditions: Dict[BdrySide, "BaseBC"] = {}
         self.setup_conditions(bc_config)
 
     def setup_conditions(self, bc_config: "BoundaryConditionsConfiguration") -> None:
-        """Set up the boundary condition in a dictionary."""
+        """Set up the boundary conditions in dictionaries for main and MPV variables."""
+        self.boundary_conditions.clear()
+        self.mpv_boundary_conditions.clear()
+
         for inst_opts in bc_config.options:
-            # Validate that the given side is compatible with the direction.
+            # Validate side/direction compatibility
             BoundaryManager._validate_side_direction_compatibility(
                 inst_opts.side, inst_opts.direction
             )
-            # Create the BC instance using the factory.
+
+            ############################### Create and store PRIMARY BC instance #######################################
             bc_instance = get_boundary_conditions(inst_opts.type, inst_opts)
-            # fill the boundary_condition dictionary with the needed data
             self.boundary_conditions[inst_opts.side] = bc_instance
+
+            ############################### Create and store MPV BC instance (if specified) ############################
+            mpv_type_to_use = inst_opts.mpv_boundary_type
+            if mpv_type_to_use is None:
+                raise ValueError("The MPV boundary type must be specified.")
+
+            mpv_bc_instance = get_boundary_conditions(
+                inst_opts.mpv_boundary_type, inst_opts
+            )
+            self.mpv_boundary_conditions[inst_opts.side] = mpv_bc_instance
 
     @staticmethod
     def _validate_side_direction_compatibility(side: BdrySide, direction: str) -> None:
@@ -57,59 +71,38 @@ class BoundaryManager:
         self,
         cells: "np.ndarray",
         side: BdrySide,
-        contexts: List["BCApplicationContext"] = [None],
+        # Contexts might need adjustment if BC apply signatures change
+        # contexts: List["BCApplicationContext"] = [None], # Keep or adjust as needed
     ):
-        """Apply the boundary conditions on a single side.
-
-        Parameters
-        ----------
-        cells: np.ndarray
-            The variable container.
-        side: BdrySide
-            The side to apply the boundary condition on.
-        context: BCApplicationContext
-            The context object containing the apply method information.
-        """
-
-        print(f"Apply boundary conditions *cell variables* on side: {side}")
-        if side not in self.boundary_conditions.keys():
+        """Apply the PRIMARY boundary conditions on a single side."""
+        print(f"Apply boundary conditions *main variables* on side: {side}")
+        if side not in self.boundary_conditions:  # Check primary dict
             raise ValueError(
-                f"The side {side} does not exist in the list of given sides: {self.boundary_conditions.keys()}."
+                f"No primary boundary condition configured for side: {side}"
             )
         condition = self.boundary_conditions[side]
-        condition.apply(cells, contexts[0])
+        # Assuming apply takes only 'cells' for now, add context if needed
+        condition.apply(cells)  # Pass context[0] if required
 
     def apply_boundary_on_direction(
         self,
         cells: "np.ndarray",
         direction: str,
-        contexts: List["BCApplicationContext"] = [None, None],
+        # contexts: List["BCApplicationContext"] = [None, None], # Keep or adjust
     ):
-        """Apply the boundary conditions on a single direction, consisting of two sides.
-
-        Parameters
-        ----------
-        cells: np.ndarray
-            The variable container.
-        direction: str
-            The direction to apply the boundary condition on. Values should be "x", "y" or "z".
-        contexts: List["BCApplicationContext"]
-            The context object containing the apply method information.
-        """
-
+        """Apply the PRIMARY boundary conditions on a single direction."""
         sides: Tuple[BdrySide, BdrySide] = side_direction_mapping(direction)
-        print(f"Apply boundary conditions *cell variables* on sides: {sides}")
-        for side, context in zip(sides, contexts):
-            if side in self.boundary_conditions.keys():
+        print(f"Apply boundary conditions *main variables* on sides: {sides}")
+        for side in sides:  # Add context iteration if needed
+            if side in self.boundary_conditions:
                 condition = self.boundary_conditions[side]
-                # TODO: Include Context in apply
-                condition.apply(cells)
+                condition.apply(cells)  # Pass context if required
 
     def apply_boundary_on_all_sides(self, cells: "np.ndarray"):
-        """Apply the boundary conditions on all sides."""
-        print("Applying full boundary conditions on *cell variables*...")
+        """Apply the PRIMARY boundary conditions on all sides."""
+        print("Applying full PRIMARY boundary conditions on *main variables*...")
         for side, condition in self.boundary_conditions.items():
-            condition.apply(cells)
+            condition.apply(cells)  # Pass context if required
 
     def apply_boundary_on_single_var_one_side(
         self,
@@ -117,22 +110,11 @@ class BoundaryManager:
         side: "BdrySide",
         contexts: List["BCApplicationContext"] = [None],
     ):
-        """Apply the boundary for a single variable on one side.
-
-        Parameters
-        ----------
-        variable: np.ndarray
-            The variable array
-        side: BdrySide
-            The side to apply the boundary condition on.
-        contexts: BCApplicationContext
-            The context object containing the apply method information.
-        """
-
-        print(f"Apply BC on single variable on the side: {side}")
-        if side not in self.boundary_conditions.keys():
+        """Apply the PRIMARY boundary for a single variable on one side."""
+        print(f"Apply PRIMARY BC on single variable on the side: {side}")
+        if side not in self.boundary_conditions:
             raise ValueError(
-                f"The side {side} does not exist in the list of given sides: {self.boundary_conditions.keys()}."
+                f"No primary boundary condition configured for side: {side}"
             )
         condition = self.boundary_conditions[side]
         condition.apply_single_variable(variable, contexts[0])
@@ -143,201 +125,281 @@ class BoundaryManager:
         direction: str,
         contexts: List["BCApplicationContext"] = [None, None],
     ):
-        """Apply the boundary for a single variable on a single direction consisting of two sides.
-
-        Parameters
-        ----------
-        variable: np.ndarray
-            The variable array
-        direction: str
-            The direction of the correction.
-        contexts: List["BCApplicationContext"]
-            The context object containing the apply method information.
-        """
+        """Apply the PRIMARY boundary for a single variable on a single direction."""
         sides = side_direction_mapping(direction)
-        print(f"Apply BC on single variable on the sides: {sides}")
-        for (side, condition), context in zip(
-            self.boundary_conditions.items(), contexts
-        ):
-            condition.apply_single_variable(variable, context)
+        print(f"Apply PRIMARY BC on single variable on the sides: {sides}")
+        # Corrected iteration: zip sides with contexts
+        for side, context in zip(sides, contexts):
+            if side in self.boundary_conditions:
+                condition = self.boundary_conditions[side]
+                condition.apply_single_variable(variable, context)
 
     def apply_boundary_on_single_var_all_sides(
         self, variable: "np.ndarray", contexts: List["BCApplicationContext"]
     ):
-        """Apply the boundary conditions on all sides and directions for the input variable.
+        """Apply the PRIMARY boundary conditions on all sides for the input variable."""
+        print("Apply PRIMARY BC on single variable on all sides...")
+        # Corrected iteration: Use boundary_conditions dict items
+        if len(contexts) != len(self.boundary_conditions):
+            raise ValueError(
+                "Number of contexts must match number of boundary conditions"
+            )
+        i = 0
+        for side, condition in self.boundary_conditions.items():
+            condition.apply_single_variable(variable, contexts[i])
+            i += 1
 
-        Parameters
-        ----------
-        variable: np.ndarray
-            The variable array
-        contexts: List["BCApplicationContext"]
-            The context object containing the apply method information.
-        """
-        print("Apply BC on single variable on all sides...")
-        for (side, condition), context in zip(
-            self.boundary_conditions.items(), contexts
-        ):
-            condition.apply_single_variable(variable, context)
+    def apply_pressure_boundary_on_one_side(
+        self,
+        mpv_vars: "np.ndarray",  # Assuming mpv vars are passed directly (e.g., mpv.p2_cells)
+        side: BdrySide,
+        context: Optional[
+            "BCApplicationContext"
+        ] = None,  # Context for this specific application
+    ):
+        """Apply the MPV-specific boundary condition on a single side."""
+        print(f"Apply boundary conditions *MPV variables* on side: {side}")
+        if side not in self.mpv_boundary_conditions:  # Check MPV dict
+            raise ValueError(f"No MPV boundary condition configured for side: {side}")
+        condition = self.mpv_boundary_conditions[side]
+        if context is None:
+            context = BCApplicationContext()
+        condition.apply_single_variable(mpv_vars, context)
+
+    def apply_pressure_boundary_on_direction(
+        self,
+        mpv_vars: "np.ndarray",
+        direction: str,
+        contexts: List[Optional["BCApplicationContext"]] = [None, None],
+    ):
+        """Apply the MPV-specific boundary conditions on a single direction."""
+        sides: Tuple[BdrySide, BdrySide] = side_direction_mapping(direction)
+        print(f"Apply boundary conditions *MPV variables* on sides: {sides}")
+        for side, context in zip(sides, contexts):
+            if side in self.mpv_boundary_conditions:
+                condition = self.mpv_boundary_conditions[side]
+                if context is None:
+                    context = BCApplicationContext()
+                condition.apply_single_variable(mpv_vars, context)
+
+    def apply_pressure_boundary_on_all_sides(
+        self,
+        mpv_vars: "np.ndarray",
+        contexts: Optional[List["BCApplicationContext"]] = None,
+    ):
+        """Apply the MPV-specific boundary conditions on all sides."""
+        print("Applying full MPV boundary conditions on *pressure variables*...")
+        num_bcs = len(self.mpv_boundary_conditions)
+        if contexts is None:
+            contexts = [BCApplicationContext() for _ in range(num_bcs)]
+        elif len(contexts) != num_bcs:
+            raise ValueError(
+                "Number of contexts must match number of MPV boundary conditions"
+            )
+
+        i = 0
+        for side, condition in self.mpv_boundary_conditions.items():
+            condition.apply_single_variable(mpv_vars, contexts[i])
+            i += 1
 
     def apply_extra(
         self,
         variable: "np.ndarray",
         side: "BdrySide",
-        operations: List["ExtraBCOperation"],
+        operations: List["ExtraBCOperation"],  # Should likely be single operation
+        target_mpv: bool = False,
     ) -> None:
-        """Apply the extra conditions on the given single variable for a single side.
+        """Apply extra conditions on the given single variable for a single side.
+        Targets primary BC by default, use target_mpv=True for MPV BC."""
 
-        Parameters
-        ----------
-        variable: np.ndarray
-            The variable array
-        side: BdrySide
-            The side to apply the boundary condition on.
-        operations: List["ExtraBCOperation"]
-            The operations for the extra conditions.
-        context: BCApplicationContext
-            The context object containing the apply method information.
-        """
+        target_dict = (
+            self.mpv_boundary_conditions if target_mpv else self.boundary_conditions
+        )
+        bc_dict_name = "MPV" if target_mpv else "Primary"
 
-        print(f"Apply EXTRA boundary conditions on the side: {side}")
-        if side not in self.boundary_conditions.keys():
+        print(f"Apply EXTRA boundary conditions ({bc_dict_name}) on the side: {side}")
+        if side not in target_dict:
             raise ValueError(
-                f"The side {side} does not exist in the list of given sides: {self.boundary_conditions.keys()}."
+                f"The side {side} does not exist in the {bc_dict_name} list."
             )
-        condition = self.boundary_conditions[side]
-        condition.apply_extra(variable, operations[0])
+
+        condition = target_dict[side]
+        # Assuming operation list contains only one relevant operation for the side
+        if operations:
+            # Check if the operation type matches the condition type?
+            # The ExtraBCOperation base class already has target_type/target_side
+            # Let's assume the caller provides the correct operation.
+            condition.apply_extra(variable, operations[0])  # Pass the operation object
 
     def apply_extra_all_sides(
-        self, variable: "np.ndarray", operations: List["ExtraBCOperation"]
+        self,
+        variable: "np.ndarray",
+        operations: List["ExtraBCOperation"],
+        target_mpv: bool = False,  # --- NEW FLAG ---
     ) -> None:
-        """Applies a batch of potentially targeted operations.
+        """Applies a batch of potentially targeted operations to primary or MPV BCs."""
 
-        Parameters
-        ----------
-        variable: np.ndarray
-            The variable array
-        operations: List["ExtraBCOperation"]
-            The operations for the extra conditions.
-
-        Notes
-        -----
-        Call to this function happens in time integration, both in the implicit and explicit part.
-        """
+        target_dict = (
+            self.mpv_boundary_conditions if target_mpv else self.boundary_conditions
+        )
+        bc_dict_name = "MPV" if target_mpv else "Primary"
 
         if not operations:
             return
-        print(f"\n--- Applying Batch of {len(operations)} Specific Operations ---")
+        print(
+            f"\n--- Applying Batch of {len(operations)} Specific Operations ({bc_dict_name}) ---"
+        )
 
         for operation in operations:
             # Handle operations targeting ALL sides
             if operation.target_side == BdrySide.ALL:
-                for condition in self.boundary_conditions.values():
-                    if condition.type == operation.target_type:
+                applied = False
+                for condition in target_dict.values():
+                    # Check if the operation's target_type matches the condition's type
+                    if (
+                        operation.target_type is None
+                        or condition.type == operation.target_type
+                    ):
                         condition.apply_extra(variable, operation)
+                        applied = True
+                if not applied:
+                    print(
+                        f"  Warning: Operation {operation.get_identifier()} did not match any {bc_dict_name} conditions."
+                    )
+
             # Handle operations targeting specific sides
             else:
-                print(f"Applying extra BC on side {operation.target_side}")
-                condition = self.boundary_conditions.get(operation.target_side)
-                if condition and condition.type == operation.target_type:
-                    condition.apply_extra(variable, operation)
+                target_side = operation.target_side
+                print(f"Applying extra BC ({bc_dict_name}) on side {target_side}")
+                condition = target_dict.get(target_side)
+                if condition:
+                    # Check if operation's target type matches condition's type
+                    if (
+                        operation.target_type is None
+                        or condition.type == operation.target_type
+                    ):
+                        condition.apply_extra(variable, operation)
+                    else:
+                        print(
+                            f"  Skipped: Operation type {operation.target_type} mismatch for condition type {condition.type} on side {target_side}"
+                        )
+
+                else:
+                    print(
+                        f"  Skipped: Side {target_side} not found in {bc_dict_name} conditions."
+                    )
 
 
-import numpy as np
-
-
-def boundary_manager_2d():
+def boundary_manager_2d_updated():
     from atmpy.physics.thermodynamics import Thermodynamics
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.variables.variables import Variables
+    from atmpy.variables.multiple_pressure_variables import MPV  # Import MPV
     from atmpy.infrastructure.enums import VariableIndices as VI
-    from atmpy.boundary_conditions.bc_extra_operations import (
-        WallAdjustment,
-        PeriodicAdjustment,
-    )
-
-    np.set_printoptions(linewidth=300)
-    np.set_printoptions(suppress=True)
-    np.set_printoptions(precision=5)
-
-    nx = 6
-    ngx = 2
-    nnx = nx + 2 * ngx
-    ny = 5
-    ngy = 2
-    nny = ny + 2 * ngy
-
-    dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
-    grid = create_grid(dim)
-    rng = np.random.default_rng()
-    arr = np.arange(nnx * nny)
-    rng.shuffle(arr)
-    array = arr.reshape(nnx, nny)
-
-    variables = Variables(grid, 6, 1)
-    variables.cell_vars[..., VI.RHO] = 1
-    variables.cell_vars[..., VI.RHO][1:-1, 1:-1] = 4
-    variables.cell_vars[..., VI.RHOU] = array
-    variables.cell_vars[..., VI.RHOY] = 2
-    variables.cell_vars[..., VI.RHOW] = 3
-
-    rng.shuffle(arr)
-    array = arr.reshape(nnx, nny)
-    variables.cell_vars[..., VI.RHOV] = array
-    gravity = np.array([0.0, 1.0, 0.0])
-    th = Thermodynamics()
-
-    stratification = lambda x: x**2
-
-    gravity = [0.0, 1.0, 0.0]
-    direction = "y"
+    from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
     from atmpy.boundary_conditions.contexts import (
         BCInstantiationOptions,
         BoundaryConditionsConfiguration,
         BCApplicationContext,
     )
+    import numpy as np
 
-    bc = BCInstantiationOptions(
-        side=BdrySide.BOTTOM, type=BdryType.WALL, direction=direction, grid=grid
+    np.set_printoptions(linewidth=300)
+    np.set_printoptions(suppress=True)
+    np.set_printoptions(precision=10)
+
+    # Grid setup (same as before)
+    nx = 6
+    ngx = 2
+    ny = 5
+    ngy = 2
+    dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
+    grid = create_grid(dim)
+
+    # Variable setup (same as before)
+    variables = Variables(grid, 6, 1)
+    variables.cell_vars.fill(1.0)  # Fill with baseline
+    variables.cell_vars[grid.get_inner_slice() + (VI.RHO,)] = 5.0  # Inner rho = 5
+    mpv = MPV(grid, num_vars=6, direction="y")  # Create MPV object
+    mpv.p2_cells.fill(100.0)  # Example p2 values
+    mpv.p2_cells[grid.get_inner_slice()] = np.arange(30).reshape(
+        (nx, ny)
+    )  # Inner p2 = 0
+
+    # BC Configuration with MPV types
+    stratification = lambda y: 1.0  # Example stratification
+    th = Thermodynamics()
+    gravity = (0.0, 1.0, 0.0)
+
+    # Bottom: Reflective Gravity for main vars, WALL for MPV vars
+    bc_bottom = BCInstantiationOptions(
+        side=BdrySide.BOTTOM,
+        type=BdryType.REFLECTIVE_GRAVITY,
+        mpv_boundary_type=BdryType.WALL,
+        direction="y",
+        grid=grid,
+        stratification=stratification,
+        gravity=gravity,
     )
-    bc2 = BCInstantiationOptions(
-        side=BdrySide.TOP, type=BdryType.WALL, direction=direction, grid=grid
+    # Top: Reflective Gravity for main vars, WALL for MPV vars
+    bc_top = BCInstantiationOptions(
+        side=BdrySide.TOP,
+        type=BdryType.REFLECTIVE_GRAVITY,
+        mpv_boundary_type=BdryType.WALL,
+        direction="y",
+        grid=grid,
+        stratification=stratification,
+        gravity=gravity,
     )
-    # bc3 = RFBCInstantiationOptions(
-    #     side=BdrySide.LEFT, type=BdryType.WALL, direction="x", grid=grid
-    # )
-    # bc4 = RFBCInstantiationOptions(
-    #     side=BdrySide.RIGHT, type=BdryType.PERIODIC, direction="x", grid=grid
-    # )
-    # options = [bc, bc2, bc3, bc4]
-    options = [bc, bc2]
-    bc_conditions = BoundaryConditionsConfiguration(options)
+    # Left: Periodic for main vars, Periodic for MPV vars (MPV type could be None to default)
+    bc_left = BCInstantiationOptions(
+        side=BdrySide.LEFT,
+        type=BdryType.PERIODIC,
+        mpv_boundary_type=BdryType.PERIODIC,
+        direction="x",
+        grid=grid,
+    )
+    # Right: Periodic for main vars, Periodic for MPV vars
+    bc_right = BCInstantiationOptions(
+        side=BdrySide.RIGHT,
+        type=BdryType.PERIODIC,
+        # mpv_boundary_type=BdryType.PERIODIC,
+        direction="x",
+        grid=grid,
+    )
 
-    manager = BoundaryManager(bc_conditions)
-    print(manager.boundary_conditions.keys())
+    options = [bc_bottom, bc_top, bc_left, bc_right]
+    print(bc_right.mpv_boundary_type)
+    bc_config = BoundaryConditionsConfiguration(options)
 
-    print("Applying boundary conditions for 2D test:")
-    print(variables.cell_vars[..., VI.RHOU])
-    x = variables.cell_vars[..., VI.RHOU]
-    # context = [BCApplicationContext(scale_factor=10), BCApplicationContext(scale_factor=10)]
+    # Create Manager
+    manager = BoundaryManager(bc_config)
 
-    operations = [
-        WallAdjustment(target_side=BdrySide.ALL, factor=100),
-        PeriodicAdjustment(target_side=BdrySide.RIGHT, factor=100),
-    ]
+    print("--- Initial State ---")
+    print("Rho:\n", variables.cell_vars[..., VI.RHO])
+    print("P2 Cells:\n", mpv.p2_cells)
+
+    # Apply BCs
+    print("\n--- Applying Boundaries ---")
     manager.apply_boundary_on_all_sides(variables.cell_vars)
-    # manager.apply_boundary_on_single_var_direction(
-    #     variables.cell_vars[..., VI.RHOU], direction=direction, contexts=context
-    # )
-    # for side in [BdrySide.TOP, BdrySide.LEFT, BdrySide.RIGHT, BdrySide.BOTTOM]:
-    # manager.apply_extra(variables.cell_vars[..., VI.RHOU], side, context)
-    # manager.apply_extra_all_sides(variables.cell_vars[..., VI.RHOU], operations)
-    # manager.apply_boundary_on_all_sides(variables.cell_vars)
+    # Assuming MPV p2_cells are handled like single vars, use apply_mpv_...
+    mpv.state(gravity, 0.115)
+    manager.apply_pressure_boundary_on_all_sides(mpv.p2_cells)
 
-    contexts = [BCApplicationContext(is_nodal=True)] * grid.ndim * 2
-    manager.apply_boundary_on_single_var_all_sides(x, contexts)
-    print(x)
-    # print(variables.cell_vars[..., VI.RHOU])
+    print("\n--- State After BC Application ---")
+    print(
+        "Rho (Reflective Gravity applied on Y boundaries):\n",
+        variables.cell_vars[..., VI.RHO],
+    )
+    print("P2 Cells (WALL applied on Y boundaries, PERIODIC on X):\n", mpv.p2_cells)
+
+    # Example Extra Op application (e.g., scale boundary nodal velocity)
+    # Assume nodal_velocity exists and WallAdjustment applies to primary BCs
+    # nodal_velocity = np.ones(grid.nshape) # Example nodal data
+    # operations = [WallAdjustment(target_side=BdrySide.BOTTOM, factor=0.5)]
+    # manager.apply_extra_all_sides(nodal_velocity, operations, target_mpv=False)
+    # print("\nNodal Velocity after extra op:\n", nodal_velocity)
 
 
 if __name__ == "__main__":
-    boundary_manager_2d()
+    boundary_manager_2d_updated()

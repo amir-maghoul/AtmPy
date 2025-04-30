@@ -159,7 +159,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             )
         ]
         self.boundary_manager.apply_extra_all_sides(
-            self.mpv.wcenter, boundary_operation
+            self.mpv.wcenter, boundary_operation, target_mpv=False
         )
 
     def calculate_enthalpy_weighted_pressure_gradient(
