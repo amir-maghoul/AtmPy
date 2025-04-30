@@ -313,9 +313,9 @@ class Grid:
         else:
             raise ValueError("Invalid value for 'axis'.")
 
-    def get_inner_cells(self) -> Tuple[slice, ...]:
+    def get_inner_slice(self) -> Tuple[slice, ...]:
         """
-        Get slices corresponding to the inner cells (excluding ghost cells).
+        Get slices corresponding to the inner cells/nodes.
 
         Returns:
             Tuple[slice, ...]: Slices for indexing inner cells.

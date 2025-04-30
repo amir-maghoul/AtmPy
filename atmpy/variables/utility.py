@@ -1,7 +1,7 @@
 """Utility module for variables"""
 
 import numpy as np
-from typing import Union, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING, Optional
 from atmpy.physics.thermodynamics import Thermodynamics
 
 if TYPE_CHECKING:
@@ -24,136 +24,211 @@ def _cumulative_integral(arr: np.ndarray, ghost_idx: int) -> np.ndarray:
     return result
 
 
-def compute_stratification(
-    hydrostate: "Variables",
-    Y: np.ndarray,
-    Y_n: np.ndarray,
-    axis: int,
+def column_hydrostatics(
+    mpv: "MPV",
+    Y_cells: np.ndarray,
+    Y_nodes: np.ndarray,
     gravity_strength: Union[np.ndarray, list],
     Msq: float,
+    ref_node_idx: Optional[int] = None,
+    ref_rhoY: float = 1.0,
 ) -> None:
-    """Compute the stratification of pressure variables for constructing the hydrostatic state.
-    This function computes the stratification of the hydrostatic background by integrating an inverse variable (S = 1/Y)
-    along the specified (gravity) axis. The integration is performed after moving the chosen axis to the front (axis 0)
-    and then the results are moved back. The cell‐ and node–based hydro-state variables are updated in-place.
+    """
+    Computes the hydrostatic state by vertically integrating a given
+    potential temperature profile (Y).
+
+    This function mimics the logic of PyBella's `hydrostatics.column` but is
+    adapted for the Atmpy framework. It calculates the hydrostatic Exner
+    pressure, pressure, density, etc., on both cell centers and nodes based
+    on the provided potential temperature profiles Y_cells and Y_nodes.
+
+    The integration assumes d(pi)/dr = -Gamma * g * S, where S = 1/Y and
+    r is the coordinate in the direction of gravity. A trapezoidal rule is
+    used for integration node-to-node. Cell-centered values are derived
+    from the nodal values.
 
     Parameters
     ----------
-    hydrostate : Variables
-        The container for hydrostatic cell and node variables.
-    Y : np.ndarray
-        Cell-centered stratification variable (e.g. potential temperature).
-    Y_n : np.ndarray
-        Node-centered stratification variable (e.g. pressure variable).
-    axis : int
-        The axis along which stratification (integration) is performed.
-    gravity_strength : Union[np.ndarray, list]
-        Gravity strength vector—for the integration only the component along the chosen axis is used.
+    mpv : MPV
+        The Multiple Pressure Variables object whose `hydrostate` variable
+        will be populated. The `mpv.direction` determines the hydrostatic
+        direction, and `mpv.grid1D` provides the 1D grid details.
+    Y_cells : np.ndarray
+        1D array of potential temperature (or equivalent) values at the
+        cell centers of the 1D hydrostatic grid (`mpv.grid1D`).
+        Shape should be `(mpv.grid1D.ncx_total,)`.
+    Y_nodes : np.ndarray
+        1D array of potential temperature (or equivalent) values at the
+        nodes of the 1D hydrostatic grid (`mpv.grid1D`).
+        Shape should be `(mpv.grid1D.nnx_total,)`.
+    gravity_strength : np.ndarray or list
+        Array or list of gravity strengths in [x, y, z] directions.
     Msq : float
-        Mach number squared.
+        Mach number squared (used for scaling p2).
+    ref_node_idx : Optional[int], optional
+        The index of the node in `Y_nodes` where the reference pressure
+        is defined. If None (default), uses the index of the first inner
+        node (boundary between first ghost layer and first inner cell).
+    ref_rhoY : float, optional
+        The reference value for rho * Y (density * potential temperature)
+        at the `ref_node_idx`. Defaults to 1.0.
+
+    Returns
+    -------
+    None
+        Modifies `mpv.hydrostate.cell_vars` and `mpv.hydrostate.node_vars`
+        in place.
+
+    Raises
+    ------
+    ValueError
+        If input array shapes are incorrect or gravity is zero in the
+        specified direction but `ref_rhoY` leads to non-uniform state.
     """
-    # Instantiate thermodynamics (assumed fast)
-    th = Thermodynamics()
-    grid = hydrostate.grid
-    dr = grid.dxyz[axis]
+    thermo = Thermodynamics()
+    Gamma = thermo.Gamma  # Specific heat ratio / (Specific heat ratio - 1)
+    gamm = thermo.gamma  # Specific heat ratio
+    gm1 = thermo.gamma - 1.0  # Specific heat ratio - 1
+    Gamma_inv = 1.0 / Gamma
+    gm1_inv = 1.0 / gm1
 
-    # 'ghost' is the number of ghost cells on the bottom side; this will be used to split integration
-    ghost = grid.ng[axis][0]
+    grid1D = mpv.grid1D
+    direction = mpv.direction
+    g = gravity_strength[direction]
 
-    # Move the integration axis to the front for easier vectorized operations.
-    Y_axis0 = np.moveaxis(Y, axis, 0)
-    Y_n_axis0 = np.moveaxis(Y_n, axis, 0)
-    hydrostate_cells_vars_axis0 = np.moveaxis(hydrostate.cell_vars, axis, 0)
-    hydrostate_nodes_vars_axis0 = np.moveaxis(hydrostate.node_vars, axis, 0)
-
-    # Computing reference values
-    rhoY0 = 1.0
-    p0 = rhoY0**th.gamma
-    pi0 = rhoY0**th.gm1
-
-    # Compute the primary integrand arrays:
-    # S_p is cell based (1/Y)
-    S_p = 1.0 / Y_axis0
-
-    # S_m represents mid‐point/interpolated values; note the indices [ghost-1:ghost+1] use the node–centered value.
-    S_m = np.empty_like(S_p)
-    S_m[ghost - 1 : ghost + 1] = 1.0 / np.expand_dims(Y_n_axis0[ghost], axis=0)
-    S_m[0] = 1.0 / Y_axis0[ghost - 1]
-    S_m[ghost + 1 :] = 1.0 / Y_axis0[ghost:-1]
-
-    # Precompute the integration spacing vector 'd' along the moved axis.
-    n_str = Y_axis0.shape[0]
-    if n_str < 3:
-        raise ValueError(
-            "Insufficient points along the integration axis (need at least 3)."
+    # Check for zero gravity case
+    if g == 0.0:
+        print(
+            "Warning: Gravity is zero in the hydrostatic direction. Setting uniform state."
         )
-    # Instead of concatenating arrays, we preallocate and then set special values.
-    d_values = np.full(n_str, dr, dtype=Y_axis0.dtype)
-    d_values[0] = -dr
-    d_values[1] = -dr / 2
-    d_values[2] = dr / 2
-    # Reshape for broadcasting across the remaining dimensions.
-    d = d_values.reshape([n_str] + [1] * (Y_axis0.ndim - 1))
+        # Set uniform state based on reference values if possible
+        # Note: This assumes Y=1 if rhoY=1 and rho=1 initially.
+        # A more robust approach might require specifying reference rho OR Y.
+        p0 = ref_rhoY**gamm
+        pi0 = ref_rhoY**gm1
+        Y0 = 1.0  # Assuming ref_rhoY=1 implies rho=1, Y=1
+        rho0 = ref_rhoY / Y0 if Y0 != 0 else 1.0  # Avoid division by zero
+        S0 = 1.0 / Y0 if Y0 != 0 else 1.0
 
-    # Compute the local integrand
-    integrand = d * 0.5 * (S_p + S_m)
+        mpv.hydrostate.cell_vars[..., HI.P0] = p0
+        mpv.hydrostate.cell_vars[..., HI.P2_0] = pi0 / Msq
+        mpv.hydrostate.cell_vars[..., HI.RHO0] = rho0
+        mpv.hydrostate.cell_vars[..., HI.RHOY0] = ref_rhoY
+        mpv.hydrostate.cell_vars[..., HI.Y0] = Y0
+        mpv.hydrostate.cell_vars[..., HI.S0] = S0
 
-    # Integrate the primary integrand vertically.
-    integrated_val = _cumulative_integral(integrand, ghost)
+        mpv.hydrostate.node_vars[..., HI.P0] = p0
+        mpv.hydrostate.node_vars[..., HI.P2_0] = pi0 / Msq
+        mpv.hydrostate.node_vars[..., HI.RHO0] = rho0
+        mpv.hydrostate.node_vars[..., HI.RHOY0] = ref_rhoY
+        mpv.hydrostate.node_vars[..., HI.Y0] = Y0
+        mpv.hydrostate.node_vars[..., HI.S0] = S0
+        return
 
-    rhoY0 = 1.0
-    gravity_val = gravity_strength[axis]
-    pi0 = rhoY0**th.gm1
+    # --- Grid and Input Validation ---
+    # Since grid1D is always 1D, its properties are in the first dimension
+    dr = grid1D.dx  # Equivalent to dx, dy, or dz of original grid
+    n_cells_total = grid1D.ncx_total
+    n_nodes_total = grid1D.nnx_total
+    ng = grid1D.ngx  # Number of ghost cells on one side
 
-    # Compute hydrostatic profiles (cell‐based)
-    pi_hydro = pi0 - th.Gamma * gravity_val * integrated_val
-    p_hydro = pi_hydro**th.Gammainv
-    rhoY_hydro = pi_hydro**th.gm1inv
+    if Y_cells.shape != (n_cells_total,):
+        raise ValueError(
+            f"Shape of Y_cells {Y_cells.shape} does not match grid1D cell shape ({n_cells_total},)"
+        )
+    if Y_nodes.shape != (n_nodes_total,):
+        raise ValueError(
+            f"Shape of Y_nodes {Y_nodes.shape} does not match grid1D node shape ({n_nodes_total},)"
+        )
 
-    # Move results back to original axis
-    p_hydro_final = np.moveaxis(p_hydro, 0, axis)
-    rhoY_hydro_final = np.moveaxis(rhoY_hydro, 0, axis)
-    # S_p_final will be used to compute rho on cells.
-    S_p_final = np.moveaxis(S_p, 0, axis)
+    # --- Determine Reference Point ---
+    idx_ref = ref_node_idx if ref_node_idx is not None else ng
+    if not (0 <= idx_ref < n_nodes_total):
+        raise ValueError(
+            f"ref_node_idx {idx_ref} is out of bounds for nodes [0, {n_nodes_total-1}]"
+        )
 
-    # Build index tuple for inner (non-ghost) cells (the same shape is used for node_vars here).
-    inner_idx = tuple(slice(0, s) for s in grid.cshape)
-    # Update cell-based variables (assumed channel ordering:
-    # 0: rho0, 1: p0, 2: p2_0, 3: S0, 4: Y0, 5: rhoY0)
-    hydrostate.cell_vars[inner_idx + (HI.RHO0,)] = rhoY_hydro_final * S_p_final
-    hydrostate.cell_vars[inner_idx + (HI.P0,)] = p_hydro_final
-    # For p2_0, move pi_hydro on the fly and scale by Msq.
-    hydrostate.cell_vars[inner_idx + (HI.P2_0,)] = (
-        np.moveaxis(pi_hydro, 0, axis)[inner_idx] / Msq
-    )
-    hydrostate.cell_vars[inner_idx + (HI.S0,)] = S_p_final
-    hydrostate.cell_vars[inner_idx + (HI.Y0,)] = 1.0 / S_p_final
-    hydrostate.cell_vars[inner_idx + (HI.RHOY0,)] = rhoY_hydro_final
+    # --- Calculate Reference State Values ---
+    p0_ref = ref_rhoY**gamm
+    pi0_ref = ref_rhoY**gm1
+    Y0_ref = Y_nodes[idx_ref]
+    if Y0_ref == 0:
+        raise ValueError(
+            f"Potential temperature Y is zero at reference node {idx_ref}, cannot compute density."
+        )
+    rho0_ref = ref_rhoY / Y0_ref
+    S0_ref = 1.0 / Y0_ref
 
-    # ----- Node-based integration -----
-    # For the node–based computation, define an analogous integration for Sn, using the same Y_axis0.
-    Sn_p = 1.0 / Y_axis0
-    # Build the spacing for nodes; for indices below ghost, the spacing is negative.
-    d_node = np.full(n_str, dr, dtype=Y_axis0.dtype)
-    d_node[:ghost] = -dr
-    d_node = d_node.reshape([n_str] + [1] * (Y_axis0.ndim - 1))
+    # --- Calculate Nodal Hydrostatic Profile ---
+    S_nodes = 1.0 / Y_nodes
+    pi_nodes = np.zeros(n_nodes_total)
+    pi_nodes[idx_ref] = pi0_ref
 
-    Sn_int = d_node * Sn_p
-    Sn_int = _cumulative_integral(Sn_int, ghost)
+    # Integrate upwards (increasing index) from reference node
+    for i in range(idx_ref + 1, n_nodes_total):
+        # d(pi) = -Gamma * g * S * dr
+        # Integrate from i-1 to i using trapezoidal rule for S
+        delta_pi = -Gamma * g * 0.5 * (S_nodes[i] + S_nodes[i - 1]) * dr
+        pi_nodes[i] = pi_nodes[i - 1] + delta_pi
 
-    # Compute node hydrostatic pressures.
-    pi_hydro_n = pi0 - th.Gamma * gravity_val * Sn_int
-    rhoY_hydro_n = pi_hydro_n**th.gm1inv
+    # Integrate downwards (decreasing index) from reference node
+    for i in range(idx_ref - 1, -1, -1):
+        # Integrate from i+1 to i using trapezoidal rule for S
+        delta_pi = -Gamma * g * 0.5 * (S_nodes[i] + S_nodes[i + 1]) * dr
+        # Since we integrate downwards, dr is negative, so we add (-delta_pi)
+        pi_nodes[i] = pi_nodes[i + 1] - delta_pi  # pi[i] - pi[i+1] = delta_pi
 
-    # Move back to original axis.
-    pi_hydro_n_final = np.moveaxis(pi_hydro_n, 0, axis)
-    rhoY_hydro_n_final = np.moveaxis(rhoY_hydro_n, 0, axis)
+    # --- Calculate Node Variables ---
+    # Avoid division by zero or invalid ops if pi becomes negative
+    pi_nodes_safe = np.maximum(pi_nodes, 1e-15)  # Prevent log/pow issues
+    p_nodes = pi_nodes_safe**Gamma_inv
+    rhoY_nodes = pi_nodes_safe**gm1_inv
+    rho_nodes = rhoY_nodes * S_nodes  # rho = rhoY * S = rhoY / Y
+    p2_nodes = pi_nodes / Msq  # Use original pi for p2
 
-    # Update node-based variables.
-    hydrostate.node_vars[inner_idx + (HI.RHO0,)] = rhoY_hydro_n_final
-    hydrostate.node_vars[inner_idx + (HI.P0,)] = rhoY_hydro_n_final**th.gamma
-    hydrostate.node_vars[inner_idx + (HI.P2_0,)] = pi_hydro_n_final / Msq
-    # Here, we use the provided node-based stratification variable Y_n directly.
-    hydrostate.node_vars[inner_idx + (HI.S0,)] = 1.0 / Y_n
-    hydrostate.node_vars[inner_idx + (HI.Y0,)] = 1.0 / Y_n
-    hydrostate.node_vars[inner_idx + (HI.RHOY0,)] = rhoY_hydro_n_final
+    # Store Node Variables
+    mpv.hydrostate.node_vars[..., HI.P0] = p_nodes
+    mpv.hydrostate.node_vars[..., HI.P2_0] = p2_nodes
+    mpv.hydrostate.node_vars[..., HI.RHO0] = rho_nodes
+    mpv.hydrostate.node_vars[..., HI.RHOY0] = rhoY_nodes
+    mpv.hydrostate.node_vars[..., HI.Y0] = Y_nodes  # Given input
+    mpv.hydrostate.node_vars[..., HI.S0] = S_nodes
+
+    # --- Calculate Cell Variables ---
+    # Average nodal Exner pressure to cell centers
+    pi_cells = 0.5 * (pi_nodes[:-1] + pi_nodes[1:])
+
+    # Calculate cell variables from cell-centered Exner pressure and Y_cells
+    pi_cells_safe = np.maximum(pi_cells, 1e-15)  # Prevent log/pow issues
+    p_cells = pi_cells_safe**Gamma_inv
+    rhoY_cells = pi_cells_safe**gm1_inv
+    S_cells = 1.0 / Y_cells
+    rho_cells = rhoY_cells * S_cells  # rho = rhoY * S = rhoY / Y
+    p2_cells = pi_cells / Msq  # Use original pi_cells for p2
+
+    # Store Cell Variables
+    mpv.hydrostate.cell_vars[..., HI.P0] = p_cells
+    mpv.hydrostate.cell_vars[..., HI.P2_0] = p2_cells
+    mpv.hydrostate.cell_vars[..., HI.RHO0] = rho_cells
+    mpv.hydrostate.cell_vars[..., HI.RHOY0] = rhoY_cells
+    mpv.hydrostate.cell_vars[..., HI.Y0] = Y_cells  # Given input
+    mpv.hydrostate.cell_vars[..., HI.S0] = S_cells
+
+
+if __name__ == "__main__":
+    from atmpy.physics.thermodynamics import Thermodynamics
+
+    th = Thermodynamics()
+    grav = 9.81
+    t_ref = 100.0
+    T_ref = 300.0
+    R_gas = 287.4
+    h_ref = 10_000
+    cp = th.gamma * R_gas / (th.gm1)
+    N_ref = 9.81 / np.sqrt(cp * T_ref)
+
+    g = grav * h_ref / (R_gas * T_ref)
+    Nsq_ref = N_ref * N_ref
+
+    Msq = 0.115
+    gravity_vec = [0.0, g, 0.0]

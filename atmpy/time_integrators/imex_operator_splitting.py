@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING, Union, List, Any, Callable
 
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.boundary_conditions.contexts import BCApplicationContext
-from atmpy.infrastructure.utility import directional_indices, one_element_inner_slice, one_element_inner_nodal_shape
+from atmpy.infrastructure.utility import (
+    directional_indices,
+    one_element_inner_slice,
+    one_element_inner_nodal_shape,
+)
 from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
 from atmpy.infrastructure.enums import VariableIndices as VI, Preconditioners
 
@@ -84,13 +88,19 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Helper for nodal boundary conditions
         # That is setting the flag is_nodal for all dimensions and all sides (therefore ndim*2) to True
         # since p2_nodes is nodal.
-        self._nodal_bc_contexts = [BCApplicationContext(is_nodal=True)] * self.grid.ndim * 2
+        self._nodal_bc_contexts = (
+            [BCApplicationContext(is_nodal=True)] * self.grid.ndim * 2
+        )
 
-    def _get_advection_routine(self, advection_routine_name: "AdvectionRoutines") -> None:
+    def _get_advection_routine(
+        self, advection_routine_name: "AdvectionRoutines"
+    ) -> None:
         """Get the advection routine. The sole raison d'être of this method is to avoid circular import
         issues from factory."""
         from atmpy.infrastructure.factory import get_advection_routines
+
         self.advection_routine = get_advection_routines(advection_routine_name)
+
 
     def step(self) -> None:
         """
@@ -137,7 +147,13 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ################### 3. Advect state by dt/2 using fluxes at t^n (Eq. 14a, but integrated) ######################
         # Result is Sol*
-        advection_func(self.grid, self.variables, self.flux, half_dt, boundary_manager=self.boundary_manager)
+        advection_func(
+            self.grid,
+            self.variables,
+            self.flux,
+            half_dt,
+            boundary_manager=self.boundary_manager,
+        )
         logging.debug("Predictor: After advection")
 
         ################### 4. Save current pressure p^n before non-advective updates ##################################
@@ -158,8 +174,13 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.flux.compute_averaging_fluxes()
         logging.debug("--- Finished Predictor Step (Predicted Fluxes Updated) ---")
 
-    def _corrector_step(self, dt: float, advection_func: Callable,
-                        initial_vars: np.ndarray, initial_p2: np.ndarray) -> None:
+    def _corrector_step(
+        self,
+        dt: float,
+        advection_func: Callable,
+        initial_vars: np.ndarray,
+        initial_p2: np.ndarray,
+    ) -> None:
         """
         Performs the corrector stage of the time step (Eq. 17 in BK19).
         Advances the state from t^n to t^{n+1} using predicted advective fluxes.
@@ -188,7 +209,13 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Uses the predicted fluxes computed at the end of _predictor_step
         # (These are stored in self.flux)
         # Result is Sol**
-        advection_func(self.grid, self.variables, self.flux, dt, boundary_manager=self.boundary_manager)
+        advection_func(
+            self.grid,
+            self.variables,
+            self.flux,
+            dt,
+            boundary_manager=self.boundary_manager,
+        )
         logging.debug("Corrector: After full advection (Eq. 17b)")
 
         ######################### 5. Implicit Corrector (Fast Modes, Eq. 17c) ##########################################
@@ -313,8 +340,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # The buoyancy term is NOT adjusted in this preparatory step (updt_chi=0.0). Only the momenta is needed for div.
         CHI_UPDT_VALUE = 0.0
         self.pressure_solver.apply_pressure_gradient_update(
-            p=self.mpv.p2_nodes, # Use current pressure
-            updt_chi=CHI_UPDT_VALUE,        # Don't adjust buoyancy here
+            p=self.mpv.p2_nodes,  # Use current pressure
+            updt_chi=CHI_UPDT_VALUE,  # Don't adjust buoyancy here
             dt=dt,
             is_nongeostrophic=self.is_nongeostrophic,
             is_nonhydrostatic=self.is_nonhydrostatic,
@@ -345,7 +372,11 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ############################ 6. Solve the elliptic helmholtz equation ##########################################
         p2_inner_flat, solver_info = self.pressure_solver.solve_helmholtz(
-            rhs_flat, dt, self.is_nongeostrophic, self.is_nonhydrostatic, self.is_compressible,
+            rhs_flat,
+            dt,
+            self.is_nongeostrophic,
+            self.is_nonhydrostatic,
+            self.is_compressible,
             # Add tol/max_iter if needed, e.g., tol=1e-7
         )
 
@@ -360,15 +391,17 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ############################ 8. Update boundary with the new values ############################################
         # Use the current existing context (is_nodal for all sides)
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(p2_full, self._nodal_bc_contexts)
+        self.boundary_manager.apply_boundary_on_single_var_all_sides(
+            p2_full, self._nodal_bc_contexts
+        )
 
         ############################ 9. Final Correction using Pressure Increment delta_p ##############################
         # Apply the update using the *solved increment*.
         # The buoyancy *is* adjusted now (updt_chi=1.0).
         CHI_UPDT_VALUE = 1.0
         self.pressure_solver.apply_pressure_gradient_update(
-            p=p2_full,      # Use solved increment
-            updt_chi=CHI_UPDT_VALUE,   # Adjust buoyancy now
+            p=p2_full,  # Use solved increment
+            updt_chi=CHI_UPDT_VALUE,  # Adjust buoyancy now
             dt=dt,
             is_nongeostrophic=self.is_nongeostrophic,
             is_nonhydrostatic=self.is_nonhydrostatic,
@@ -444,7 +477,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             (g / self.Msq) * dbuoy * self.is_nonhydrostatic
         )
 
-    def _forward_pressure_update(self, cellvars: np.ndarray, dt: float, p2n: np.ndarray):
+    def _forward_pressure_update(
+        self, cellvars: np.ndarray, dt: float, p2n: np.ndarray
+    ):
         """Update the Exner pressure."""
 
         # Compute the weighting factor Y = (rhoY / rho) = Theta
@@ -452,7 +487,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # Compute the divergence of the pressure-weighted momenta: (Pu)_x + (Pv)_y + (Pw)_z where
         # P = rho*Y = rho*Theta
-        pressure_weighted_momenta = self._calculate_enthalpy_weighted_momenta(self.variables.cell_vars)
+        pressure_weighted_momenta = self._calculate_enthalpy_weighted_momenta(
+            self.variables.cell_vars
+        )
         inner_slice = one_element_inner_slice(self.grid.ndim, full=False)
         self.mpv.rhs[inner_slice] = self.discrete_operator.divergence(
             pressure_weighted_momenta,
@@ -509,11 +546,14 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
     def _calculate_enthalpy_weighted_momenta(self, cellvars: np.ndarray):
-        """ Calculate the vector [Pu, [Pv], [Pw]] which is equal to rho*Theta*velocities. This is needed in multiple
+        """Calculate the vector [Pu, [Pv], [Pw]] which is equal to rho*Theta*velocities. This is needed in multiple
         parts of the code"""
         Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
-        momenta_indices = [VI.RHOU, VI.RHOV, VI.RHOW][:self.grid.ndim]
+        momenta_indices = [VI.RHOU, VI.RHOV, VI.RHOW][: self.grid.ndim]
         return cellvars[..., momenta_indices] * Y[..., np.newaxis]
+
+    def get_dt(self):
+        pass
 
 
 def example_usage():
@@ -554,8 +594,21 @@ def example_usage():
     ####################################################################################################################
     from atmpy.variables.multiple_pressure_variables import MPV
 
+    A0 = 0.1 / 100
+    t_ref = 100.0
+    T_ref = 300.0
+    R_gas = 287.4
+    h_ref = 10_000
+    cp = th.gamma * R_gas / (th.gm1)
+    N_ref = 9.81 / np.sqrt(cp * T_ref)
+
+    grav = 9.81
+
+    g = grav * h_ref / (R_gas * T_ref)
+    Nsq_ref = N_ref * N_ref
+
     Msq = 0.115
-    gravity_vec = [0.0, 9.81, 0.0]
+    gravity_vec = [0.0, g, 0.0]
 
     mpv = MPV(grid)
     mpv.state(gravity_vec, Msq)
@@ -565,13 +618,6 @@ def example_usage():
     ####################################################################################################################
     ########## Prepare some thermodynamic constant for initialization ##################################################
     ####################################################################################################################
-    A0 = 0.1 / 100
-    t_ref = 100.0
-    T_ref = 300.0
-    R_gas = 287.4
-    cp = th.gamma * R_gas / (th.gm1)
-    N_ref = 9.81 / np.sqrt(cp * T_ref)
-    Nsq_ref = N_ref * N_ref
     rhobar_n = mpv.hydrostate.node_vars[..., HI.RHOY0]
     Y_bar_n = mpv.hydrostate.node_vars[..., HI.Y0]
     oorhobarsqrt = 1.0 / np.sqrt(rhobar)
@@ -627,10 +673,7 @@ def example_usage():
     exponentials = np.exp(1j * k * X + mu * Y + (eigval[ind]) * (t) + 1j * s * t)
     chi_pi = A0 * np.real(eigvec[3, ind] * exponentials).T
 
-
     pi_n = oorhobarsqrt_n * Cs / Y_bar_n / th.Gammainv * chi_pi
-
-
 
     ####################################################################################################################
     ## VARIABLE DATA ###################################################################################################
@@ -664,21 +707,13 @@ def example_usage():
     flux = Flux(grid, variables, eos)
 
     ########## STRATIFICATION ##########################################################################################
-    def stratification_function(y, dy):
-        g = gravity_vec[1]
+    def stratification_function(y):
+        Nsq = Nsq_ref * t_ref * t_ref
+        g1 = g / Msq
 
-        Hex = 1.0 / (th.Gamma * g)
-        pi_m = np.exp(-(y - 0.5 * dy) / Hex)
-        pi_p = np.exp(-(y + 0.5 * dy) / Hex)
+        return np.exp(Nsq * y / g1)
 
-        Theta = - (Gamma * g * dy) / (pi_p - pi_m)
-
-        return Theta
-
-    def stratification_wrapper(dy):
-        return lambda y : stratification_function(y, dy)
-
-    stratification = stratification_wrapper(grid.dy)
+    stratification = stratification_function
 
     ####################################################################################################################
     ######### BOUNDARY MANAGER #########################################################################################
@@ -691,13 +726,19 @@ def example_usage():
     )
 
     direction = "y"
-
-
     bc = BCInstantiationOptions(
-        side=BdrySide.BOTTOM, type=BdryType.REFLECTIVE_GRAVITY, direction=direction, grid=grid, stratification=stratification,
+        side=BdrySide.BOTTOM,
+        type=BdryType.REFLECTIVE_GRAVITY,
+        direction=direction,
+        grid=grid,
+        stratification=stratification,
     )
     bc2 = BCInstantiationOptions(
-        side=BdrySide.TOP, type=BdryType.REFLECTIVE_GRAVITY, direction=direction, grid=grid, stratification=stratification,
+        side=BdrySide.TOP,
+        type=BdryType.REFLECTIVE_GRAVITY,
+        direction=direction,
+        grid=grid,
+        stratification=stratification,
     )
     bc3 = BCInstantiationOptions(
         side=BdrySide.LEFT, type=BdryType.PERIODIC, direction="x", grid=grid
@@ -705,8 +746,8 @@ def example_usage():
     bc4 = BCInstantiationOptions(
         side=BdrySide.RIGHT, type=BdryType.PERIODIC, direction="x", grid=grid
     )
-    # options = [bc, bc2, bc3, bc4]
-    options = [bc, bc2]
+    options = [bc, bc2, bc3, bc4]
+    # options = [bc, bc2]
 
     bc_conditions = BoundaryConditionsConfiguration(options)
     manager = BoundaryManager(bc_conditions)
@@ -798,9 +839,13 @@ def example_usage():
     #     dt=0.1,
     #     Msq=1.0
     # )
-    # print(variables.cell_vars[..., VI.RHOY])
-    # # print(mpv.wcenter)
-    # # print(mpv.p2_nodes)
+    # print(variables.cell_vars[..., VI.RHOY] / variables.cell_vars[..., VI.RHO])
+    print(variables.cell_vars[..., VI.RHOY])
+    # manager.apply_boundary_on_all_sides(variables.cell_vars)
+    # print(variables.cell_vars[..., VI.RHOU])
+
+    # print(mpv.wcenter)
+    # print(mpv.p2_nodes)
     # time_integrator.forward_update()
     # time_integrator.backward_explicit_update(dt)
     # # contexts = [BCApplicationContext(is_nodal=True)] * grid.ndim * 2
@@ -809,7 +854,6 @@ def example_usage():
     # # manager.apply_boundary_on_single_var_all_sides(
     # #     mpv.p2_nodes, contexts
     # # )
-    # # pressure.correction_nodes(mpv.p2_nodes, 1.0)
     # # # print(mpv.wcenter)
     # print(mpv.p2_nodes)
     # print(variables.cell_vars[..., VI.RHOU])
@@ -819,8 +863,8 @@ def example_usage():
 
     print(mpv.p2_nodes)
     # # pressure.pressure_coefficients_nodes(variables.cell_vars, dt)
-    time_integrator.forward_update()
-    time_integrator.backward_update_explicit(dt)
+    # time_integrator.forward_update()
+    # time_integrator.backward_update_explicit(dt)
     time_integrator.backward_update_implicit(dt)
     # # x = pressure.helmholtz_operator(mpv.p2_nodes, dt, True, True, True)
     print(mpv.p2_nodes)

@@ -147,7 +147,7 @@ Module Contents
 
 
 
-   .. py:method:: get_inner_cells() -> Tuple[slice, Ellipsis]
+   .. py:method:: get_inner_slice() -> Tuple[slice, Ellipsis]
 
       Get slices corresponding to the inner cells (excluding ghost cells).
 

@@ -124,12 +124,12 @@ class MPV:
         tile_shape[self.direction] = 1
         return tile_shape
 
-    def state(self, gravity_strength: Union[np.ndarray, list], Msq: float):
+    def state(self, gravity_strength: Union[np.ndarray, list, tuple], Msq: float):
         """Computes the initial values for the multiple pressure variables
 
         Parameters
         ----------
-        gravity_strength : np.ndarray or List of shape (3,)
+        gravity_strength : np.ndarray, List or tuple of shape (3,)
             the array of gravity strengths in each direction
 
         Msq : float

@@ -156,7 +156,7 @@ class TestKgrid:
 
     def test_get_inner_cells_1d(self):
         grid = Grid(nx=10, x_start=0.0, x_end=1.0, ngx=2)
-        inner_cells_slice = grid.get_inner_cells()
+        inner_cells_slice = grid.get_inner_slice()
         var_cells = np.arange(grid.ncx_total)
         inner_cells = var_cells[inner_cells_slice]
         assert len(inner_cells) == grid.nx
@@ -165,7 +165,7 @@ class TestKgrid:
         grid = Grid(
             nx=10, x_start=0.0, x_end=1.0, ny=20, y_start=0.0, y_end=2.0, ngx=2, ngy=3
         )
-        inner_cells_slice = grid.get_inner_cells()
+        inner_cells_slice = grid.get_inner_slice()
         var_cells = np.zeros((grid.ncx_total, grid.ncy_total))
         inner_cells = var_cells[inner_cells_slice]
         assert inner_cells.shape == (grid.nx, grid.ny)
@@ -185,7 +185,7 @@ class TestKgrid:
             ngy=1,
             ngz=1,
         )
-        inner_cells_slice = grid.get_inner_cells()
+        inner_cells_slice = grid.get_inner_slice()
         var_cells = np.zeros((grid.ncx_total, grid.ncy_total, grid.ncz_total))
         inner_cells = var_cells[inner_cells_slice]
         assert inner_cells.shape == (grid.nx, grid.ny, grid.nz)
@@ -194,7 +194,7 @@ class TestKgrid:
         grid = Grid(nx=10, x_start=0.0, x_end=1.0)
         grid.ndim = 4  # Invalid dimension
         with pytest.raises(ValueError):
-            grid.get_inner_cells()
+            grid.get_inner_slice()
 
     def test_apply_boundary_conditions_cells_1d(self):
         pass

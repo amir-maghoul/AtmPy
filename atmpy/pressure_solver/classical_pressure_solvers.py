@@ -10,7 +10,10 @@ from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
 )
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
-from atmpy.infrastructure.utility import one_element_inner_slice, one_element_inner_nodal_shape
+from atmpy.infrastructure.utility import (
+    one_element_inner_slice,
+    one_element_inner_nodal_shape,
+)
 from atmpy.physics.thermodynamics import Thermodynamics
 from atmpy.pressure_solver import preconditioners
 from atmpy.pressure_solver.abstract_pressure_solver import AbstractPressureSolver
@@ -188,7 +191,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         #### Calculate the needed values for the updates in the RHS of the momenta equations (the Exner pressure #######
         #### perturbation (Pi^prime)_x, _y, _z (see RHS of momenta eq.) and the P*Theta coefficients)  ##################
         dpdx, dpdy, dpdz = self.discrete_operator.gradient(p)
-        pTheta = self._calculate_coefficient_pTheta(cellvars) # Capital P. it is written small for naming in Python.
+        pTheta = self._calculate_coefficient_pTheta(
+            cellvars
+        )  # Capital P. it is written small for naming in Python.
 
         ##################### Calculate exner pressure gradient times coefficient (cell-centered) ######################
         ##################### These are the nominator terms under the divergence in the Helmholtz equation #############
@@ -517,4 +522,3 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             * sp.signal.fftconvolve(P**cexp, kernel, mode="valid")
             / kernel.sum()
         )
-

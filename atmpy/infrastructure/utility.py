@@ -83,9 +83,10 @@ def one_element_inner_slice(ndim: int, full: bool = True) -> Tuple[slice, ...]:
     else:
         return tuple(inner_idx[:-1])
 
+
 def one_element_inner_nodal_shape(nshape: Tuple[int, ...]) -> Tuple[int, ...]:
-    """ Finds the shape of one element inner nodes."""
-    return tuple([x-2 for x in nshape])
+    """Finds the shape of one element inner nodes."""
+    return tuple([x - 2 for x in nshape])
 
 
 def direction_axis(direction: str) -> int:
