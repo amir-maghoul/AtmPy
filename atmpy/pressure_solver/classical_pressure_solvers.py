@@ -69,7 +69,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self.mpv: "MPV" = mpv
         self.boundary_manager: "BoundaryManager" = boundary_manager
         self.ndim = self.variables.ndim
-        self.vertical_momentum_index: int = self.coriolis.gravity.gravity_momentum_index
+        self.vertical_momentum_index: int = (
+            self.coriolis.gravity.vertical_momentum_index
+        )
         self.precondition_type: "Preconditioners" = precondition_type
         self.precon_compute: Optional[Callable] = (
             self._get_preconditioner_compute_components()

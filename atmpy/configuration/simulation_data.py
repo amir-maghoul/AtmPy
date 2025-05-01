@@ -2,13 +2,15 @@
 for a concrete simulation."""
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 import numpy as np
 from atmpy.infrastructure.enums import BoundaryConditions as BdryType, BoundarySide
 from atmpy.infrastructure.enums import SlopeLimiters as LimiterType
 from atmpy.grid.utility import DimensionSpec, create_grid
 from atmpy.grid.kgrid import Grid
+from atmpy.physics.gravity import Gravity
 from atmpy.physics.thermodynamics import Thermodynamics
+from atmpy.time_integrators.coriolis import CoriolisOperator
 
 
 @dataclass
@@ -63,15 +65,35 @@ class SpatialGrid:
 
 
 @dataclass
-class BoundaryConditions:
-    """The data class for boundary conditions information."""
+class BoundarySpec:
+    """Specifies boundary conditions for a single side."""
 
-    conditions: Dict[BoundarySide, BdryType] = field(
+    main_type: BdryType
+    mpv_type: Optional[BdryType] = (
+        None  # Explicitly None if same as main or default desired
+    )
+
+
+@dataclass
+class BoundaryConditions:
+    """Stores the boundary condition specifications for each side."""
+
+    # Dictionary mapping BoundarySide enum to BoundarySpec dataclass
+    conditions: Dict[BoundarySide, BoundarySpec] = field(
         default_factory=lambda: {
-            BoundarySide.LEFT: BdryType.PERIODIC,
-            BoundarySide.RIGHT: BdryType.PERIODIC,
-            BoundarySide.BOTTOM: BdryType.PERIODIC,
-            BoundarySide.TOP: BdryType.PERIODIC,
+            # Default to PERIODIC for both main and mpv, matching vortex case
+            BoundarySide.LEFT: BoundarySpec(
+                main_type=BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
+            ),
+            BoundarySide.RIGHT: BoundarySpec(
+                main_type=BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
+            ),
+            BoundarySide.BOTTOM: BoundarySpec(
+                main_type=BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
+            ),
+            BoundarySide.TOP: BoundarySpec(
+                main_type=BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
+            ),
             # Add FRONT/BACK if needed for 3D
         }
     )
@@ -89,60 +111,6 @@ class Temporal:
         default_factory=lambda: np.array([1.0])
     )  # Default from PyBella
     stepmax: int = 101
-
-
-@dataclass
-class ModelRegimes:
-    """The data class for model regimes information."""
-
-    is_ArakawaKonor: int = 0
-    is_nongeostrophic: int = 1
-    is_nonhydrostatic: int = 1
-    is_compressible: int = 1
-    Msq: float = 0.115
-
-
-@dataclass
-class Physics:
-    """The data class for physics information."""
-
-    u_wind_speed: float = 1.0  # Default from PyBella
-    v_wind_speed: float = 1.0  # Default from PyBella
-    w_wind_speed: float = 0.0  # Default from PyBella
-    gravity_strength: Tuple[float, float, float] = (0.0, 0.0, 0.0)
-    stratification: callable = lambda y: 1.0
-
-
-@dataclass
-class Numerics:
-    """The data class for numerical information."""
-
-    do_advection: bool = True
-    limiter_scalars: LimiterType = LimiterType.VAN_LEER
-    tol: float = 1e-8
-    max_iterations: int = 6000
-    initial_projection: bool = True
-
-
-@dataclass
-class Diagnostics:
-    """The data class for diagnostic information."""
-
-    diag: bool = True
-    diag_plot_compare: bool = False
-    diag_current_run: str = "atmpy_run"
-
-
-@dataclass
-class Outputs:
-    """The data class for output information."""
-
-    autogen_fn: bool = False
-    output_timesteps: bool = True
-    output_type: str = "test"
-    output_base_name: str = "_travelling_vortex"
-    output_suffix: str = ""
-    aux: str = ""
 
 
 @dataclass
@@ -199,3 +167,73 @@ class GlobalConstants:
                 "gamma, R_gas, and T_ref must be positive to calculate Cs."
             )
         self.Cs = np.sqrt(self.gamma * self.R_gas * self.T_ref)
+
+@dataclass
+class ModelRegimes:
+    """The data class for model regimes information."""
+
+    is_ArakawaKonor: int = 0
+    is_nongeostrophic: int = 1
+    is_nonhydrostatic: int = 1
+    is_compressible: int = 1
+    Msq: float = 0.115
+
+    def update_derived_fields(self, constants: GlobalConstants):
+        glc = constants
+        self.Msq = glc.u_ref * glc.u_ref / (glc.R_gas * glc.T_ref)
+
+
+@dataclass
+class Physics:
+    """The data class for physics information."""
+
+    u_wind_speed: float = 1.0  # Default from PyBella
+    v_wind_speed: float = 1.0  # Default from PyBella
+    w_wind_speed: float = 0.0  # Default from PyBella
+    gravity_strength: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    coriolis_strength: Tuple[float, float, float] = (0.0, 0.0, 1.0)
+    stratification: callable = lambda y: 1.0
+    gravity: Gravity = field(init=False)
+    coriolis: CoriolisOperator = field(init=False)
+
+    def update_derived_fields(self, constants: GlobalConstants, grid_cfg: SpatialGrid):
+        """Recalculates gravity and coriolis based on current config."""
+        g = constants.grav * constants.h_ref / (constants.R_gas * constants.T_ref)
+        ndim = grid_cfg.ndim
+        self.gravity = Gravity(self.gravity_strength, ndim)
+        self.gravity.strength = g
+        self.gravity_strength = self.gravity.vector
+        self.coriolis = CoriolisOperator(self.coriolis_strength, self.gravity)
+        print("Physics derived fields updated.")
+
+
+@dataclass
+class Numerics:
+    """The data class for numerical information."""
+
+    do_advection: bool = True
+    limiter_scalars: LimiterType = LimiterType.VAN_LEER
+    tol: float = 1e-8
+    max_iterations: int = 6000
+    initial_projection: bool = True
+
+
+@dataclass
+class Diagnostics:
+    """The data class for diagnostic information."""
+
+    diag: bool = True
+    diag_plot_compare: bool = False
+    diag_current_run: str = "atmpy_run"
+
+
+@dataclass
+class Outputs:
+    """The data class for output information."""
+
+    autogen_fn: bool = False
+    output_timesteps: bool = True
+    output_type: str = "test"
+    output_base_name: str = "_travelling_vortex"
+    output_suffix: str = ""
+    aux: str = ""

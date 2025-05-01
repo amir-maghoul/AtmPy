@@ -225,6 +225,10 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             )
         self.th: "Thermodynamics" = inst_opts.thermodynamics
         self.gravity: Gravity = Gravity(inst_opts.gravity, self.ndim)
+        if self.gravity.strength == 0.0:
+            raise ValueError(
+                "The gravity strength cannot be zero for ReflectiveGravityBoundary."
+            )
         if np.isclose(self.gravity.vector[self.direction], 0):
             raise ValueError(
                 "There is no gravity strength in the specified direction. Wrong boundary conditions."
@@ -281,7 +285,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             )
 
         # Get the index of the velocities in cell_vars for the gravity and nongravity directions
-        gravity_momentum_index = self.gravity.gravity_momentum_index  # VI.RHOV
+        gravity_momentum_index = self.gravity.vertical_momentum_index  # VI.RHOV
         # calculate the Pv for the ghost cells. "v" here is the velocity in the direction of gravity
         Pv = (
             -cell_vars[nsource + (gravity_momentum_index,)]

@@ -83,7 +83,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.is_compressible: bool = is_compressible
         self.wind_speed: np.ndarray = np.array(wind_speed)
         self.ndim = self.grid.ndim
-        self.vertical_momentum_index = self.coriolis.gravity.gravity_momentum_index
+        self.vertical_momentum_index = self.coriolis.gravity.vertical_momentum_index
 
         # Helper for nodal boundary conditions
         # That is setting the flag is_nodal for all dimensions and all sides (therefore ndim*2) to True
@@ -573,18 +573,15 @@ def example_usage():
     np.set_printoptions(precision=10)
 
     ####################################################################################################################
-    # GRID DATA ########################################################################################################
+    ############################ CHOOSE TEST CASE ######################################################################
     ####################################################################################################################
+    from atmpy.test_cases.traveling_vortex import TravelingVortex
 
-    nx = 6
-    ngx = 2
-    nnx = nx + 2 * ngx
-    ny = 10
-    ngy = 2
-    nny = ny + 2 * ngy
+    case = TravelingVortex()
 
-    dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
-    grid = create_grid(dim)
+    grid = case.config.grid
+    gravity_vec = case.config.physics.gravity_strength
+    Msq = case.config.model_regimes.Msq
 
     th = Thermodynamics()
 
@@ -593,109 +590,118 @@ def example_usage():
     ####################################################################################################################
     from atmpy.variables.multiple_pressure_variables import MPV
 
-    A0 = 0.1 / 100
-    t_ref = 100.0
-    T_ref = 300.0
-    R_gas = 287.4
-    h_ref = 10_000
-    cp = th.gamma * R_gas / (th.gm1)
-    N_ref = 9.81 / np.sqrt(cp * T_ref)
-
-    grav = 9.81
-
-    g = grav * h_ref / (R_gas * T_ref)
-    Nsq_ref = N_ref * N_ref
-
-    Msq = 0.115
-    gravity_vec = [0.0, g, 0.0]
+    # A0 = 0.1 / 100
+    # t_ref = 100.0
+    # T_ref = 300.0
+    # R_gas = 287.4
+    # h_ref = 10_000
+    # cp = th.gamma * R_gas / (th.gm1)
+    # N_ref = 9.81 / np.sqrt(cp * T_ref)
+    #
+    # grav = 9.81
+    #
+    # g = grav * h_ref / (R_gas * T_ref)
+    # Nsq_ref = N_ref * N_ref
+    #
+    # Msq = 0.115
+    # gravity_vec = [0.0, g, 0.0]
 
     mpv = MPV(grid)
-    mpv.state(gravity_vec, Msq)
-    Y_bar = mpv.hydrostate.cell_vars[..., HI.Y0]
-    rhobar = mpv.hydrostate.cell_vars[..., HI.RHO0]
+    # mpv.state(gravity_vec, Msq)
+    # Y_bar = mpv.hydrostate.cell_vars[..., HI.Y0]
+    # rhobar = mpv.hydrostate.cell_vars[..., HI.RHO0]
 
     ####################################################################################################################
     ########## Prepare some thermodynamic constant for initialization ##################################################
     ####################################################################################################################
-    rhobar_n = mpv.hydrostate.node_vars[..., HI.RHOY0]
-    Y_bar_n = mpv.hydrostate.node_vars[..., HI.Y0]
-    oorhobarsqrt = 1.0 / np.sqrt(rhobar)
-    oorhobarsqrt_n = 1.0 / np.sqrt(rhobar_n)
-
-    Cs = np.sqrt(th.gamma / Msq)
-    N = t_ref * np.sqrt(Nsq_ref)
-
-    k = N / Cs
-
-    omega = 7.292 * 1e-5
-    coriolis = [0.0, 0.0, 0.0]
-    coriolis[2] = 2.0 * omega * t_ref
-    F = coriolis[2]
-
-    G = np.sqrt(9.0 / 40.0)
-    Gamma = G * N / Cs
-    mu = -Gamma
-
-    matrix = -np.array(
-        [
-            [0, F, 0, 1j * Cs * k],
-            [-F, 0, -N, Cs * (mu + Gamma)],
-            [0, N, 0, 0],
-            [1j * Cs * k, Cs * (mu - Gamma), 0, 0],
-        ]
-    )
-
-    eigval, eigvec = np.linalg.eig(matrix)
-    ind = np.argmax(np.real(eigval))
-    x = grid.x_cells.reshape(-1, 1)
-    y = grid.y_cells.reshape(-1, 1)
-    X, Y = np.meshgrid(x, y)
-    t = 0
-    s = 1
-    exponentials = np.exp(1j * k * X + mu * Y + (eigval[ind]) * (t) + 1j * s * t)
-    chi_Y = A0 * np.real(eigvec[2, ind] * exponentials).T
-    Y_p = oorhobarsqrt * N / 9.81 * Y_bar * chi_Y
-
-    Theta = Y_bar + Y_p
-
-    chi_u = A0 * np.real(eigvec[0, ind] * exponentials).T
-    chi_w = A0 * np.real(eigvec[1, ind] * exponentials).T
-
-    up = oorhobarsqrt * chi_u
-    vp = oorhobarsqrt * chi_w
-
-    x = grid.x_nodes.reshape(-1, 1)
-    y = grid.y_nodes.reshape(-1, 1)
-    X, Y = np.meshgrid(x, y)
-    t = 0
-    s = 1
-    exponentials = np.exp(1j * k * X + mu * Y + (eigval[ind]) * (t) + 1j * s * t)
-    chi_pi = A0 * np.real(eigvec[3, ind] * exponentials).T
-
-    pi_n = oorhobarsqrt_n * Cs / Y_bar_n / th.Gammainv * chi_pi
+    # rhobar_n = mpv.hydrostate.node_vars[..., HI.RHOY0]
+    # Y_bar_n = mpv.hydrostate.node_vars[..., HI.Y0]
+    # oorhobarsqrt = 1.0 / np.sqrt(rhobar)
+    # oorhobarsqrt_n = 1.0 / np.sqrt(rhobar_n)
+    #
+    # Cs = np.sqrt(th.gamma / Msq)
+    # N = t_ref * np.sqrt(Nsq_ref)
+    #
+    # k = N / Cs
+    #
+    # omega = 7.292 * 1e-5
+    # coriolis = [0.0, 0.0, 0.0]
+    # coriolis[2] = 2.0 * omega * t_ref
+    # F = coriolis[2]
+    #
+    # G = np.sqrt(9.0 / 40.0)
+    # Gamma = G * N / Cs
+    # mu = -Gamma
+    #
+    # matrix = -np.array(
+    #     [
+    #         [0, F, 0, 1j * Cs * k],
+    #         [-F, 0, -N, Cs * (mu + Gamma)],
+    #         [0, N, 0, 0],
+    #         [1j * Cs * k, Cs * (mu - Gamma), 0, 0],
+    #     ]
+    # )
+    #
+    # eigval, eigvec = np.linalg.eig(matrix)
+    # ind = np.argmax(np.real(eigval))
+    # x = grid.x_cells.reshape(-1, 1)
+    # y = grid.y_cells.reshape(-1, 1)
+    # X, Y = np.meshgrid(x, y)
+    # t = 0
+    # s = 1
+    # exponentials = np.exp(1j * k * X + mu * Y + (eigval[ind]) * (t) + 1j * s * t)
+    # chi_Y = A0 * np.real(eigvec[2, ind] * exponentials).T
+    # Y_p = oorhobarsqrt * N / 9.81 * Y_bar * chi_Y
+    #
+    # Theta = Y_bar + Y_p
+    #
+    # chi_u = A0 * np.real(eigvec[0, ind] * exponentials).T
+    # chi_w = A0 * np.real(eigvec[1, ind] * exponentials).T
+    #
+    # up = oorhobarsqrt * chi_u
+    # vp = oorhobarsqrt * chi_w
+    #
+    # x = grid.x_nodes.reshape(-1, 1)
+    # y = grid.y_nodes.reshape(-1, 1)
+    # X, Y = np.meshgrid(x, y)
+    # t = 0
+    # s = 1
+    # exponentials = np.exp(1j * k * X + mu * Y + (eigval[ind]) * (t) + 1j * s * t)
+    # chi_pi = A0 * np.real(eigvec[3, ind] * exponentials).T
+    #
+    # pi_n = oorhobarsqrt_n * Cs / Y_bar_n / th.Gammainv * chi_pi
 
     ####################################################################################################################
     ## VARIABLE DATA ###################################################################################################
     ####################################################################################################################
 
-    rng = np.random.default_rng()
-    arr = np.arange(nnx * nny)
-    rng.shuffle(arr)
-    array = arr.reshape(nnx, nny)
+    # rng = np.random.default_rng()
+    # arr = np.arange(nnx * nny)
+    # rng.shuffle(arr)
+    # array = arr.reshape(nnx, nny)
 
     variables = Variables(grid, 6, 1)
-    variables.cell_vars[..., VI.RHO] = rhobar
-    # variables.cell_vars[..., VI.RHO][1:-1, 1:-1] = 4
-    variables.cell_vars[..., VI.RHOU] = up
-    variables.cell_vars[..., VI.RHOY] = rhobar * Theta
-    variables.cell_vars[..., VI.RHOW] = 0.0
+    # variables.cell_vars[..., VI.RHO] = rhobar
+    # # variables.cell_vars[..., VI.RHO][1:-1, 1:-1] = 4
+    # variables.cell_vars[..., VI.RHOU] = up
+    # variables.cell_vars[..., VI.RHOY] = rhobar * Theta
+    # variables.cell_vars[..., VI.RHOW] = 0.0
+    #
+    # rng.shuffle(arr)
+    # array = arr.reshape(nnx, nny)
+    # variables.cell_vars[..., VI.RHOV] = vp
 
-    rng.shuffle(arr)
-    array = arr.reshape(nnx, nny)
-    variables.cell_vars[..., VI.RHOV] = vp
+    # mpv.p2_nodes[...] = pi_n
 
-    mpv.p2_nodes[...] = pi_n
+    case.initialize_solution(variables, mpv)
 
+    ####################################################################################################################
+    ######### BOUNDARY MANAGER #########################################################################################
+    ####################################################################################################################
+    from atmpy.boundary_conditions.boundary_manager import BoundaryManager
+    bm_config = case.config.get_boundary_manager_config()
+    manager = BoundaryManager(bm_config)
+    manager.apply_boundary_on_all_sides(variables.cell_vars)
     ####################################################################################################################
     ######### FLUX #####################################################################################################
     ####################################################################################################################
@@ -706,51 +712,8 @@ def example_usage():
     flux = Flux(grid, variables, eos)
 
     ########## STRATIFICATION ##########################################################################################
-    def stratification_function(y):
-        Nsq = Nsq_ref * t_ref * t_ref
-        g1 = g / Msq
+    stratification = case.config.physics.stratification
 
-        return np.exp(Nsq * y / g1)
-
-    stratification = stratification_function
-
-    ####################################################################################################################
-    ######### BOUNDARY MANAGER #########################################################################################
-    ####################################################################################################################
-    from atmpy.boundary_conditions.boundary_manager import BoundaryManager
-    from atmpy.boundary_conditions.contexts import (
-        BCInstantiationOptions,
-        BoundaryConditionsConfiguration,
-        BCApplicationContext,
-    )
-
-    direction = "y"
-    bc = BCInstantiationOptions(
-        side=BdrySide.BOTTOM,
-        type=BdryType.REFLECTIVE_GRAVITY,
-        direction=direction,
-        grid=grid,
-        stratification=stratification,
-    )
-    bc2 = BCInstantiationOptions(
-        side=BdrySide.TOP,
-        type=BdryType.REFLECTIVE_GRAVITY,
-        direction=direction,
-        grid=grid,
-        stratification=stratification,
-    )
-    bc3 = BCInstantiationOptions(
-        side=BdrySide.LEFT, type=BdryType.PERIODIC, direction="x", grid=grid
-    )
-    bc4 = BCInstantiationOptions(
-        side=BdrySide.RIGHT, type=BdryType.PERIODIC, direction="x", grid=grid
-    )
-    options = [bc, bc2, bc3, bc4]
-    # options = [bc, bc2]
-
-    bc_conditions = BoundaryConditionsConfiguration(options)
-    manager = BoundaryManager(bc_conditions)
-    manager.apply_boundary_on_all_sides(variables.cell_vars)
 
     ####################################################################################################################
     ########## DISCRETE OPERATOR AND PRESSURE SOLVER ###################################################################
@@ -765,11 +728,7 @@ def example_usage():
         PressureContext,
     )
 
-    from atmpy.physics.gravity import Gravity
-    from atmpy.time_integrators.coriolis import CoriolisOperator
-
-    gravity = Gravity(gravity_vec, grid.ndim)
-    coriolis = CoriolisOperator([0.0, 1.0, 0.0], gravity)
+    coriolis = case.config.physics.coriolis
 
     op_context = DiscreteOperatorsContext(
         operator_type=DiscreteOperators.CLASSIC_OPERATOR, grid=grid
@@ -824,22 +783,7 @@ def example_usage():
     )
     time_integrator = context.instantiate()
 
-    ###### Approach 2 #############################
-    # Or simply using the direct needed integrator:
-    # time_integrator = IMEXTimeIntegrator(
-    #     grid=grid,
-    #     variables=variables,
-    #     mpv=mpv,
-    #     flux=flux,
-    #     boundary_manager=manager,
-    #     coriolis_operator=coriolis,
-    #     pressure_solver=pressure,
-    #     thermodynamics=th,
-    #     dt=0.1,
-    #     Msq=1.0
-    # )
-    # print(variables.cell_vars[..., VI.RHOY] / variables.cell_vars[..., VI.RHO])
-    print(variables.cell_vars[..., VI.RHOY])
+    print(variables.cell_vars[..., VI.RHO])
     # manager.apply_boundary_on_all_sides(variables.cell_vars)
     # print(variables.cell_vars[..., VI.RHOU])
 
@@ -860,13 +804,15 @@ def example_usage():
     # print(variables.cell_vars[..., VI.RHOV])
     # print(".......................................................")
 
-    print(mpv.p2_nodes)
+    # print(mpv.p2_nodes)
+    print(variables.cell_vars[..., VI.RHO])
     # # pressure.pressure_coefficients_nodes(variables.cell_vars, dt)
     # time_integrator.forward_update()
     # time_integrator.backward_update_explicit(dt)
-    time_integrator.backward_update_implicit(dt)
+    time_integrator.step()
     # # x = pressure.helmholtz_operator(mpv.p2_nodes, dt, True, True, True)
-    print(mpv.p2_nodes)
+    # print(mpv.p2_nodes)
+    print(variables.cell_vars[..., VI.RHO])
     # print(x)
     #
     # rhs = np.ones_like(x).flatten()

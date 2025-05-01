@@ -108,26 +108,23 @@ class TravelingVortex(BaseTestCase):
         #################################### Grid Configuration ########################################################
         grid_updates = {
             "ndim": 2,
-            "nx": 64,
-            "ny": 64,
+            "nx": 6,
+            "ny": 10,
             "nz": 0,
-            "xmin": -0.5,
-            "xmax": 0.5,
-            "ymin": -0.5,
-            "ymax": 0.5,
+            "xmin": 0,
+            "xmax": 2,
+            "ymin": 0,
+            "ymax": 2,
             "ngx": 2,  # Standard ghost cells
             "ngy": 2,
         }
         self.set_grid_configuration(grid_updates)
 
         #################################### Boundary Conditions #######################################################
-        bc_updates = {
-            BoundarySide.LEFT: BdryType.PERIODIC,
-            BoundarySide.RIGHT: BdryType.PERIODIC,
-            BoundarySide.BOTTOM: BdryType.REFLECTIVE_GRAVITY,
-            BoundarySide.TOP: BdryType.REFLECTIVE_GRAVITY,
-        }
-        self.set_boundary_conditions(bc_updates)
+        self.set_boundary_condition(BoundarySide.LEFT,   BdryType.PERIODIC, mpv_type=BdryType.PERIODIC)
+        self.set_boundary_condition(BoundarySide.RIGHT,  BdryType.PERIODIC, mpv_type=BdryType.PERIODIC)
+        self.set_boundary_condition(BoundarySide.BOTTOM, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC)
+        self.set_boundary_condition(BoundarySide.TOP,    BdryType.PERIODIC, mpv_type=BdryType.PERIODIC)
 
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
@@ -145,6 +142,7 @@ class TravelingVortex(BaseTestCase):
             "v_wind_speed": self.v0,  # Use parameter defined above
             "w_wind_speed": self.w0,
             "gravity_strength": (0.0, 0.0, 0.0),  # Zero gravity case
+            "coriolis_strength": (0.0, 0.0, 0.0),
             "stratification": lambda y: 1.0,  # Isothermal background
         }
         self.set_physics(physics_updates)
@@ -180,6 +178,8 @@ class TravelingVortex(BaseTestCase):
         }
         self.set_diagnostics(diag_updates)
 
+        #################################### Global Constants ##########################################################
+
         constants_updates = {
             "gamma": 1.4,
             "R_gas": 287.4,
@@ -189,7 +189,7 @@ class TravelingVortex(BaseTestCase):
             "t_ref": 100.0,
             "grav": 0.0,
         }
-        self.set_global_constants(constants_updates)  # This recalculates dependent refs
+        self.set_global_constants(constants_updates)
 
         # Final check/update of Msq after constants are set
         self._update_Msq()
@@ -206,7 +206,8 @@ class TravelingVortex(BaseTestCase):
         print("Initializing solution for Traveling Vortex...")
 
         grid = self.config.grid
-        thermo = Thermodynamics(self.config.global_constants.gamma)
+        thermo = Thermodynamics()
+        thermo.update(self.config.global_constants.gamma)
         Msq = self.config.model_regimes.Msq
 
         if Msq <= 0 and self.config.model_regimes.is_compressible:
@@ -218,8 +219,6 @@ class TravelingVortex(BaseTestCase):
         inner_slice = grid.get_inner_slice()
 
         # --- Calculate Hydrostatic Base State ---
-        # For zero gravity, this just sets uniform fields based on reference p0=1, rho0=1
-        # Need gravity argument for the state function
         gravity = self.config.physics.gravity_strength
         mpv.state(gravity, Msq)
 
@@ -332,7 +331,11 @@ class TravelingVortex(BaseTestCase):
         mpv.p2_cells[inner_slice] = (
             thermo.Gamma
             * self.fac**2
-            * np.divide(p2c_unscaled, rhoY0_cells, where=rhoY0_cells != 0)
+            * np.divide(
+                p2c_unscaled,
+                rhoY0_cells[inner_slice[0]],
+                where=rhoY0_cells[inner_slice[0]] != 0,
+            )
         )
 
         # --- Calculate Nodal Pressure Perturbation p2 (Nodes, Inner Domain Only) ---
@@ -393,6 +396,9 @@ class TravelingVortex(BaseTestCase):
 if __name__ == "__main__":
     # 1. Create the test case instance
     vortex_case = TravelingVortex()
+    np.set_printoptions(linewidth=300)
+    np.set_printoptions(suppress=True)
+    np.set_printoptions(precision=10)
 
     # 2. The configuration is now set inside vortex_case.config
     #    Access config like:
@@ -420,31 +426,10 @@ if __name__ == "__main__":
 
     # 4. Initialize the solution variables using the test case method
     vortex_case.initialize_solution(sim_vars, sim_mpv)
-
-    # 5. Now sim_vars and sim_mpv contain the initial state (inner domain)
-    #    The BoundaryManager would then be created using vortex_case.config
-    #    and applied by the solver during the simulation loop.
-    print("\nExample initialized values (center slice):")
-    center_x = grid.nx // 2 + grid.ngx
-    center_y = grid.ny // 2 + grid.ngy
-    print(
-        f"Rho @ ({center_x}, {center_y}): {sim_vars.cell_vars[center_x, center_y, VI.RHO]:.4f}"
-    )
-    print(
-        f"RhoU @ ({center_x}, {center_y}): {sim_vars.cell_vars[center_x, center_y, VI.RHOU]:.4f}"
-    )
-    print(
-        f"RhoV @ ({center_x}, {center_y}): {sim_vars.cell_vars[center_x, center_y, VI.RHOV]:.4f}"
-    )
-    print(
-        f"RhoY @ ({center_x}, {center_y}): {sim_vars.cell_vars[center_x, center_y, VI.RHOY]:.4f}"
-    )
-    print(
-        f"p2_cells @ ({center_x}, {center_y}): {sim_mpv.p2_cells[center_x, center_y]:.4f}"
-    )
-    # Note: Node indexing might differ slightly
-    node_center_x = grid.nx // 2 + grid.ngx
-    node_center_y = grid.ny // 2 + grid.ngy
-    print(
-        f"p2_nodes @ ({node_center_x}, {node_center_y}): {sim_mpv.p2_nodes[node_center_x, node_center_y]:.4f}"
-    )
+    print(sim_vars.cell_vars[..., VI.RHO])
+    constants_updates = {"T_ref": 100}
+    print(vortex_case.config.global_constants.T_ref)
+    print(vortex_case.config.model_regimes.Msq)
+    vortex_case.set_global_constants(constants_updates)
+    print(vortex_case.config.global_constants.T_ref)
+    print(vortex_case.config.model_regimes.Msq)

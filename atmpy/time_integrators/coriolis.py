@@ -19,7 +19,7 @@ class CoriolisOperator:
 
     def __init__(
         self,
-        coriolis_strength: Union[np.ndarray, list],
+        coriolis_strength: Union[np.ndarray, list, tuple],
         gravity: "Gravity",
     ):
         self.strength: np.ndarray = np.array(coriolis_strength)

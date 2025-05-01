@@ -394,13 +394,15 @@ def boundary_manager_2d_updated():
     print("P2 Cells (WALL applied on Y boundaries, PERIODIC on X):\n", mpv.p2_cells)
 
     boundary_operation = [
-        WallAdjustment(
-            target_side=BdrySide.LEFT, target_type=BdryType.WALL, factor=100
-        )
+        WallAdjustment(target_side=BdrySide.LEFT, target_type=BdryType.WALL, factor=100)
     ]
-    manager.apply_extra_all_sides( variables.cell_vars[..., VI.RHO], boundary_operation, target_mpv=False)
-    print(" RHO (EXTRA applied on Y boundaries, PERIODIC on X):\n",  variables.cell_vars[..., VI.RHO])
-
+    manager.apply_extra_all_sides(
+        variables.cell_vars[..., VI.RHO], boundary_operation, target_mpv=False
+    )
+    print(
+        " RHO (EXTRA applied on Y boundaries, PERIODIC on X):\n",
+        variables.cell_vars[..., VI.RHO],
+    )
 
 
 if __name__ == "__main__":

@@ -29,7 +29,9 @@ class AbstractPressureSolver(ABC):
         self.coriolis: "CoriolisOperator" = coriolis
         self.th: "Thermodynamics" = thermodynamics
         self.Msq: float = Msq
-        self.vertical_momentum_index: int = self.coriolis.gravity.gravity_momentum_index
+        self.vertical_momentum_index: int = (
+            self.coriolis.gravity.vertical_momentum_index
+        )
         self.precondition_type: "Preconditioners" = precondition_type
         self.precon_apply: Callable
 

@@ -87,7 +87,7 @@ def first_order_directional_rk(
 
     lmbda: float = dt / grid.dxyz[direction_int]
     # Find the left and right indices
-    left_idx, right_idx, _, _ = directional_indices(ndim, direction, full=True)
+    left_idx, right_idx, _ = directional_indices(ndim, direction, full=True)
     flux.apply_riemann_solver(lmbda, direction)
     variables.cell_vars[...] += lmbda * (
         flux.flux[direction][left_idx] - flux.flux[direction][right_idx]

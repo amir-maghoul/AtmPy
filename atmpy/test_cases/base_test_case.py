@@ -2,8 +2,9 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Any, List, Tuple, TYPE_CHECKING
+from typing import Dict, Any, List, Tuple, TYPE_CHECKING, Optional
 from atmpy.configuration.simulation_configuration import SimulationConfig
+from atmpy.configuration.simulation_data import BoundarySpec
 from atmpy.infrastructure.enums import BoundarySide, BoundaryConditions as BdryType
 
 if TYPE_CHECKING:
@@ -15,28 +16,23 @@ class BaseTestCase(ABC):
     def __init__(self, name: str, config: SimulationConfig):
         self.name = name
         self.config = config
-        # Remove parameters, initial_conditions, boundary_conditions attributes
-        # Configuration is handled by self.config
-        # Initial conditions are handled by initialize_solution
-        # Boundary conditions setup is handled during config init or setup
 
     def set_boundary_condition(
-        self,
-        boundary_side: BoundarySide,
-        condition: BdryType,
+            self,
+            boundary_side: BoundarySide,
+            main_type: BdryType,
+            mpv_type: Optional[BdryType] = None  # Add optional mpv_type
     ):
-        """Update the boundary condition for a given boundary side in the config."""
-        # Modify the config directly
-        if boundary_side not in self.config.boundary_conditions.conditions:
-            print(
-                f"Warning: Boundary side {boundary_side} not initially in config. Adding."
-            )
-        self.config.boundary_conditions.conditions[boundary_side] = condition
+        """Update the boundary condition *specification* for a given boundary side in the config."""
+        self.config.update_boundary_condition(boundary_side, main_type, mpv_type)
 
-    def set_boundary_conditions(self, bc_updates: Dict[BoundarySide, BdryType]):
-        """Update multiple boundary conditions in the configuration."""
-        for side, condition in bc_updates.items():
-            self.set_boundary_condition(side, condition)
+    def set_boundary_conditions(self, bc_updates: Dict[BoundarySide, Tuple[BdryType, Optional[BdryType]]]):
+        """Update multiple boundary condition *specifications* in the configuration.
+           Input dictionary maps side to a tuple (main_type, mpv_type).
+        """
+        specs = {side: BoundarySpec(main_type=types[0], mpv_type=types[1])
+                 for side, types in bc_updates.items()}
+        self.config.update_boundary_conditions(specs)
 
     def set_grid_configuration(self, grid_updates: Dict[str, Any]):
         """Update spatial grid configuration."""
@@ -53,6 +49,7 @@ class BaseTestCase(ABC):
             # Update the grid reference in the main config too
             self.config.grid = self.config.spatial_grid.grid
             print("Grid configuration updated and grid object recreated.")
+            self.config.update_all_derived_fields()
 
     def set_global_constants(self, global_constant_updates: Dict[str, float]):
         """Update the global constants in the configuration."""
@@ -68,6 +65,7 @@ class BaseTestCase(ABC):
             # Re-run post_init if dependent values need recalculation
             if hasattr(constants_config, "__post_init__"):
                 constants_config.__post_init__()
+            self.config.update_all_derived_fields()
 
     def set_temporal(self, temporal_updates: Dict[str, Any]):
         """Update the temporal configuration."""

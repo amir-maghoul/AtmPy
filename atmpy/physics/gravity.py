@@ -40,22 +40,27 @@ class Gravity:
 
     """
 
-    def __init__(self, gravity_vector: Union[np.ndarray, list], ndim: int):
+    def __init__(self, gravity_vector: Union[np.ndarray, list, tuple], ndim: int):
         self.vector: np.ndarray = np.array(gravity_vector)
         self.ndim = ndim
-        non_zero = np.nonzero(self.vector)[0]
-        if len(non_zero) != 1:
-            raise ValueError("Gravity vector must be nonzero in exactly one direction.")
-
-        self.axis: int = cast(int, non_zero[0])
-        if self.axis != GRAVITY_AXIS:
-            raise ValueError(
-                f""" The axis {GRAVITY_AXIS} is the forced axis for gravity. """
-            )
+        self.axis = GRAVITY_AXIS
         self.direction: str = GRAVITY_DIRECTION
-        self.strength: float = self.vector[self.axis]
-        self.gravity_momentum_index = GRAVITY_MOMENTUM_INDEX
+        self.strength = 0.0
+        self.vertical_momentum_index = GRAVITY_MOMENTUM_INDEX
         self.perpendicular_momentum_index = PERPENDICULAR_MOMENTUM_INDEX
+
+        non_zero = np.nonzero(self.vector)[0]
+        if non_zero.size == 1:
+            self.axis: int = cast(int, non_zero[0])
+            if self.axis != GRAVITY_AXIS:
+                raise ValueError(
+                    f""" The axis {GRAVITY_AXIS} is the forced axis for gravity. """
+                )
+            self.strength: float = self.vector[self.axis]
+        elif non_zero.size > 1:
+            raise ValueError(
+                "Gravity vector cannot have strength in more than one direction."
+            )
 
     def get_coordinate_cells(self, grid: "Grid"):
         """
