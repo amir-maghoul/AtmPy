@@ -18,6 +18,7 @@ from atmpy.physics.thermodynamics import Thermodynamics
 from atmpy.pressure_solver import preconditioners
 from atmpy.pressure_solver.abstract_pressure_solver import AbstractPressureSolver
 from atmpy.pressure_solver.preconditioners import *
+from atmpy.pressure_solver.utility import laplacian_inner_slice
 
 if TYPE_CHECKING:
     from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
@@ -292,10 +293,10 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         Notes
         -----
-        The output is of shape (nx-1, ny-1, nz-1):
-        - p is of shape (nx+1, ny+1, nz+1)
-        - grad(p) is of shape (nx, ny, nz)
-        - divergence(grad(p)) is of shape (nx-1, ny-1, nz-1)
+        The output is of shape (nnx-2, nny-2, nnz-2):
+        - p is of shape (nnx, nny, nnz)
+        - grad(p) is of shape (nnx-1, nny-1, nnz-1)
+        - divergence(grad(p)) is of shape (nnx-2, ny-2, nz-2)
         """
 
         ######### Calculate the needed term inside the divergence: M_inv ⋅ ( dt * (PΘ)° * ∇p )  ########################
@@ -346,15 +347,20 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         Returns
         -------
         np.ndarray
-            The full Helmholtz operator of shape (nx-1, ny-1, nz-1)
+            The full Helmholtz operator of shape (nnx-2, nny-2, nnz-2)
         """
         ############### Calculate the Laplacian ########################################################################
-        laplacian = self.isentropic_laplacian(
+        laplacian_full = self.isentropic_laplacian(
             p, dt, is_nongeostrophic, is_nonhydrostatic
         )
 
+        ################ Extract inner node values from laplacian ######################################################
+        laplacian_inner_nodes_slice = laplacian_inner_slice(self.grid.ng)
+        laplacian = laplacian_full[laplacian_inner_nodes_slice]
+        assert laplacian.shape == self.grid.inshape
+
         ####### Creating the pressure term corresponding to the dPdpi and add it to the laplacian ######################
-        inner_slice = one_element_inner_slice(self.ndim, full=False)
+        inner_slice = self.grid.get_inner_slice()
         helmholtz_result = laplacian + self.mpv.wcenter[inner_slice] * p[inner_slice]
 
         return helmholtz_result
@@ -371,18 +377,16 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         """
 
         # Get inner slice and inner shape of node grid
-        inner_slice = one_element_inner_slice(self.ndim, full=False)
-        inshape = one_element_inner_nodal_shape(self.grid.nshape)
+        inshape = self.grid.inshape
 
         ######## Create the shape of the flat vector containing the inner nodes ########################################
         flat_size = np.prod(inshape)
-
-        ######## The operator (matrix) shape needed for sp.LinearOperator ##############################################
         operator_shape = (flat_size, flat_size)
 
         ######## Helmholtz operator wrapper ############################################################################
         def _matvec(p_flat):
             ############## Pad p_flat to the full nodal shape expected by helmholtz_operator ###########################
+            inner_slice = self.grid.get_inner_slice()
             p_full = np.zeros(self.grid.nshape, dtype=p_flat.dtype)
             p_full[inner_slice] = p_flat.reshape(inshape)
 

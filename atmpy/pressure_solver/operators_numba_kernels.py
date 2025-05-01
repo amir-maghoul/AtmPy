@@ -18,14 +18,14 @@ def _gradient_1d_numba(p: np.ndarray, dx: float) -> Tuple[np.ndarray]:
 
     Parameters
     ----------
-    p : np.ndarray of shape (nx+1, )
+    p : np.ndarray of shape (nnx, )
         The input scalar function (mostly pressure or exner pressure perturbation) defined on nodes.
     dx : float
         The discretization fineness in each coordinate direction
 
     Returns
     -------
-    Dpx : np.ndarray
+    Dpx : np.ndarray of shape(nnx-1,)
         The derivative in each coordinate direction
     """
     # Preallocate for derivatives
@@ -48,14 +48,14 @@ def _gradient_2d_numba(
 
     Parameters
     ----------
-    p : np.ndarray of shape (nx+1, ny+1)
+    p : np.ndarray of shape (nnx, nny)
         The input scalar function (mostly pressure or exner pressure perturbation) defined on nodes.
     dx, dy : float
         The discretization fineness in each coordinate direction
 
     Returns
     -------
-    Dpx, Dpy : np.ndarray
+    Dpx, Dpy : np.ndarray of shape(nnx-1, nny-1)
         The derivative in each coordinate direction
     """
     nx = p.shape[0] - 1
@@ -91,14 +91,14 @@ def _gradient_3d_numba(
 
     Parameters
     ----------
-    p : np.ndarray of shape (nx+1, ny+1, nz+1)
+    p : np.ndarray of shape (nnx, nny, nnz)
         The input scalar function (mostly pressure or exner pressure perturbation) defined on nodes.
     dx, dy, dz : float
         The discretization fineness in each coordinate direction
 
     Returns
     -------
-    Dpx, Dpy, Dpz : np.ndarray
+    Dpx, Dpy, Dpz : np.ndarray of shape (nnx-1, nny-1, nnz-1)
         The derivative in each coordinate direction
     """
     nx = p.shape[0] - 1
@@ -151,7 +151,7 @@ def _divergence_1d_numba(
 ) -> np.ndarray:
     """
     Calculates 1D divergence at nodes based on cell-centered vector component.
-    Output shape: (nx-1, ) - Node-centered
+    Output shape: (nnx-2, ) - Node-centered
     """
     nx = vector_field.shape[0]
     nnx = nx - 1  # number of nodes in x direction
@@ -178,7 +178,7 @@ def _divergence_2d_numba(
 ) -> np.ndarray:
     """
     Calculates 2D divergence at nodes based on cell-centered vector components.
-    Output shape: (nx-1, ny-1) - Node-centered
+    Output shape: (nnx-2, nny-2) - Node-centered
     """
     nx, ny = vector_field.shape[0], vector_field.shape[1]
     nnx = nx - 1
@@ -225,7 +225,7 @@ def _divergence_3d_numba(
 ) -> np.ndarray:
     """
     Calculates 3D divergence at nodes based on cell-centered vector components.
-    Output shape: (nx-1, ny-1, nz-1) - Node-centered
+    Output shape: (nnx-2, nny-2, nnz-2) - Node-centered
     """
     nx, ny, nz = vector_field.shape[0], vector_field.shape[1], vector_field.shape[2]
     nnx = nx - 1

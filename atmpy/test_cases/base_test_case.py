@@ -18,20 +18,24 @@ class BaseTestCase(ABC):
         self.config = config
 
     def set_boundary_condition(
-            self,
-            boundary_side: BoundarySide,
-            main_type: BdryType,
-            mpv_type: Optional[BdryType] = None  # Add optional mpv_type
+        self,
+        boundary_side: BoundarySide,
+        main_type: BdryType,
+        mpv_type: Optional[BdryType] = None,  # Add optional mpv_type
     ):
         """Update the boundary condition *specification* for a given boundary side in the config."""
         self.config.update_boundary_condition(boundary_side, main_type, mpv_type)
 
-    def set_boundary_conditions(self, bc_updates: Dict[BoundarySide, Tuple[BdryType, Optional[BdryType]]]):
+    def set_boundary_conditions(
+        self, bc_updates: Dict[BoundarySide, Tuple[BdryType, Optional[BdryType]]]
+    ):
         """Update multiple boundary condition *specifications* in the configuration.
-           Input dictionary maps side to a tuple (main_type, mpv_type).
+        Input dictionary maps side to a tuple (main_type, mpv_type).
         """
-        specs = {side: BoundarySpec(main_type=types[0], mpv_type=types[1])
-                 for side, types in bc_updates.items()}
+        specs = {
+            side: BoundarySpec(main_type=types[0], mpv_type=types[1])
+            for side, types in bc_updates.items()
+        }
         self.config.update_boundary_conditions(specs)
 
     def set_grid_configuration(self, grid_updates: Dict[str, Any]):

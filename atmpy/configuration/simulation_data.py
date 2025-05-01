@@ -168,6 +168,7 @@ class GlobalConstants:
             )
         self.Cs = np.sqrt(self.gamma * self.R_gas * self.T_ref)
 
+
 @dataclass
 class ModelRegimes:
     """The data class for model regimes information."""

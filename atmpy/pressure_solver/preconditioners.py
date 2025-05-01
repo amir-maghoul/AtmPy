@@ -138,7 +138,7 @@ def compute_inverse_diagonal_components(
     mpv = pressure_solver.mpv
 
     ################## Create shape and slice of one element inner ((nx-1, ny-1, nz-1)) ################################
-    inner_slice = one_element_inner_slice(grid.ndim, full=False)
+    inner_slice = grid.get_inner_slice()
     inner_shape = mpv.wcenter[inner_slice].shape
 
     ################################### Perform the probing ############################################################

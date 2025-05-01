@@ -15,6 +15,7 @@ from atmpy.infrastructure.utility import (
 )
 from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
 from atmpy.infrastructure.enums import VariableIndices as VI, Preconditioners
+from atmpy.pressure_solver.utility import laplacian_inner_slice
 
 if TYPE_CHECKING:
     from atmpy.flux.flux import Flux
@@ -363,8 +364,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # is basically ∇⋅(M_inv⋅(dt*(PΘ)*∇p₂)) where M is extended coriolis inverse
         divergence_inner = self.discrete_operator.divergence(pressure_weighted_momenta)
 
+        laplacian_inner_node_slice = laplacian_inner_slice(self.grid.ng)
         # Final RHS for A * delta_p = rhs
-        rhs_flat = divergence_inner.flatten()
+        rhs_flat = divergence_inner[laplacian_inner_node_slice].flatten()
 
         # Adjust the coefficients of the pressure gradient term for the solver as a result of compressibility regime
         self.mpv.wcenter *= self.is_compressible
@@ -380,8 +382,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
         ############################ 7. Prepare p2 for Correction Step #################################################
-        inner_slice = one_element_inner_slice(self.ndim, full=False)
-        inner_shape = one_element_inner_nodal_shape(self.grid.nshape)
+        inner_slice = self.grid.get_inner_slice()
+        inner_shape = self.grid.inshape
         p_unflat = p2_inner_flat.reshape(inner_shape)
 
         # Pad increment to full nodal shape
@@ -699,6 +701,7 @@ def example_usage():
     ######### BOUNDARY MANAGER #########################################################################################
     ####################################################################################################################
     from atmpy.boundary_conditions.boundary_manager import BoundaryManager
+
     bm_config = case.config.get_boundary_manager_config()
     manager = BoundaryManager(bm_config)
     manager.apply_boundary_on_all_sides(variables.cell_vars)
@@ -713,7 +716,6 @@ def example_usage():
 
     ########## STRATIFICATION ##########################################################################################
     stratification = case.config.physics.stratification
-
 
     ####################################################################################################################
     ########## DISCRETE OPERATOR AND PRESSURE SOLVER ###################################################################
@@ -804,15 +806,15 @@ def example_usage():
     # print(variables.cell_vars[..., VI.RHOV])
     # print(".......................................................")
 
-    # print(mpv.p2_nodes)
-    print(variables.cell_vars[..., VI.RHO])
+    print(mpv.p2_nodes)
+    # print(variables.cell_vars[..., VI.RHO])
     # # pressure.pressure_coefficients_nodes(variables.cell_vars, dt)
     # time_integrator.forward_update()
     # time_integrator.backward_update_explicit(dt)
     time_integrator.step()
     # # x = pressure.helmholtz_operator(mpv.p2_nodes, dt, True, True, True)
-    # print(mpv.p2_nodes)
-    print(variables.cell_vars[..., VI.RHO])
+    print(mpv.p2_nodes)
+    # print(variables.cell_vars[..., VI.RHO])
     # print(x)
     #
     # rhs = np.ones_like(x).flatten()

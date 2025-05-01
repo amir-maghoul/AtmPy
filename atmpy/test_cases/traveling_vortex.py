@@ -121,10 +121,18 @@ class TravelingVortex(BaseTestCase):
         self.set_grid_configuration(grid_updates)
 
         #################################### Boundary Conditions #######################################################
-        self.set_boundary_condition(BoundarySide.LEFT,   BdryType.PERIODIC, mpv_type=BdryType.PERIODIC)
-        self.set_boundary_condition(BoundarySide.RIGHT,  BdryType.PERIODIC, mpv_type=BdryType.PERIODIC)
-        self.set_boundary_condition(BoundarySide.BOTTOM, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC)
-        self.set_boundary_condition(BoundarySide.TOP,    BdryType.PERIODIC, mpv_type=BdryType.PERIODIC)
+        self.set_boundary_condition(
+            BoundarySide.LEFT, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
+        )
+        self.set_boundary_condition(
+            BoundarySide.RIGHT, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
+        )
+        self.set_boundary_condition(
+            BoundarySide.BOTTOM, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
+        )
+        self.set_boundary_condition(
+            BoundarySide.TOP, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
+        )
 
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
