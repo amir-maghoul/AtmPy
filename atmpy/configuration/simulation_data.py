@@ -2,9 +2,13 @@
 for a concrete simulation."""
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Tuple, Any, Optional
+from typing import List, Dict, Tuple, Any, Optional, Union
 import numpy as np
-from atmpy.infrastructure.enums import BoundaryConditions as BdryType, BoundarySide
+from atmpy.infrastructure.enums import (
+    BoundaryConditions as BdryType,
+    BoundarySide,
+    AdvectionRoutines,
+)
 from atmpy.infrastructure.enums import SlopeLimiters as LimiterType
 from atmpy.grid.utility import DimensionSpec, create_grid
 from atmpy.grid.kgrid import Grid
@@ -188,11 +192,9 @@ class ModelRegimes:
 class Physics:
     """The data class for physics information."""
 
-    u_wind_speed: float = 1.0  # Default from PyBella
-    v_wind_speed: float = 1.0  # Default from PyBella
-    w_wind_speed: float = 0.0  # Default from PyBella
-    gravity_strength: Tuple[float, float, float] = (0.0, 0.0, 0.0)
-    coriolis_strength: Tuple[float, float, float] = (0.0, 0.0, 1.0)
+    wind_speed: Union[List[float], np.ndarray, Tuple[float]] = (0.0, 0.0, 0.0)
+    gravity_strength: Union[List[float], np.ndarray, Tuple[float]] = (0.0, 0.0, 0.0)
+    coriolis_strength: Union[List[float], np.ndarray, Tuple[float]] = (0.0, 0.0, 1.0)
     stratification: callable = lambda y: 1.0
     gravity: Gravity = field(init=False)
     coriolis: CoriolisOperator = field(init=False)
@@ -214,9 +216,11 @@ class Numerics:
 
     do_advection: bool = True
     limiter_scalars: LimiterType = LimiterType.VAN_LEER
+    advection_routine: AdvectionRoutines = (AdvectionRoutines.STRANG_SPLIT,)
     tol: float = 1e-8
     max_iterations: int = 6000
     initial_projection: bool = True
+    num_vars_cell: int = 6
 
 
 @dataclass
@@ -235,6 +239,14 @@ class Outputs:
     autogen_fn: bool = False
     output_timesteps: bool = True
     output_type: str = "test"
+    output_path: str = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/"
+    output_folder: str = ""
     output_base_name: str = "_travelling_vortex"
+    output_filename: str = ""
     output_suffix: str = ""
+    output_extension: str = ".nc"
+    checkpoint_base_name: str = "_traveling_vortex_checkpoint"
+    enable_checkpointing: str = True
+    checkpoint_frequency_steps: int = 100
+    checkpoint_filename: str = ""
     aux: str = ""

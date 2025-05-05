@@ -10,6 +10,7 @@ from atmpy.infrastructure.enums import BoundarySide, BoundaryConditions as BdryT
 if TYPE_CHECKING:
     from atmpy.variables.variables import Variables
     from atmpy.variables.multiple_pressure_variables import MPV
+import os
 
 
 class BaseTestCase(ABC):
@@ -128,6 +129,7 @@ class BaseTestCase(ABC):
                 print(f"Warning: Output setting '{key}' not found in config.")
         # Update suffix based on grid if needed
         self._update_output_suffix()
+        self._update_output_filename()
 
     def _update_Msq(self):
         """Helper to recalculate Msq based on current reference values."""
@@ -151,6 +153,26 @@ class BaseTestCase(ABC):
             self.config.outputs.output_suffix = f"_{grid.nx}_{grid.ny}"
         elif grid.ndim == 3:
             self.config.outputs.output_suffix = f"_{grid.nx}_{grid.ny}_{grid.nz}"
+
+    def _update_output_filename(self):
+        """Helper to update output filename."""
+        out_name = (
+            self.config.outputs.output_base_name
+            + self.config.outputs.output_suffix
+            + self.config.outputs.output_extension
+        )
+        chkpnt_name = (
+            self.config.outputs.checkpoint_base_name + self.config.outputs.output_suffix
+        )
+        self.config.outputs.output_filename = os.path.join(
+            self.config.outputs.output_path, self.config.outputs.output_folder, out_name
+        )
+        self.config.outputs.checkpoint_filename = os.path.join(
+            self.config.outputs.output_path,
+            self.config.outputs.output_folder,
+            "checkpoints",
+            chkpnt_name,
+        )
 
     @abstractmethod
     def setup(self):

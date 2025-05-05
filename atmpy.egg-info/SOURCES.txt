@@ -1,6 +1,7 @@
 setup.py
 atmpy/__init__.py
 atmpy/physical_cases.py
+atmpy/redundancies.py
 atmpy.egg-info/PKG-INFO
 atmpy.egg-info/SOURCES.txt
 atmpy.egg-info/dependency_links.txt
@@ -34,12 +35,15 @@ atmpy/physics/thermodynamics.py
 atmpy/physics/utility.py
 atmpy/post_processing/__init__.py
 atmpy/pressure_solver/__init__.py
+atmpy/pressure_solver/abstract_pressure_solver.py
+atmpy/pressure_solver/classical_pressure_solvers.py
 atmpy/pressure_solver/contexts.py
 atmpy/pressure_solver/discrete_operations.py
 atmpy/pressure_solver/linear_solvers.py
-atmpy/pressure_solver/pressure_solvers.py
+atmpy/pressure_solver/operators_numba_kernels.py
+atmpy/pressure_solver/preconditioners.py
+atmpy/pressure_solver/utility.py
 atmpy/solver/__init__.py
-atmpy/solver/advection_routines.py
 atmpy/solver/initial_conditions.py
 atmpy/solver/solver.py
 atmpy/solver/utility.py
@@ -48,8 +52,10 @@ atmpy/test_cases/base_test_case.py
 atmpy/test_cases/traveling_vortex.py
 atmpy/time_integrators/__init__.py
 atmpy/time_integrators/abstract_time_integrator.py
+atmpy/time_integrators/advection_routines.py
 atmpy/time_integrators/contexts.py
 atmpy/time_integrators/coriolis.py
+atmpy/time_integrators/coriolis_numba_kernels.py
 atmpy/time_integrators/imex_operator_splitting.py
 atmpy/time_integrators/utility.py
 atmpy/variables/__init__.py

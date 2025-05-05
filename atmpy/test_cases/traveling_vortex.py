@@ -9,7 +9,11 @@ from atmpy.infrastructure.utility import (
 )
 from atmpy.test_cases.base_test_case import BaseTestCase
 from atmpy.configuration.simulation_configuration import SimulationConfig
-from atmpy.infrastructure.enums import BoundaryConditions as BdryType, BoundarySide
+from atmpy.infrastructure.enums import (
+    BoundaryConditions as BdryType,
+    BoundarySide,
+    AdvectionRoutines,
+)
 from atmpy.infrastructure.enums import (
     VariableIndices as VI,
     HydrostateIndices as HI,
@@ -108,8 +112,8 @@ class TravelingVortex(BaseTestCase):
         #################################### Grid Configuration ########################################################
         grid_updates = {
             "ndim": 2,
-            "nx": 6,
-            "ny": 10,
+            "nx": 64,
+            "ny": 64,
             "nz": 0,
             "xmin": 0,
             "xmax": 2,
@@ -139,16 +143,14 @@ class TravelingVortex(BaseTestCase):
             "CFL": 0.45,
             "dtfixed": 0.01,
             "dtfixed0": 0.01,
-            "tout": np.array([1.0]),  # Single output time from PyBella example
-            "stepmax": 101,  # From PyBella example
+            "tout": np.array([1.0]),
+            "stepmax": 101,
         }
         self.set_temporal(temporal_updates)
 
         ################################### Physics Settings ###########################################################
         physics_updates = {
-            "u_wind_speed": self.u0,  # Use parameter defined above
-            "v_wind_speed": self.v0,  # Use parameter defined above
-            "w_wind_speed": self.w0,
+            "wind_speed": [self.u0, self.v0, self.w0],
             "gravity_strength": (0.0, 0.0, 0.0),  # Zero gravity case
             "coriolis_strength": (0.0, 0.0, 0.0),
             "stratification": lambda y: 1.0,  # Isothermal background
@@ -166,6 +168,7 @@ class TravelingVortex(BaseTestCase):
         #################################### Numerics  #################################################################
         numerics_updates = {
             "limiter_scalars": LimiterType.VAN_LEER,
+            "advection_routine": AdvectionRoutines.STRANG_SPLIT,
             "initial_projection": True,
         }
         self.set_numerics(numerics_updates)
@@ -173,6 +176,7 @@ class TravelingVortex(BaseTestCase):
         #################################### Outputs ###################################################################
         output_updates = {
             "output_type": "test",
+            "output_folder": "traveling_vortex",
             "output_base_name": "_travelling_vortex",
             "output_timesteps": True,
             # output_suffix is updated automatically based on grid

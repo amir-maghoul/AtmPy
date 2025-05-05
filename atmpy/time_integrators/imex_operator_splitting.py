@@ -592,109 +592,15 @@ def example_usage():
     ####################################################################################################################
     from atmpy.variables.multiple_pressure_variables import MPV
 
-    # A0 = 0.1 / 100
-    # t_ref = 100.0
-    # T_ref = 300.0
-    # R_gas = 287.4
-    # h_ref = 10_000
-    # cp = th.gamma * R_gas / (th.gm1)
-    # N_ref = 9.81 / np.sqrt(cp * T_ref)
-    #
-    # grav = 9.81
-    #
-    # g = grav * h_ref / (R_gas * T_ref)
-    # Nsq_ref = N_ref * N_ref
-    #
-    # Msq = 0.115
-    # gravity_vec = [0.0, g, 0.0]
-
     mpv = MPV(grid)
-    # mpv.state(gravity_vec, Msq)
-    # Y_bar = mpv.hydrostate.cell_vars[..., HI.Y0]
-    # rhobar = mpv.hydrostate.cell_vars[..., HI.RHO0]
 
     ####################################################################################################################
-    ########## Prepare some thermodynamic constant for initialization ##################################################
+    ######### Variables ################################################################################################
     ####################################################################################################################
-    # rhobar_n = mpv.hydrostate.node_vars[..., HI.RHOY0]
-    # Y_bar_n = mpv.hydrostate.node_vars[..., HI.Y0]
-    # oorhobarsqrt = 1.0 / np.sqrt(rhobar)
-    # oorhobarsqrt_n = 1.0 / np.sqrt(rhobar_n)
-    #
-    # Cs = np.sqrt(th.gamma / Msq)
-    # N = t_ref * np.sqrt(Nsq_ref)
-    #
-    # k = N / Cs
-    #
-    # omega = 7.292 * 1e-5
-    # coriolis = [0.0, 0.0, 0.0]
-    # coriolis[2] = 2.0 * omega * t_ref
-    # F = coriolis[2]
-    #
-    # G = np.sqrt(9.0 / 40.0)
-    # Gamma = G * N / Cs
-    # mu = -Gamma
-    #
-    # matrix = -np.array(
-    #     [
-    #         [0, F, 0, 1j * Cs * k],
-    #         [-F, 0, -N, Cs * (mu + Gamma)],
-    #         [0, N, 0, 0],
-    #         [1j * Cs * k, Cs * (mu - Gamma), 0, 0],
-    #     ]
-    # )
-    #
-    # eigval, eigvec = np.linalg.eig(matrix)
-    # ind = np.argmax(np.real(eigval))
-    # x = grid.x_cells.reshape(-1, 1)
-    # y = grid.y_cells.reshape(-1, 1)
-    # X, Y = np.meshgrid(x, y)
-    # t = 0
-    # s = 1
-    # exponentials = np.exp(1j * k * X + mu * Y + (eigval[ind]) * (t) + 1j * s * t)
-    # chi_Y = A0 * np.real(eigvec[2, ind] * exponentials).T
-    # Y_p = oorhobarsqrt * N / 9.81 * Y_bar * chi_Y
-    #
-    # Theta = Y_bar + Y_p
-    #
-    # chi_u = A0 * np.real(eigvec[0, ind] * exponentials).T
-    # chi_w = A0 * np.real(eigvec[1, ind] * exponentials).T
-    #
-    # up = oorhobarsqrt * chi_u
-    # vp = oorhobarsqrt * chi_w
-    #
-    # x = grid.x_nodes.reshape(-1, 1)
-    # y = grid.y_nodes.reshape(-1, 1)
-    # X, Y = np.meshgrid(x, y)
-    # t = 0
-    # s = 1
-    # exponentials = np.exp(1j * k * X + mu * Y + (eigval[ind]) * (t) + 1j * s * t)
-    # chi_pi = A0 * np.real(eigvec[3, ind] * exponentials).T
-    #
-    # pi_n = oorhobarsqrt_n * Cs / Y_bar_n / th.Gammainv * chi_pi
-
-    ####################################################################################################################
-    ## VARIABLE DATA ###################################################################################################
-    ####################################################################################################################
-
-    # rng = np.random.default_rng()
-    # arr = np.arange(nnx * nny)
-    # rng.shuffle(arr)
-    # array = arr.reshape(nnx, nny)
 
     variables = Variables(grid, 6, 1)
-    # variables.cell_vars[..., VI.RHO] = rhobar
-    # # variables.cell_vars[..., VI.RHO][1:-1, 1:-1] = 4
-    # variables.cell_vars[..., VI.RHOU] = up
-    # variables.cell_vars[..., VI.RHOY] = rhobar * Theta
-    # variables.cell_vars[..., VI.RHOW] = 0.0
-    #
-    # rng.shuffle(arr)
-    # array = arr.reshape(nnx, nny)
-    # variables.cell_vars[..., VI.RHOV] = vp
 
-    # mpv.p2_nodes[...] = pi_n
-
+    # Initialize variables
     case.initialize_solution(variables, mpv)
 
     ####################################################################################################################
@@ -786,45 +692,10 @@ def example_usage():
     time_integrator = context.instantiate()
 
     print(variables.cell_vars[..., VI.RHO])
-    # manager.apply_boundary_on_all_sides(variables.cell_vars)
-    # print(variables.cell_vars[..., VI.RHOU])
-
-    # print(mpv.wcenter)
-    # print(mpv.p2_nodes)
-    # time_integrator.forward_update()
-    # time_integrator.backward_explicit_update(dt)
-    # # contexts = [BCApplicationContext(is_nodal=True)] * grid.ndim * 2
-    # #
-    # # # Update the boundary nodes for pressure variable
-    # # manager.apply_boundary_on_single_var_all_sides(
-    # #     mpv.p2_nodes, contexts
-    # # )
-    # # # print(mpv.wcenter)
-    # print(mpv.p2_nodes)
-    # print(variables.cell_vars[..., VI.RHOU])
-    # print(".......................................................")
-    # print(variables.cell_vars[..., VI.RHOV])
-    # print(".......................................................")
 
     print(mpv.p2_nodes)
-    # print(variables.cell_vars[..., VI.RHO])
-    # # pressure.pressure_coefficients_nodes(variables.cell_vars, dt)
-    # time_integrator.forward_update()
-    # time_integrator.backward_update_explicit(dt)
     time_integrator.step()
-    # # x = pressure.helmholtz_operator(mpv.p2_nodes, dt, True, True, True)
     print(mpv.p2_nodes)
-    # print(variables.cell_vars[..., VI.RHO])
-    # print(x)
-    #
-    # rhs = np.ones_like(x).flatten()
-    # print(mpv.wcenter.shape)
-    # y, info = pressure.solve_helmholtz(rhs, dt, True, True, True)
-    # print(y.reshape((grid.ncx_total - 1, grid.ncy_total - 1)))
-    # print(info)
-    # print(variables.cell_vars[..., VI.RHOU])
-    # manager.apply_boundary_on_all_sides(variables.cell_vars)
-    # print(variables.cell_vars[..., VI.RHOU])
 
 
 if __name__ == "__main__":
