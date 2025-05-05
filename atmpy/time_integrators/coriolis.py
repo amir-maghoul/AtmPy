@@ -1,5 +1,5 @@
 """This module is responsible for calculation on the coriolis operator"""
-
+import logging
 from typing import TYPE_CHECKING, Union, Any, Tuple, Callable
 import numpy as np
 
@@ -16,6 +16,9 @@ class CoriolisOperator:
     Encapsulates the handling of coriolis operator in the implicit time update. This is a part of operator splitting
     for stiff coriolis operator.
     """
+
+    # flag to avoid redundant precompilation of kernels
+    _kernel_compiled = False
 
     def __init__(
         self,
@@ -38,8 +41,11 @@ class CoriolisOperator:
 
     def _precompile_numba(self):
         """Attempt to pre-compile the core Numba function."""
-        print("Pre-compiling Numba Coriolis kernel...")
+        if CoriolisOperator._kernel_compiled:
+            logging.debug("Numba Coriolis kernel already compiled/attempted.")
+            return
         try:
+            print("Pre-compiling Numba Coriolis kernel...")
             # Create dummy data with minimal size but correct types/shapes
             dummy_shape = (2, 2, 2)  # Minimal 3D cell shape
             dummy_momentum = np.zeros(dummy_shape, dtype=np.float64)
@@ -57,6 +63,7 @@ class CoriolisOperator:
                 0.1,  # dt
                 dummy_strength,
             )
+            CoriolisOperator._kernel_compiled = True
             print("Numba Coriolis kernel pre-compiled successfully.")
         except Exception as e:
             print(f"\nWARNING: Could not pre-compile Numba Coriolis kernel.")
