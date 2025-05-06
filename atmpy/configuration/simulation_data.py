@@ -216,7 +216,7 @@ class Numerics:
 
     do_advection: bool = True
     limiter_scalars: LimiterType = LimiterType.VAN_LEER
-    advection_routine: AdvectionRoutines = (AdvectionRoutines.STRANG_SPLIT,)
+    advection_routine: AdvectionRoutines = AdvectionRoutines.STRANG_SPLIT
     tol: float = 1e-8
     max_iterations: int = 6000
     initial_projection: bool = True

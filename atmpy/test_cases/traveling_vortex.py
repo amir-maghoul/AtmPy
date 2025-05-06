@@ -115,10 +115,10 @@ class TravelingVortex(BaseTestCase):
             "nx": 64,
             "ny": 64,
             "nz": 0,
-            "xmin": 0,
-            "xmax": 2,
-            "ymin": 0,
-            "ymax": 2,
+            "xmin": -0.5,
+            "xmax": 0.5,
+            "ymin": -0.5,
+            "ymax": 0.5,
             "ngx": 2,  # Standard ghost cells
             "ngy": 2,
         }
@@ -143,7 +143,7 @@ class TravelingVortex(BaseTestCase):
             "CFL": 0.45,
             "dtfixed": 0.01,
             "dtfixed0": 0.01,
-            "tout": np.array([1.0]),
+            "tout": np.array([10.0]),
             "stepmax": 101,
         }
         self.set_temporal(temporal_updates)
@@ -403,45 +403,3 @@ class TravelingVortex(BaseTestCase):
         # config.numerics.initial_projection is True.
 
         print("Solution initialization complete.")
-
-
-if __name__ == "__main__":
-    # 1. Create the test case instance
-    vortex_case = TravelingVortex()
-    np.set_printoptions(linewidth=300)
-    np.set_printoptions(suppress=True)
-    np.set_printoptions(precision=10)
-
-    # 2. The configuration is now set inside vortex_case.config
-    #    Access config like:
-    print(
-        "Grid dimensions (inner cells):",
-        vortex_case.config.spatial_grid.nx,
-        vortex_case.config.spatial_grid.ny,
-    )
-    print(
-        "Boundary condition Left:",
-        vortex_case.config.boundary_conditions.conditions[BoundarySide.LEFT],
-    )
-    print("Msq:", vortex_case.config.model_regimes.Msq)
-
-    # 3. Create the necessary simulation objects based on the config
-    #    (This would happen in your main solver script)
-    from atmpy.variables.variables import Variables
-    from atmpy.variables.multiple_pressure_variables import MPV
-
-    grid = vortex_case.config.grid  # Get the grid object
-    sim_vars = Variables(grid, num_vars_cell=6, num_vars_node=1)  # Example: 6 cell vars
-    sim_mpv = MPV(
-        grid, num_vars=6, direction="y"
-    )  # Example: 6 hydro vars, hydro dir y (though unused here)
-
-    # 4. Initialize the solution variables using the test case method
-    vortex_case.initialize_solution(sim_vars, sim_mpv)
-    print(sim_vars.cell_vars[..., VI.RHO])
-    constants_updates = {"T_ref": 100}
-    print(vortex_case.config.global_constants.T_ref)
-    print(vortex_case.config.model_regimes.Msq)
-    vortex_case.set_global_constants(constants_updates)
-    print(vortex_case.config.global_constants.T_ref)
-    print(vortex_case.config.model_regimes.Msq)

@@ -22,6 +22,7 @@ dependencies:
   - mypy==1.11.1
   - pip == 24.2
   - netCDF4
+  - xarray
   - pip:
       -  sphinx-rtd-theme
       - -e .
