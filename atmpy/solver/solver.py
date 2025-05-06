@@ -11,7 +11,11 @@ import numpy as np
 
 # Assuming output_writer.py is in atmpy.io
 from atmpy.io.output_writers import NetCDFWriter
-from atmpy.infrastructure.enums import VariableIndices as VI
+from atmpy.infrastructure.enums import (
+    VariableIndices as VI,
+    PrimitiveVariableIndices as PVI,
+)
+from atmpy.physics.eos import ExnerBasedEOS
 
 # Basic logging setup
 logging.basicConfig(
@@ -191,86 +195,259 @@ class Solver:
             self._save_output(reason)
 
     def _save_output(self, reason: str) -> None:
-        """Saves standard analysis output using NetCDFWriter."""
+        """Saves standard analysis output using NetCDFWriter, including conservative and primitive variables."""
         logging.info(
             f"Saving analysis output to {self.output_filename} (Reason: {reason}) at t={self.current_t:.4f}, step={self.current_step}"
         )
 
         file_exists = os.path.exists(self.output_filename)
-        mode = "a" if file_exists and self.current_step > 0 else "w"
+        # Append if file exists and not the first step (t=0, step=0)
+        mode = (
+            "a"
+            if file_exists and (self.current_t > 1e-9 or self.current_step > 0)
+            else "w"
+        )
 
         try:
             with NetCDFWriter(
                 self.output_filename,
-                self.grid,
+                self.grid,  # Pass the kgrid.Grid object
                 self.config,
                 mode=mode,
                 is_checkpoint=False,
             ) as writer:
                 # --- Define Dimensions (based on INNER grid size) ---
-                inner_cell_dims = tuple(dim_map_cells[i] for i in range(self.grid.ndim))
-                inner_node_dims = tuple(dim_map_nodes[i] for i in range(self.grid.ndim))
+                # These are determined by the writer based on is_checkpoint=False
+                inner_cell_dims = []
+                for i in range(self.grid.ndim):
+                    inner_cell_dims.append(
+                        dim_map_cells[i]
+                    )  # Using global DIM_MAP_CELLS from output_writers
+                inner_cell_dims = tuple(inner_cell_dims)
+
                 # Prepend 'time'
                 time_inner_cell_dims = ("time",) + inner_cell_dims
-                time_inner_node_dims = ("time",) + inner_node_dims
+                # Node dimensions would be similar if you save nodal primitive vars
+                # inner_node_dims = tuple(DIM_MAP_NODES[i] for i in range(self.grid.ndim))
+                # time_inner_node_dims = ("time",) + inner_node_dims
 
                 # --- Define Variables ---
                 # Helper dicts for attributes
-                attrs = {
-                    "rho": {"units": "kg m-3", "long_name": "Density"},
+                attrs_conservative = {
+                    "rho": {"units": "kg m-3", "long_name": "Density (conservative)"},
+                    "rhou": {
+                        "units": "kg m-2 s-1",
+                        "long_name": "X-momentum density (rho*u)",
+                    },
+                    "rhov": {
+                        "units": "kg m-2 s-1",
+                        "long_name": "Y-momentum density (rho*v)",
+                    },
+                    "rhow": {
+                        "units": "kg m-2 s-1",
+                        "long_name": "Z-momentum density (rho*w)",
+                    },
                     "rhoY": {
                         "units": "kg m-3 K",
-                        "long_name": "rho * Potential Temperature",
-                    },  # Adjust as needed
-                    "u": {"units": "m s-1", "long_name": "X-velocity component"},
-                    "v": {"units": "m s-1", "long_name": "Y-velocity component"},
-                    "w": {"units": "m s-1", "long_name": "Z-velocity component"},
+                        "long_name": "Potential temperature density (rho*Theta_nd or rho*Y)",
+                    },
+                    "rhoX": {"units": "kg m-3", "long_name": "Tracer density (rho*X)"},
+                }
+                attrs_primitive = {
+                    "p": {
+                        "units": (
+                            "Pa K^gamma"
+                            if isinstance(self.time_integrator.flux.eos, ExnerBasedEOS)
+                            else "Pa"
+                        ),
+                        "long_name": "Pressure (Exner or Thermodynamic)",
+                    },
+                    "u": {
+                        "units": "m s-1",
+                        "long_name": "X-velocity component (primitive)",
+                    },
+                    "v": {
+                        "units": "m s-1",
+                        "long_name": "Y-velocity component (primitive)",
+                    },
+                    "w": {
+                        "units": "m s-1",
+                        "long_name": "Z-velocity component (primitive)",
+                    },
+                    "Y": {
+                        "units": "K",
+                        "long_name": "Potential temperature (Theta_nd or Y)",
+                    },
+                    # Or dimensionless if Y is used directly
+                    "X": {"units": "kg/kg", "long_name": "Tracer mixing ratio (X)"},
+                    # You might also want to save the actual temperature T
+                    "T": {"units": "K", "long_name": "Temperature"},
+                }
+                # Add p2_nodes if you still want to save it
+                attrs_nodal = {
                     "p2_nodes": {
-                        "units": "Pa K m3 kg-1",
+                        "units": "Pa K m3 kg-1",  # Adjust if definition changed
                         "long_name": "Exner Pressure Perturbation (Nodes)",
-                    },  # Adjust
+                    },
                 }
-                vars_to_define = {
-                    "rho": time_inner_cell_dims,
-                    "rhoY": time_inner_cell_dims,
-                    "u": time_inner_cell_dims,
-                    "p2_nodes": time_inner_node_dims,
-                }
-                if self.grid.ndim >= 2:
-                    vars_to_define["v"] = time_inner_cell_dims
-                if self.grid.ndim >= 3:
-                    vars_to_define["w"] = time_inner_cell_dims
 
-                for name, dims in vars_to_define.items():
-                    writer.define_variable(
-                        name, dims, dtype=np.float64, attributes=attrs.get(name)
+                vars_to_define = {}
+                # Conservative
+                vars_to_define["rho"] = (
+                    time_inner_cell_dims,
+                    attrs_conservative["rho"],
+                )
+                vars_to_define["rhou"] = (
+                    time_inner_cell_dims,
+                    attrs_conservative["rhou"],
+                )
+                if self.grid.ndim >= 2 and VI.RHOV < self.variables.num_vars_cell:
+                    vars_to_define["rhov"] = (
+                        time_inner_cell_dims,
+                        attrs_conservative["rhov"],
                     )
+                if self.grid.ndim >= 3 and VI.RHOW < self.variables.num_vars_cell:
+                    vars_to_define["rhow"] = (
+                        time_inner_cell_dims,
+                        attrs_conservative["rhow"],
+                    )
+                vars_to_define["rhoY"] = (
+                    time_inner_cell_dims,
+                    attrs_conservative["rhoY"],
+                )
+                if VI.RHOX < self.variables.num_vars_cell:  # Check if RHOX is used
+                    vars_to_define["rhoX"] = (
+                        time_inner_cell_dims,
+                        attrs_conservative["rhoX"],
+                    )
+
+                # Primitive (ensure PVI enum is defined and used correctly)
+                vars_to_define["p"] = (time_inner_cell_dims, attrs_primitive["p"])
+                vars_to_define["u"] = (time_inner_cell_dims, attrs_primitive["u"])
+                if (
+                    self.grid.ndim >= 2 and PVI.V < self.variables.num_vars_cell
+                ):  # Assuming num_vars_cell ~ num_primitive_vars
+                    vars_to_define["v"] = (time_inner_cell_dims, attrs_primitive["v"])
+                if self.grid.ndim >= 3 and PVI.W < self.variables.num_vars_cell:
+                    vars_to_define["w"] = (time_inner_cell_dims, attrs_primitive["w"])
+                vars_to_define["Y_prim"] = (
+                    time_inner_cell_dims,
+                    attrs_primitive["Y"],
+                )  # Renamed to Y_prim to avoid clash with y-coord
+                if (
+                    PVI.X < self.variables.num_vars_cell
+                ):  # Check if X is used in primitives
+                    vars_to_define["X_prim"] = (
+                        time_inner_cell_dims,
+                        attrs_primitive["X"],
+                    )  # Renamed to X_prim
+                vars_to_define["T"] = (time_inner_cell_dims, attrs_primitive["T"])
+
+                # Nodal (if any)
+                # Example: p2_nodes
+                # if self.mpv and hasattr(self.mpv, 'p2_nodes'):
+                #     inner_node_dims = tuple(DIM_MAP_NODES[i] for i in range(self.grid.ndim))
+                #     time_inner_node_dims = ("time",) + inner_node_dims
+                #     vars_to_define["p2_nodes"] = (time_inner_node_dims, attrs_nodal["p2_nodes"])
+
+                for name, (dims, attributes) in vars_to_define.items():
+                    # Ensure all dimensions in 'dims' exist before defining
+                    all_dims_exist = True
+                    for d_name in dims:
+                        if d_name not in writer.ds.dimensions:
+                            logging.warning(
+                                f"Dimension '{d_name}' for variable '{name}' not found. Skipping variable definition."
+                            )
+                            all_dims_exist = False
+                            break
+                    if all_dims_exist:
+                        writer.define_variable(
+                            name, dims, dtype=np.float64, attributes=attributes
+                        )
+                    else:
+                        logging.warning(
+                            f"Variable '{name}' was not defined due to missing dimensions."
+                        )
 
                 # --- Prepare Data Dictionary (INNER domain data) ---
                 inner_slice = self.grid.get_inner_slice()
+                eos = (
+                    self.time_integrator.flux.eos
+                )  # Get EOS from time integrator or config
 
-                rho_inner = self.variables.cell_vars[inner_slice + (VI.RHO,)]
-                safe_rho_inner = np.maximum(rho_inner, 1e-15)
+                # Calculate primitives first
+                self.variables.to_primitive(
+                    eos
+                )  # This populates self.variables.primitives
 
-                data_to_write = {
-                    "rho": rho_inner,
-                    "rhoY": self.variables.cell_vars[inner_slice + (VI.RHOY,)],
-                    "u": self.variables.cell_vars[inner_slice + (VI.RHOU,)]
-                    / safe_rho_inner,
-                    "p2_nodes": self.mpv.p2_nodes[
-                        inner_slice
-                    ],  # Slice works for nodes too
-                }
+                data_to_write = {}
+
+                # Conservative Variables
+                data_to_write["rho"] = self.variables.cell_vars[inner_slice + (VI.RHO,)]
+                data_to_write["rhou"] = self.variables.cell_vars[
+                    inner_slice + (VI.RHOU,)
+                ]
                 if self.grid.ndim >= 2 and VI.RHOV < self.variables.num_vars_cell:
-                    data_to_write["v"] = (
-                        self.variables.cell_vars[inner_slice + (VI.RHOV,)]
-                        / safe_rho_inner
-                    )
+                    data_to_write["rhov"] = self.variables.cell_vars[
+                        inner_slice + (VI.RHOV,)
+                    ]
                 if self.grid.ndim >= 3 and VI.RHOW < self.variables.num_vars_cell:
-                    data_to_write["w"] = (
-                        self.variables.cell_vars[inner_slice + (VI.RHOW,)]
-                        / safe_rho_inner
+                    data_to_write["rhow"] = self.variables.cell_vars[
+                        inner_slice + (VI.RHOW,)
+                    ]
+                data_to_write["rhoY"] = self.variables.cell_vars[
+                    inner_slice + (VI.RHOY,)
+                ]
+                if VI.RHOX < self.variables.num_vars_cell:
+                    data_to_write["rhoX"] = self.variables.cell_vars[
+                        inner_slice + (VI.RHOX,)
+                    ]
+
+                # Primitive Variables
+                # Ensure PVI enum indices are correct for your self.variables.primitives array
+                data_to_write["p"] = self.variables.primitives[inner_slice + (PVI.P,)]
+                data_to_write["u"] = self.variables.primitives[inner_slice + (PVI.U,)]
+                if self.grid.ndim >= 2 and PVI.V < self.variables.num_vars_cell:
+                    data_to_write["v"] = self.variables.primitives[
+                        inner_slice + (PVI.V,)
+                    ]
+                if self.grid.ndim >= 3 and PVI.W < self.variables.num_vars_cell:
+                    data_to_write["w"] = self.variables.primitives[
+                        inner_slice + (PVI.W,)
+                    ]
+                data_to_write["Y_prim"] = self.variables.primitives[
+                    inner_slice + (PVI.Y,)
+                ]
+                if PVI.X < self.variables.num_vars_cell:
+                    data_to_write["X_prim"] = self.variables.primitives[
+                        inner_slice + (PVI.X,)
+                    ]
+
+                # Calculate and save Temperature (T)
+                # This depends on your EOS and available variables.
+                # Example for ExnerBasedEOS: T = (P_exner / (rho * R_gas)) * (P_exner / P_ref)^(-R_gas/cp_gas)
+                # Or more simply if P_exner = rhoY * (R_gas / P_ref)^(R_gas/cp_gas) / P_ref^(R_gas/cp_gas - 1)
+                # and Theta (Y_prim) = T * (P_ref / P_thermo)^(R_gas/cp_gas)
+                # T = Y_prim * (P_thermo / P_ref)^(R_gas/cp_gas)
+                # P_thermo = P_exner * (P_ref)^ (R_gas/cp_gas) / (R_gas/P_ref)^ (R_gas/cp_gas)
+                # For ExnerBasedEOS where rhoY = rho * Theta_nd and P_exner = rhoY (if scaled appropriately)
+                # Theta_nd = Y_prim (from primitives)
+                # T_physical = Theta_nd * T_ref
+                # This assumes Y_prim is the non-dimensional potential temperature.
+                if "Y_prim" in data_to_write:
+                    T_physical = (
+                        data_to_write["Y_prim"] * self.config.global_constants.T_ref
                     )
+                    data_to_write["T"] = T_physical
+                else:  # Fallback if Y_prim is not available or setup differently
+                    logging.warning(
+                        "Primitive Y (potential temperature) not found, cannot compute Temperature T directly for output."
+                    )
+
+                # Nodal variables (if any)
+                # if "p2_nodes" in vars_to_define: # Check if it was successfully defined
+                #    if self.mpv and hasattr(self.mpv, 'p2_nodes'):
+                #        data_to_write["p2_nodes"] = self.mpv.p2_nodes[inner_slice] # Slicing works for nodes too
 
                 # --- Write Data ---
                 writer.write_timestep_data(self.current_t, data_to_write)

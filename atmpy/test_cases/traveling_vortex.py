@@ -177,7 +177,7 @@ class TravelingVortex(BaseTestCase):
         output_updates = {
             "output_type": "test",
             "output_folder": "traveling_vortex",
-            "output_base_name": "_travelling_vortex",
+            "output_base_name": "_traveling_vortex",
             "output_timesteps": True,
             # output_suffix is updated automatically based on grid
         }

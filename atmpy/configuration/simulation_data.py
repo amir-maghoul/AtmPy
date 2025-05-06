@@ -111,9 +111,8 @@ class Temporal:
     dtfixed0: float = 0.01
     dtfixed: float = 0.01
     acoustic_timestep: float = 0.0
-    tout: np.ndarray = field(
-        default_factory=lambda: np.array([1.0])
-    )  # Default from PyBella
+    tout: np.ndarray = field(default_factory=lambda: np.array([1.0]))
+    tmax: float = 0.05
     stepmax: int = 101
 
 
