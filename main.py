@@ -2,12 +2,12 @@
 
 import numpy as np
 import logging
-import argparse
 import os
 
 from atmpy.test_cases.rising_bubble import RisingBubble
 from atmpy.test_cases.traveling_vortex import TravelingVortex
 from atmpy.physics.thermodynamics import Thermodynamics
+from atmpy.scripts import parse_arguments
 from atmpy.grid.utility import DimensionSpec, create_grid
 from atmpy.variables.variables import Variables
 from atmpy.infrastructure.enums import (
@@ -43,27 +43,8 @@ np.set_printoptions(suppress=True)
 np.set_printoptions(precision=10)
 
 ################################### Parser #########################################################################
-parser = argparse.ArgumentParser(description="Atmpy Simulation")
-parser.add_argument(
-    "--restart", type=str, help="Path to checkpoint file to restart from."
-)
-# NEW ARGUMENT FOR MODE
-parser.add_argument(
-    "--mode",
-    type=str,
-    choices=["run", "visualize_only", "run_and_visualize"],  # Define allowed modes
-    default="run_and_visualize",  # Default behavior
-    help="Simulation mode: 'run' (run sim, no viz), 'visualize_only' (load and viz, no run), 'run_and_visualize' (run then viz).",
-)
-parser.add_argument(
-    "--input_file",
-    type=str,
-    help="Path to NetCDF file to visualize (required if mode is 'visualize_only').",
-)
 
-
-args = parser.parse_args()
-
+args = parse_arguments()
 
 #################################### Instantiate Test Case and Get Config ##########################################
 case = TravelingVortex()
@@ -71,23 +52,18 @@ case = TravelingVortex()
 config = case.config  # The SimulationConfig object is now held by the case
 
 # Modify config if needed (e.g., simulation time)
-config.temporal.tmax = 1
+config.temporal.tmax = 3
 config.temporal.stepmax = 101  # Limit steps
 config.outputs.output_frequency_steps = 3  # Output every 2 steps
-config.temporal.tout = [0.00]  # Also output at a specific time
+config.temporal.tout = [0]  # Also output at a specific time
 
 #################################### Parser Fill #######################################################################
 # --- Determine output filename for visualization ---
 # This needs to be robust whether we run or just visualize
-if args.mode == "visualize_only":
-    if not args.input_file:
-        parser.error("--input_file is required when --mode is 'visualize_only'")
+if args.mode == "visualize_only" or args.mode == "run_and_visualize":
     output_data_file = args.input_file
 else:  # 'run' or 'run_and_visualize'
     # Ensure output filename in config is up-to-date if changed by case.setup()
-    # or if it's dynamically generated.
-    # For TravelingVortex, output_base_name and output_suffix are set in setup.
-    # We need to construct the full path.
     if not config.outputs.output_filename:  # If not explicitly set by user/case
         config.outputs.output_filename = os.path.join(
             config.outputs.output_path,
@@ -270,14 +246,6 @@ if args.mode in ["run", "run_and_visualize"]:
         initial_step=initial_step,  # Pass loaded/initial step
     )
     solver.run()
-
-    # --- Post-processing / Analysis (Optional) ---
-    print("\n --- Final State (Inner Domain Rho Example) ---")
-    inner_slice = grid.get_inner_slice()
-    print(variables.cell_vars[inner_slice + (VI.RHO,)])
-
-    print("\n --- Final State (Inner Domain p2 Example) ---")
-    print(mpv.p2_nodes[inner_slice])
 
 ############################################ Visualization #############################################################
 import xarray as xr

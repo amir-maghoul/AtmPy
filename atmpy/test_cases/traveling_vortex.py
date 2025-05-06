@@ -256,8 +256,8 @@ class TravelingVortex(BaseTestCase):
         dy = YC - self.yc
 
         # Account for periodicity: find the closest image
-        dx = dx - Lx * np.round(dx / Lx)
-        dy = dy - Ly * np.round(dy / Ly)
+        dx = dx - Lx * np.round(np.abs(dx / Lx))
+        dy = dy - Ly * np.round(np.abs(dy / Ly))
 
         r_cell = np.sqrt(dx**2 + dy**2)
         r_over_R0_cell = np.divide(r_cell, self.R0, where=self.R0 != 0)

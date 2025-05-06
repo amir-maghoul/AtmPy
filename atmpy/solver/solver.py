@@ -16,6 +16,7 @@ from atmpy.infrastructure.enums import (
     PrimitiveVariableIndices as PVI,
 )
 from atmpy.physics.eos import ExnerBasedEOS
+from atmpy.solver.utility import calculate_dynamic_dt
 
 # Basic logging setup
 logging.basicConfig(
@@ -32,6 +33,8 @@ if TYPE_CHECKING:
 # Helper Dictionaries
 dim_map_cells = {0: "x", 1: "y", 2: "z"}
 dim_map_nodes = {0: "x_node", 1: "y_node", 2: "z_node"}
+
+MACHINE_EPSILON = np.finfo(float).eps
 
 
 class Solver:
@@ -117,6 +120,32 @@ class Solver:
                 logging.info(f"Reached stepmax = {self.stepmax}. Stopping.")
                 break
 
+            # --- Determine next output time for dt adjustment ---
+            # Find the smallest t_out in self.tout that is > self.current_t
+            # and hasn't been saved yet.
+            # If all specific tout are done, use tmax as the next target.
+            pending_output_times = self.tout[np.logical_not(self._output_times_saved)]
+            future_output_times = pending_output_times[
+                pending_output_times > self.current_t + MACHINE_EPSILON
+            ]
+
+            if future_output_times.size > 0:
+                next_target_output_t = np.min(future_output_times)
+            else:
+                next_target_output_t = self.tmax
+
+            # --- Calculate dynamic dt ---
+            current_dt = calculate_dynamic_dt(
+                self.variables,
+                self.grid,
+                self.config,
+                self.current_t,
+                next_target_output_t,
+                self.current_step,
+            )
+            # Update the time integrator's dt if it stores it internally
+            self.time_integrator.dt = current_dt
+
             step_start_time = time.time()
             try:
                 self.time_integrator.step()
@@ -129,7 +158,7 @@ class Solver:
                 raise e
 
             self.current_step += 1
-            self.current_t += self.dt
+            self.current_t += current_dt
 
             log_interval_steps = max(1, self.stepmax // 20) if self.stepmax > 0 else 50
             if self.current_step % log_interval_steps == 0:
