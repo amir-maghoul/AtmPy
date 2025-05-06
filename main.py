@@ -1,42 +1,32 @@
 # main.py
 
-import numpy as np
 import logging
 import os
 
-from atmpy.test_cases.rising_bubble import RisingBubble
-from atmpy.test_cases.traveling_vortex import TravelingVortex
-from atmpy.physics.thermodynamics import Thermodynamics
-from atmpy.scripts import parse_arguments
-from atmpy.grid.utility import DimensionSpec, create_grid
-from atmpy.variables.variables import Variables
+import numpy as np
+
+from atmpy.boundary_conditions.boundary_manager import BoundaryManager
+from atmpy.flux.flux import Flux
 from atmpy.infrastructure.enums import (
-    VariableIndices as VI,
-    HydrostateIndices as HI,
-    BoundaryConditions as BdryType,
-    BoundarySide,
     PressureSolvers,
     DiscreteOperators,
     LinearSolvers,
-    AdvectionRoutines,
     TimeIntegrators,
     Preconditioners,
 )
-from atmpy.boundary_conditions.bc_extra_operations import (
-    WallAdjustment,
-    PeriodicAdjustment,
-)
-from atmpy.variables.multiple_pressure_variables import MPV
-from atmpy.boundary_conditions.boundary_manager import BoundaryManager
 from atmpy.physics.eos import ExnerBasedEOS
-from atmpy.flux.flux import Flux
+from atmpy.physics.thermodynamics import Thermodynamics
+from atmpy.pressure_solver.classical_pressure_solvers import ClassicalPressureSolver
 from atmpy.pressure_solver.contexts import (
     DiscreteOperatorsContext,
     PressureContext,
 )
-from atmpy.time_integrators.contexts import TimeIntegratorContext
-from atmpy.pressure_solver.classical_pressure_solvers import ClassicalPressureSolver
+from atmpy.scripts import parse_arguments
 from atmpy.solver.solver import Solver
+from atmpy.test_cases.traveling_vortex import TravelingVortex
+from atmpy.time_integrators.contexts import TimeIntegratorContext
+from atmpy.variables.multiple_pressure_variables import MPV
+from atmpy.variables.variables import Variables
 
 np.set_printoptions(linewidth=300)
 np.set_printoptions(suppress=True)
@@ -53,7 +43,7 @@ config = case.config  # The SimulationConfig object is now held by the case
 
 # Modify config if needed (e.g., simulation time)
 config.temporal.tmax = 3
-config.temporal.stepmax = 101  # Limit steps
+config.temporal.stepmax = 101000  # Limit steps
 config.outputs.output_frequency_steps = 3  # Output every 2 steps
 config.temporal.tout = [0]  # Also output at a specific time
 
@@ -278,12 +268,12 @@ if args.mode in ["visualize_only", "run_and_visualize"]:
             # Initial plot setup
             # For the first frame, plot the data at the first timestep
             # The contourf object will be updated in the animation function
-            # Choose a colormap
-            cmap = plt.cm.viridis
 
             # Get min/max for consistent color scaling across all frames
             data_min = ds[data_var].min().item()
             data_max = ds[data_var].max().item()
+
+            cmap = "viridis"
 
             # Initial plot for the first time step
             # contour = ax.contourf(x_coords, y_coords, ds[data_var].isel(time=0).values.T, cmap=cmap, levels=np.linspace(data_min, data_max, 15))
@@ -292,7 +282,7 @@ if args.mode in ["visualize_only", "run_and_visualize"]:
             contour = ax.contourf(
                 x_coords,
                 y_coords,
-                ds[data_var].isel(time=0).data,
+                ds[data_var].isel(time=0).data.T,
                 cmap=cmap,
                 levels=np.linspace(data_min, data_max, 15),
             )
@@ -305,9 +295,7 @@ if args.mode in ["visualize_only", "run_and_visualize"]:
             def animate(i):
                 ax.clear()  # Clear previous frame's contours
                 current_data = ds[data_var].isel(time=i).data
-                # Use .data for the raw numpy array, contourf expects (Y, X) if data is (y_dim, x_dim)
-                # If your NetCDF is (time, x, y), then current_data is (x_dim, y_dim)
-                # and contourf needs (X_coords, Y_coords, Z_data_matching_X_Y)
+
                 # If X_coords (1D for x), Y_coords (1D for y), then Z data should be (len(Y_coords), len(X_coords))
                 # Your original plot: plt.contourf(ds['x'], ds['y'], rho[i, :, :])
                 # This implies rho[i] has shape (len(ds['x']), len(ds['y'])) if ds['x'] and ds['y'] are 1D.
@@ -317,12 +305,11 @@ if args.mode in ["visualize_only", "run_and_visualize"]:
                 cont = ax.contourf(
                     x_coords,
                     y_coords,
-                    current_data,
+                    current_data.T,
                     cmap=cmap,
                     levels=np.linspace(data_min, data_max, 15),
                 )
-
-                # ax.set_title(f"{data_var} at t={times[i]:.3f}s")
+                ax.set_title(f"{data_var} at t={times[i]}s")
                 ax.set_xlabel("X (m)")
                 ax.set_ylabel("Y (m)")
                 # fig.colorbar(cont, ax=ax) # Re-adding colorbar can be slow/messy, update existing one if possible

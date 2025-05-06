@@ -403,3 +403,63 @@ class TravelingVortex(BaseTestCase):
         # config.numerics.initial_projection is True.
 
         print("Solution initialization complete.")
+
+
+if __name__ == "__main__":
+    from atmpy.boundary_conditions.boundary_manager import BoundaryManager
+    import matplotlib.pyplot as plt
+    from atmpy.variables.multiple_pressure_variables import MPV
+    from atmpy.variables.variables import Variables
+
+    case = TravelingVortex()
+    # case = RisingBubble()
+    config = case.config  # The SimulationConfig object is now held by the case
+
+    # Modify config if needed (e.g., simulation time)
+    config.temporal.tmax = 3
+    config.temporal.stepmax = 101000  # Limit steps
+    config.outputs.output_frequency_steps = 3  # Output every 2 steps
+    config.temporal.tout = [0]  # Also output at a specific time
+
+    grid = config.grid
+    gravity_vec = config.physics.gravity_strength
+    Msq = config.model_regimes.Msq
+    th = Thermodynamics()
+    th.update(config.global_constants.gamma)
+
+    ##################################### MPV ##########################################################################
+    mpv = MPV(grid)
+
+    ##################################### Variables ####################################################################
+    num_vars = 6
+    variables = Variables(
+        grid, num_vars_cell=num_vars, num_vars_node=1
+    )  # Adjust num_vars if needed
+
+    # --- Initialize Solution using Test Case
+    case.initialize_solution(variables, mpv)  # This now uses the case object
+
+    bm_config = config.get_boundary_manager_config()
+    manager = BoundaryManager(bm_config)
+    # Apply initial BCs (though initialize_solution might handle inner domain, ghosts need update)
+    manager.apply_boundary_on_all_sides(variables.cell_vars)
+    # nodal_bc_contexts = ([manager.get_context_for_side(i, is_nodal=True) for i in range(grid.ndim * 2)]) # Get contexts for p2
+    # manager.apply_boundary_on_single_var_all_sides(mpv.p2_nodes, nodal_bc_contexts)
+
+    fig, ax = plt.subplots()
+    x_coords = grid.x_cells
+    y_coords = grid.y_cells
+    cmap = plt.cm.viridis
+    rhou = variables.cell_vars[..., VI.RHOU]
+    data_min = rhou.min().item()
+    data_max = rhou.max().item()
+
+    contour = ax.contourf(
+        x_coords,
+        y_coords,
+        rhou,
+        cmap=cmap,
+        levels=np.linspace(data_min, data_max, 15),
+    )
+
+    plt.show()
