@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Tuple
+from typing import List
 
 
 def create_averaging_kernels(dimension: int) -> List[np.ndarray]:
@@ -61,65 +61,3 @@ def create_averaging_kernels(dimension: int) -> List[np.ndarray]:
 
     else:
         raise ValueError("dimension must be 1, 2, or 3.")
-
-
-def directional_indices(
-    ndim: int, direction_string: str, full: bool = True
-) -> Tuple[Tuple[slice, ...], Tuple[slice, ...], Tuple[slice, ...], Tuple[slice, ...]]:
-    """Compute the correct indexing of the flux vs. variable for the hll solvers and reconstruction.
-
-    Parameters
-    ----------
-    ndim : int
-        The spatial dimension of the problem.
-    direction_string : str
-        The direction of the flow/in which the slopes are calculated.
-    full : bool, optional
-        Whether to return the indices for full array or just a single variable within the array
-        In the latter case, we need the slices for only one variable not the whole variable attribute
-        Therefore we don't need the slices corresponding to the number of dimension (last entry of indices)
-
-    Returns
-    -------
-    Tuple
-        consisting of
-        left state indices
-        right state indices
-        the inner indices in the direction of the flow
-        the full inner indices of the whole array
-    """
-    # use ndim+1 to include the slices for the axis which corresponds to the number of variables in our cell_vars
-    left_idx, right_idx, directional_inner_idx = (
-        [slice(None)] * (ndim + 1),
-        [slice(None)] * (ndim + 1),
-        [slice(None)] * (ndim + 1),
-    )
-    if direction_string in ["x", "y", "z"]:
-        direction = direction_mapping(direction_string)
-        left_idx[direction] = slice(0, -1)
-        right_idx[direction] = slice(1, None)
-        directional_inner_idx[direction] = slice(1, -1)
-    else:
-        raise ValueError("Invalid direction string")
-    inner_idx = [slice(1, -1)] * (ndim + 1)
-
-    if full:
-        return (
-            tuple(left_idx),
-            tuple(right_idx),
-            tuple(directional_inner_idx),
-            tuple(inner_idx),
-        )
-    else:
-        return (
-            tuple(left_idx)[:-1],
-            tuple(right_idx)[:-1],
-            tuple(directional_inner_idx)[:-1],
-            tuple(inner_idx)[:-1],
-        )
-
-
-def direction_mapping(direction: str) -> int:
-    """Utility function to map the string direction to its indices in variables."""
-    direction_map = {"x": 0, "y": 1, "z": 2}
-    return direction_map[direction]

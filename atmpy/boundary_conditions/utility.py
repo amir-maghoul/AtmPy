@@ -1,15 +1,24 @@
 """Utility module for the boundary handling"""
 
-import numpy as np
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from atmpy.grid.kgrid import Grid
+from atmpy.physics.thermodynamics import Thermodynamics
+from atmpy.infrastructure.enums import (
+    BoundarySide as BdrySide,
+    BoundaryConditions as BdryType,
+)
 
 
-def get_grid_info_for_gravity():
-    """Create a mapping between the given gravity axis as int and the grid information of that axis for the gravity
-    handling.
+def create_instatiation_context():
+    pass
 
-    Parameters
-    ----------
-    gravity_axis : int
-        The index of the gravity axis
 
-    """
+def create_application_context():
+    pass
+
+
+def create_operations_context(ndim: int):
+
+    pass

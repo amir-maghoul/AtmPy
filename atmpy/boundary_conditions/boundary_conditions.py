@@ -1,14 +1,43 @@
 """Module for boundary conditions handling"""
 
 import numpy as np
+import copy
 from abc import ABC, abstractmethod
-from typing import List, Any, Tuple, Callable, TypeGuard, TypedDict, Unpack, cast, Union
+from typing import (
+    List,
+    Any,
+    Tuple,
+    Callable,
+    TypedDict,
+    Unpack,
+    cast,
+    Union,
+    Literal,
+    TYPE_CHECKING,
+)
 
-from atmpy.grid.kgrid import Grid
-from atmpy.infrastructure.enums import VariableIndices as VI
-from atmpy.infrastructure.enums import BoundarySide
-from atmpy.flux.utility import direction_mapping
-from atmpy.physics.thermodynamics import Thermodynamics
+if TYPE_CHECKING:
+    from atmpy.grid.kgrid import Grid
+    from atmpy.physics.thermodynamics import Thermodynamics
+    from atmpy.boundary_conditions.contexts import (
+        BCApplicationContext,
+        BCInstantiationOptions,
+        ReflectiveGravityBCInstantiationOptions as RFBCInstantiationOptions,
+    )
+    from atmpy.boundary_conditions.bc_extra_operations import ExtraBCOperation
+
+from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
+from atmpy.infrastructure.utility import (
+    direction_axis,
+    momentum_index,
+    side_direction_mapping,
+)
+from atmpy.infrastructure.enums import (
+    BoundaryConditions as BdryType,
+    BoundarySide,
+    VariableIndices as VI,
+)
+from atmpy.physics.gravity import Gravity
 
 
 class BaseBoundaryCondition(ABC):
@@ -16,20 +45,18 @@ class BaseBoundaryCondition(ABC):
 
     Attributes
     ----------
-    params : dict
-        The dictionary of all parameters. It must at least contain the key "direction", "inner_slice", side and ng.
     direction : int
         The direction of the boundary condition.
     side : BoundarySide
         The side in the direction for the boundary condition.
+    direction_str: str
+        The indicator that which axis is the boundary condition being applied on.
+    direction: int
+        The direction axis in integer
+    full_inner_slice: List[Tuple[Any, Any]]
+        The slice of full inner domain.
     ng : tuple
         The tuple of the number of ghost cells in each side of all directions.
-    pad_width : List[Tuple[int, int]]
-        list of tuples of the number of ghost cells in a single direction.
-        Example: [(ngx, ngx), (0, 0), (0, 0)]. For more details see the docstring for
-        py:meth:`atmpy.boundary_conditions.BoundaryCondition._create_pad_width_for_single_direction`.
-    directional_inner_slice : Tuple[slice,...]
-        Create the tuple of inner slices for a single direction.
 
 
     Notes
@@ -37,217 +64,276 @@ class BaseBoundaryCondition(ABC):
     the "inner_slice" key of the params is the tuple of all inner slices in all directions.
     """
 
-    class KwargsTypes(TypedDict):
-        """Constructor class for dictionary typing of kwargs"""
+    def __init__(self, inst_opts: "BCInstantiationOptions") -> None:
+        """Constructor for boundary conditions.
 
-        direction: str
-        grid: Grid
-
-    def __init__(self, **kwargs: Unpack[KwargsTypes]) -> None:
-
-        self.direction: int = direction_mapping(kwargs["direction"])
-        self.grid: Grid = kwargs["grid"]
-        self.ndim: int = self.grid.ndim
-        self.ng: List[Tuple[Any, Any]] = self.grid.ng[self.direction]
-        self.pad_width: List[Tuple[int, int]] = (
-            self._create_pad_width_for_single_direction()
-        )
-        self.directional_inner_slice: Tuple[slice, ...] = (
-            self._create_directional_inner_slice()
-        )
-
-    @abstractmethod
-    def apply(self, cell_vars, *args, **kwargs):
-        pass
-
-    def _create_directional_inner_slice(self) -> Tuple[slice, ...]:
-        """Create the directional inner slice for a single direction.For more details see the docstring for
-        py:meth:`atmpy.boundary_conditions.boundary_conditions.BaseBoundaryCondition._create_pad_width_for_single_direction`.
+        Parameters:
+        -----------
+        inst_opts : BCInstantiationOptions
+            The context object that contains information about the instantiation of the boundary conditions.
         """
 
-        directional_inner_slice = [slice(None)] * self.ndim
-        directional_inner_slice[self.direction] = self.grid.inner_slice[self.direction]
-        return tuple(directional_inner_slice)
+        self.direction_str = inst_opts.direction
+        self.direction: int = direction_axis(self.direction_str)
+        self.grid: "Grid" = inst_opts.grid
+        self.ndim: int = self.grid.ndim
+        self.ng: Tuple[int, int] = self.grid.ng[self.direction]
+        self.full_inner_slice: List[Tuple[int, int]] = self.grid.inner_slice
+        self.type: BdryType = inst_opts.type
+        self.side = inst_opts.side
+        self.side_axis: int = self._find_side_axis()
 
-    def _create_pad_width_for_single_direction(self) -> List[Tuple[int, int]]:
+    @abstractmethod
+    def apply(self, cell_vars):
+        """Apply the boundary condition on the cell variables"""
+        pass
+
+    @abstractmethod
+    def apply_single_variable(
+        self, variable: np.ndarray, context: "BCApplicationContext"
+    ):
+        """Apply the boundary condition on a variable. Original motivation is to apply the correction on the
+        right-hand side of the pressure equation.
+        """
+        pass
+
+    @abstractmethod
+    def apply_extra(self, variable: np.ndarray, operation: "ExtraBCOperation") -> None:
+        """Optional extra update on variable, like scaling wall nodes. This function should be considered as a
+        refinement of the boundary condition. It should be called in the euler steps (explicit and implicit) to
+        refine the already applied boundary conditions."""
+        pass
+
+    @property
+    def pad_width(self):
         """Create the pad width for a single direction. The "ng" attribute contains a
         list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
         Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
         avoid padding the boundary in all direction with the same number of ghost cells, we need to create a
         pad width tuple containing zero tuples in the undesired directions, i.e.  for x direction padding
-        [(ngx, ngx), (0, 0), (0, 0)]."""
+        [(ngx, ngx), (0, 0), (0, 0)]. For wall boundary, this is reduced to one-sided padding: for example for x direction
+        and the left side: [(ngx, 0), (0, 0), (0, 0)]"""
 
-        pad_width = [(0, 0)] * self.ndim
-        pad_width[self.direction] = tuple(self.ng)
+        side: int = self.side_axis
+        # create (ng, 0) or (0, ng)
+        ng: List[int] = [0 if i != side else self.ng[side] for i in range(2)]
+        # create the pad width
+        pad_width = [(0, 0)] * (self.ndim + 1)
+        pad_width[self.direction] = ng
         return pad_width
+
+    def _find_side_axis(self):
+        """Find the integer axis of the side on which the BC is applied in the given direction."""
+        sides: Tuple[BoundarySide, BoundarySide] = side_direction_mapping(
+            self.direction_str
+        )
+        return sides.index(
+            self.side
+        )  # Index of the side in the tuple. Used to index the sided number of ghost cells
 
 
 class PeriodicBoundary(BaseBoundaryCondition):
-    def apply(self, cell_vars: np.ndarray, *args, **kwargs):
+    """Implements the periodic boundary condition. See the parent class for the documentation of the shared attributes.
+
+    Attributes
+    ----------
+    pad_width : List[Tuple[int, int]]
+        list of tuples of the number of ghost cells in a single direction.
+        Example: [(ngx, ngx), (0, 0), (0, 0)]. For more details see the docstring for
+        py:meth:`atmpy.boundary_conditions.BoundaryCondition._create_pad_width_for_single_direction`.
+    directional_inner_slice : Tuple[slice,...]
+        Create the tuple of inner slices for a single direction."""
+
+    def __init__(self, inst_opts: "BCInstantiationOptions") -> None:
+        super().__init__(inst_opts)
+
+    def apply(self, cell_vars: np.ndarray):
         """Apply periodic boundary condition to the cell_vars.
 
         Parameters
         ----------
         cell_vars : ndarray of shape (nx, [ny], [nz], num_vars)
             The array container for all the variables.
+        context: BCApplicationContext
+            The context object that contains information about the boundary conditions apply method.
         """
-        cell_vars[..., VI.RHO] = np.pad(
-            cell_vars[self.directional_inner_slice + (VI.RHO,)],
+        inner_padded_slice = self.inner_and_padded_slices()
+        # Apply np.pad with mode "wrap" on ALL variables for periodic BC.
+        cell_vars[inner_padded_slice] = np.pad(
+            cell_vars[self.inner_slice],
             self.pad_width,
             mode="wrap",
         )
 
+    def apply_single_variable(
+        self, variable: np.ndarray, context: "BCApplicationContext"
+    ):
+        """Apply the periodic boundary condition on the pressure variable."""
+        inner_padded_slice = self.inner_and_padded_slices()
+
+        variable[inner_padded_slice[:-1]] = np.pad(
+            variable[self.inner_slice[:-1]],
+            self.pad_width[:-1],
+            mode="wrap",
+        )
+
+    def apply_extra(self, variable: np.ndarray, operation: "ExtraBCOperation") -> None:
+        pass
+
+    @property
+    def inner_slice(self) -> Tuple[slice, ...]:
+        """Create the directional inner slice for a single direction."""
+        directional_inner_slice = [slice(None)] * (self.ndim + 1)
+        directional_inner_slice[self.direction] = self.grid.inner_slice[self.direction]
+        return tuple(directional_inner_slice)
+
+    def inner_and_padded_slices(self) -> Tuple[slice, ...]:
+        """Returns the slice of the padded part."""
+        side = self._find_side_axis()
+        slc = slice(0, -self.ng[side]) if side == 0 else slice(self.ng[side], None)
+        pad_slice = [slice(None)] * (self.ndim + 1)
+        pad_slice[self.direction] = slc
+        return tuple(pad_slice)
+
 
 class ReflectiveGravityBoundary(BaseBoundaryCondition):
     """Compute the boundary condition for the side affected by the gravity. The gravity axis must be specified
-    in the kwargs as an int.
+    in the kwargs as an int. For shared attributes, see the documentation of the parent class.
 
     Attributes
     ----------
     gravity : List[float, float, float]
         The list of the gravity strength in each axis direction. For example gravity = [0.0, 0.0, 3.0] means the
         gravity exist in the third direction with the strength of 3.0
-    gravity_axis: int
-        The axis in which the gravity affects the boundary.
     stratification: Callable
         The given stratification function
-    side: str
-        The signifier of which side we are working on. The valid values are "bottom" and "top".
-        They don't mean anything in themselves. "bottom" is a signifier for the beginning of the array
-        in the given axis. "top" is a signifier for the end of the array in the given axis.
-    is_lamb: bool
-        Determines if the lamb boundary condition is applied.
+    facet: str
+        The signifier of which side of the gravity axis is considered. The valid values are "bottom" and "top".
+        "begin" is a signifier for the beginning of the array in the given axis. "end" is a signifier for the end
+        of the array in the given axis.
+        "end" = BdrySide.TOP or BdrySide.BACK
+        "begin" = BdrySide.BOTTOM or BdrySide.FRONT
     is_compressible: bool
         Determines if we are in the compressible regime.
     """
 
-    class KwargsType(TypedDict):
-        """Constructor class for typing of kwargs dictionary"""
-
-        thermodynamics: Thermodynamics
-        gravity: Union[List[float], np.ndarray]
-        stratification: Callable[[Any], Any]
-        side: str
-        is_lamb: bool
-        is_compressible: bool
-
-    def __init__(self, **kwargs: Unpack[KwargsType]) -> None:
-        super().__init__(**kwargs)
-        self.th: Thermodynamics = kwargs["thermodynamics"]
-        self.gravity: Union[List[float], np.ndarray] = kwargs["gravity"]
-        if len(np.nonzero(self.gravity)[0]) > 1:
-            raise ValueError("Only one axis can have gravity strength.")
-        if np.isclose(self.gravity[self.direction], 0):
+    def __init__(self, inst_opts: "RFBCInstantiationOptions") -> None:
+        super().__init__(inst_opts)
+        if self.ndim == 1:
+            raise ValueError(
+                "Reflective gravity is not implemented for 1 dimensional problem."
+            )
+        self.th: "Thermodynamics" = inst_opts.thermodynamics
+        self.gravity: Gravity = Gravity(inst_opts.gravity, self.ndim)
+        if self.gravity.strength == 0.0:
+            raise ValueError(
+                "The gravity strength cannot be zero for ReflectiveGravityBoundary."
+            )
+        if np.isclose(self.gravity.vector[self.direction], 0):
             raise ValueError(
                 "There is no gravity strength in the specified direction. Wrong boundary conditions."
             )
-        self.gravity_axis: int = cast(int, np.nonzero(self.gravity)[0][0])
-        if self.gravity_axis == 0:
-            raise ValueError(
-                "The first axis is reserved for horizontal velocity. It cannot have gravity."
-            )
-        self.stratification: Callable[[Any], Any] = kwargs["stratification"]
-        self.side: str = kwargs["side"]
-        if self.side not in ["top", "bottom"]:
-            raise ValueError("Side must be either 'top' or 'bottom'.")
-        self.is_lamb: bool = kwargs["is_lamb"]
-        self.is_compressible: bool = kwargs["is_compressible"]
+        self.stratification: Callable[[Any], Any] = inst_opts.stratification
+        self.facet: str = self._find_facet()
+        if self.facet not in ["begin", "end"]:
+            raise ValueError("Facet must be either 'begin' or 'end'.")
+        self.is_compressible: bool = inst_opts.is_compressible
 
-    def apply(self, cell_vars: np.ndarray, *args, **kwargs):
+    def apply(self, cell_vars: np.ndarray):
         """Apply the reflective boundary condition for the given side of the gravity axis. If self.side is top, this means
-        that the boundary condition for the top side of the vertical axis is the 'Lid' boundary. The sponge BC should be
-        implemented separately in another class."""
-
-        # calculate the boundary indices
-        nsource, nlast, nimage = self._create_boundary_indices()
-
-        # evaluate the Theta on nlast indices
-        Y_last = cell_vars[nlast + (VI.RHOY,)] / cell_vars[nlast + (VI.RHO,)]
-
-        # get the coordinate values of the grid in the direction of gravity
-        axis_coordinate_cells = self.grid.get_coordinates(self.gravity_axis)
-
-        # calculate the stratification function on the ghost cells
-        strat = 1.0 / self.stratification(
-            axis_coordinate_cells[nimage[self.gravity_axis]]
-        )
-
-        # sign to calculate the derivative of Pi. -1 if on the topside boundary and 1 if on the downside
-        sign = -1 if self.side == "top" else 1
-        dr = self.grid.dxyz[
-            self.gravity_axis
-        ]  # discretization fineness in the gravity direction
-
-        # Calculate the derivative of Pi (Exner pressure) in existence/nonexistence of lamb boundary
-        if not self.is_lamb:
-            dpi = sign * self.th.Gamma * 0.5 * dr * (1.0 / Y_last + strat)
-        else:
-            raise NotImplementedError(
-                "The lamb boundary condition is not implemented yet."
-            )
-
-        # Calculate the P = rho Theta on the nlast indices in compressible or pseudo-incompressible regimes
-        if self.is_compressible:
-            rhoY = (
-                (cell_vars[nlast + (VI.RHOY,)] ** self.th.gm1) + dpi
-            ) ** self.th.gm1inv
-        else:
-            raise NotImplementedError(
-                "The compressible boundary condition is not implemented yet."
-            )
-
-        # Get the index of the velocities in cell_vars for the gravity and nongravity directions
-        momentum_index = self._get_gravity_momentum_index()
-        # calculate the Pv for the ghost cells. "v" here is a placeholder for the velocity in the direction of gravity
-        Pv = (
-            -cell_vars[nsource + (momentum_index[0],)]
-            * cell_vars[nsource + (VI.RHOY,)]
-            / cell_vars[nsource + (VI.RHO,)]
-        )
-
-        if not self.is_lamb:
-            v = Pv / rhoY
-            Th_slc = 1.0
-        else:
-            raise ValueError("The lamb boundary condition is not implemented yet.")
-
-        # This is the actual horizontal velocity, since the gravity axis can never be the first axis.
-        u = cell_vars[nsource + (VI.RHOU,)] / cell_vars[nsource + (VI.RHO,)]
-
-        # w is a placeholder for the velocity in the direction of non-gravity.
-        w = cell_vars[nsource + (momentum_index[1],)] / cell_vars[nsource + (VI.RHO,)]
-
-        # Actual X
-        X = cell_vars[nsource + (VI.RHOX,)] / cell_vars[nsource + (VI.RHO,)]
-
-        rho = rhoY * strat
-
-        # Evaluate variables (all) at the ghost cells
-        cell_vars[nimage + (VI.RHO,)] = rho
-        cell_vars[nimage + (VI.RHOU,)] = rho * u * Th_slc
-        if not self.is_lamb:
-            cell_vars[nimage + (momentum_index[0],)] = rho * v
-        else:
-            raise NotImplementedError(
-                "The lamb boundary condition is not implemented yet."
-            )
-        cell_vars[nimage + (momentum_index[1],)] = rho * w * Th_slc
-        cell_vars[nimage + (VI.RHOY,)] = rhoY
-        cell_vars[nimage + (VI.RHOX,)] = rho * X
-
-    def _get_gravity_momentum_index(self) -> Tuple[int, int]:
-        """Helper method to get the momentum variable index in the direction of gravity as the first output and the
-        momentum in the nongravity direction as the second output. Notice since RHOU can never be the momentum in the
-        gravity axis (or more clearly, first axis can never be the gravity axis), it is not included in the array
+        that the boundary condition for the top side of the vertical axis is the 'Lid' boundary.
         """
 
-        if self.gravity_axis == 1:
-            gravity_index = VI.RHOV
-            non_gravity_index = VI.RHOW
-        elif self.gravity_axis == 2:
-            gravity_index = VI.RHOW
-            non_gravity_index = VI.RHOV
-        return gravity_index, non_gravity_index
+        # calculate the boundary indices
+        ng = self._get_ng_for_side()
+
+        # Layer by layer filling the boundary:
+        for i in range(ng):
+            nimage, nlast, nsource = self._create_boundary_slice(i)
+
+            # evaluate the Theta on nlast indices
+            Y_last = cell_vars[nlast + (VI.RHOY,)] / cell_vars[nlast + (VI.RHO,)]
+
+            # get the coordinate values of the grid in the direction of gravity
+            axis_coordinate_cells = self.gravity.get_coordinate_cells(self.grid)
+
+            # calculate the stratification function on the ghost cells
+            strat = 1.0 / self.stratification(
+                axis_coordinate_cells[nimage[self.gravity.axis]]
+            )
+
+            # sign to calculate the derivative of Pi. -1 if on the topside boundary and 1 if on the downside
+            sign = -1 if self.facet == "end" else 1
+            dr = self.grid.dxyz[
+                self.gravity.axis
+            ]  # discretization fineness in the gravity direction
+
+            # Calculate the derivative of Pi (Exner pressure) in existence/nonexistence of lamb boundary
+            dpi = (
+                sign
+                * self.th.Gamma
+                * 0.5
+                * self.gravity.strength
+                * dr
+                * (1.0 / Y_last + strat)
+            )
+
+            # Calculate the P = rho Theta on the nlast indices in compressible or pseudo-incompressible regimes
+            if self.is_compressible:
+                rhoY = (
+                    (cell_vars[nlast + (VI.RHOY,)] ** self.th.gm1) + dpi
+                ) ** self.th.gm1inv
+            else:
+                raise NotImplementedError(
+                    "The incompressible boundary condition is not implemented yet."
+                )
+
+            # Get the index of the velocities in cell_vars for the gravity and nongravity directions
+            gravity_momentum_index = self.gravity.vertical_momentum_index  # VI.RHOV
+            # calculate the Pv for the ghost cells. "v" here is the velocity in the direction of gravity
+            Pv = (
+                -cell_vars[nsource + (gravity_momentum_index,)]
+                * cell_vars[nsource + (VI.RHOY,)]
+                / cell_vars[nsource + (VI.RHO,)]
+            )
+
+            # Calculate intermediate rho and evaluate the corresponding ghost cell.
+            rho = rhoY * strat
+            cell_vars[nimage + (VI.RHO,)] = rho
+
+            # Find velocity in the direction of gravity and update ghost cells.
+            v = Pv / rhoY
+            Th_slc = 1.0
+            cell_vars[nimage + (gravity_momentum_index,)] = rho * v
+
+            # This is the actual horizontal velocity, since the gravity axis can never be the first axis.
+            u = cell_vars[nsource + (VI.RHOU,)] / cell_vars[nsource + (VI.RHO,)]
+            cell_vars[nimage + (VI.RHOU,)] = rho * u * Th_slc
+
+            # w is a placeholder for the velocity in the direction of non-gravity. First, check whether the variable container
+            # can be indexed that far.
+            perpendicular_momentum_index = self.gravity.perpendicular_momentum_index
+            if perpendicular_momentum_index < cell_vars.shape[-1]:
+                w = (
+                    cell_vars[nsource + (perpendicular_momentum_index,)]
+                    / cell_vars[nsource + (VI.RHO,)]
+                )
+                cell_vars[nimage + (perpendicular_momentum_index,)] = rho * w * Th_slc
+
+            # Compute the actual X and evaluate the ghost cells.
+            X = cell_vars[nsource + (VI.RHOX,)] / cell_vars[nsource + (VI.RHO,)]
+            cell_vars[nimage + (VI.RHOY,)] = rhoY
+            cell_vars[nimage + (VI.RHOX,)] = rho * X
+
+    def apply_single_variable(
+        self, variable: np.ndarray, context: "BCApplicationContext"
+    ):
+        pass
+
+    def apply_extra(
+        self, variable: np.ndarray, context: "BCApplicationContext"
+    ) -> None:
+        pass
 
     def _create_boundary_indices(
         self,
@@ -277,50 +363,192 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
 
         """
         ng_tuple: Tuple[int, ...] = self.grid.ng[self.direction]
-        N: int = self.grid.nc_total[self.direction]
+        N: int = self.grid.cshape[self.direction]
 
-        if self.side == "bottom":
+        if self.facet == "begin":
             ng = ng_tuple[0]
             ng_arange = np.arange(ng)
             image = ng - 1 - ng_arange  # ghost cells indices (will be updated)
             last = ng - ng_arange  # adjacent inner/ghost cell index
             source = ng + ng_arange  # inner cells moving inward
-        elif self.side == "top":
+        elif self.facet == "end":
             ng = ng_tuple[1]
             ng_arange = np.arange(ng)
             image = N - ng + ng_arange  # ghost cell indices at upper boundary
             last = N - ng + ng_arange - 1  # cell adjacent to inner cell on upper side
             source = N - ng - ng_arange - 1  # inner cells near the upper boundary
         else:
-            raise ValueError("side must be 'bottom' or 'top'.")
+            raise ValueError("Facet must be 'bottom' or 'top'.")
 
+        return image, last, source
+
+    def _get_ng_for_side(self):
+        """Get the number of ghost cells for the side"""
+        ng_tuple: Tuple[int, ...] = self.grid.ng[self.direction]
+        if self.facet == "begin":
+            ng = ng_tuple[0]
+        elif self.facet == "end":
+            ng = ng_tuple[1]
+        else:
+            raise ValueError("Facet must be 'bottom' or 'top'.")
+        return ng
+
+    def _create_boundary_slice(self, layer: int):
+        """Choose which one of the boundary should be worked with.
+        Source, last and image are all lists of size equal to the number of ghost cells. In order to fill the
+        boundary layer-by-layer, we choose the corresponding values of source, last and image one by one
+
+        Parameters
+        ----------
+        layer : int
+            The layer to choose from the source, image and last indices
+        """
+        image, last, source = self._create_boundary_indices()
         # Make the indices valid for multi-dimensional array
         nimage: list = [slice(None)] * self.ndim
-        nlast = [slice(None)] * self.ndim
-        nsource = [slice(None)] * self.ndim
+        nlast: list = [slice(None)] * self.ndim
+        nsource: list = [slice(None)] * self.ndim
 
-        nimage[self.gravity_axis] = image
-        nlast[self.gravity_axis] = last
-        nsource[self.gravity_axis] = source
+        nimage[self.gravity.axis] = image[layer]
+        nlast[self.gravity.axis] = last[layer]
+        nsource[self.gravity.axis] = source[layer]
 
-        return tuple(nsource), tuple(nlast), tuple(nimage)
+        return tuple(nimage), tuple(nlast), tuple(nsource)
+
+    def _find_facet(self):
+        """Find which end of the array is the gravity being applied on"""
+        if self.side == BoundarySide.TOP or self.side == BoundarySide.BACK:
+            return "end"
+        elif self.side == BoundarySide.BOTTOM or self.side == BoundarySide.FRONT:
+            return "begin"
+        else:
+            raise ValueError(f"{self.side} is not valid side for gravity axis.")
 
 
-class SlipWall(BaseBoundaryCondition):
-    def apply(self, cell_vars, *args, **kwargs):
-        # Zero normal velocity, reflect tangential components
-        pass
+class Wall(BaseBoundaryCondition):
+    def __init__(self, inst_opts: "BCInstantiationOptions"):
+        super().__init__(inst_opts)
+
+    def apply(self, cell_vars: np.ndarray):
+        """Apply the wall boundary condition. All the variables get reflected by the boundary, the normal velocity gets
+        reflected and negated.
+
+        Notes
+        -----
+        in np.pad, mode="symmetric" is used instead of mode="reflect". See the documentation for np.pad.
+        """
+
+        normal_momentum_index = momentum_index(self.direction)
+        pad_slice = self.padded_slices()
+
+        # Apply np.pad with mode "symmetric" on ALL variables for wall BC.
+        mode: Literal["symmetric", "edge"] = "symmetric"
+        if self.grid.nc[self.direction] == 1:
+            # Single cell case
+            # Apply np.pad with mode "edge" to copy the single cell to ghost cells
+            mode = "edge"
+
+        cell_vars[...] = np.pad(
+            cell_vars[self.inner_slice],
+            self.pad_width,
+            mode=mode,
+        )
+
+        cell_vars[pad_slice + (normal_momentum_index,)] *= -1
+
+    def apply_single_variable(
+        self, variable: np.ndarray, context: "BCApplicationContext"
+    ):
+        """Apply the wall boundary condition on a single variable. Used predominantly to apply BC on the second
+        asymptotics of the pressure variable.
+
+        Parameters
+        ----------
+        variable : np.ndarray
+            The node-centered or cell-centered variable.
+        context: BCApplicationContext
+            The context object of the method. It contains the flag 'is_nodal' to determine if the variable is defined
+            on nodes or cells.
+
+        Notes
+        -----
+        If the flag is_nodal is on, i.e. if the variable
+        is defined on nodes, the boundary node is not copied on ghost nodes. Therefore, the 'mode' will be set to
+        'reflect'. Otherwise, it will be 'symmetric' as usual for wall boundary conditions for cells.
+        """
+
+        mode: Literal["symmetric", "edge", "reflect"] = "symmetric"
+        is_nodal = context.is_nodal
+        if is_nodal:
+            mode = "reflect"
+
+        if self.grid.nc[self.direction] == 1:
+            # Single cell case
+            # Apply np.pad with mode "edge" to copy the single cell to ghost cells
+            mode = "edge"
+
+        variable[...] = np.pad(
+            variable[self.inner_slice[:-1]],
+            self.pad_width[:-1],
+            mode=mode,
+        )
+
+    def apply_extra(self, variable: np.ndarray, operation: "ExtraBCOperation") -> None:
+        """This is applied on a nodal variable. Rescale nodes at the boundary by a factor.
+
+        Parameters
+        ----------
+        variable : np.ndarray
+            The nodal variable to apply the extra boundary condition on.
+        operation: ExtraBCOperation
+            The ExtraBCOperation object to be applied.
+        """
+
+        if isinstance(operation, WallAdjustment):
+            factor = operation.factor
+            boundary_nodes_slice = self._boundary_nodes()
+            variable[boundary_nodes_slice] *= factor
+        else:
+            pass
+
+    @property
+    def inner_slice(self) -> Tuple[slice, ...]:
+        """Create the inner slice of the array from one side, i.e. either (0, -ng) or (ng, None) in the corresponding
+        direction."""
+
+        side: int = self.side_axis
+        # create slice(ng, None) or slice(0, ng)
+        slc = slice(self.ng[side], None) if side == 0 else slice(0, -self.ng[side])
+        # Create the slice object
+        inner_slice = [slice(None)] * (self.ndim + 1)
+        inner_slice[self.direction] = slc
+        return tuple(inner_slice)
+
+    def _boundary_nodes(self) -> Tuple[slice, ...]:
+        """Create the slice for the nodes at the boundary. This is used to rescale those nodes."""
+        # Notice in backward indexing, the third to last element in the last inner node (boundary node).
+        # Therefore, in backward indexing -ig - 1 is the correct index of the last inner node.
+        idx = (
+            self.ng[self.side_axis]
+            if self.side_axis == 0
+            else -self.ng[self.side_axis] - 1
+        )
+        boundary_nodes_slice = copy.deepcopy(self.full_inner_slice)
+        boundary_nodes_slice[self.direction] = idx
+        return tuple(boundary_nodes_slice)
+
+    def padded_slices(self) -> Tuple[slice, ...]:
+        """Returns the slice of the padded part."""
+        side = self._find_side_axis()
+        slc = slice(0, self.ng[side]) if side == 0 else slice(-self.ng[side], None)
+        pad_slice = [slice(None)] * self.ndim
+        pad_slice[self.direction] = slc
+        return tuple(pad_slice)
 
 
 class NonReflectiveOutlet(BaseBoundaryCondition):
     def apply(self, cell_vars, *args, **kwargs):
         # Characteristic-based extrapolation
-        pass
-
-
-class WallBoundary(BaseBoundaryCondition):
-    def apply(self, cell_vars, *args, **kwargs):
-        # Implement wall BC logic (e.g., reflect normal velocity)
         pass
 
 
@@ -340,6 +568,7 @@ def example_usage():
     from atmpy.grid.utility import create_grid, DimensionSpec
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.variables.variables import Variables
+    from atmpy.physics.thermodynamics import Thermodynamics
 
     np.set_printoptions(linewidth=100)
 
@@ -373,9 +602,9 @@ def example_usage():
     params = {
         "direction": "y",
         "grid": grid,
+        "side": BoundarySide.TOP,
         "gravity": gravity,
         "stratification": lambda x: x**2,
-        "side": "top",
         "thermodynamics": th,
         "is_lamb": False,
         "is_compressible": True,

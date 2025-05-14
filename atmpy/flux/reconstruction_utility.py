@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Callable
-from atmpy.flux.utility import directional_indices, direction_mapping
+from atmpy.infrastructure.utility import directional_indices, direction_axis
 from atmpy.infrastructure.enums import PrimitiveVariableIndices as PVI
 
 
@@ -32,8 +32,11 @@ def calculate_variable_differences(
     and diffs, the PVI.Y variable is Chi not Theta. Therefore the difference is calculated by the inversed values of Theta.
     """
 
-    direction = direction_mapping(direction_str)
+    direction = direction_axis(direction_str)
     diffs = np.zeros_like(primitives)  # The final difference array]
+
+    ### The following commented part is used got when we replace rho*Theta with Chi in calculating the reconstruction
+    ### And then transform back to rho*Theta. Since the reason is still not clear to me, I avoided this.
 
     # # Set the difference slice (one fewer element than the original array) in the corresponding direction
     # left_idx, right_idx, _, _ = directional_indices(ndim, direction_str, full=False)
@@ -49,7 +52,7 @@ def calculate_variable_differences(
     # )
 
     # Set the difference slice (one fewer element than the original array) in the corresponding direction
-    left_idx, right_idx, _, _ = directional_indices(ndim, direction_str, full=True)
+    left_idx, right_idx, _ = directional_indices(ndim, direction_str, full=True)
 
     # Apply np.diff in the direction which results in one less element
     # diffs[...][left_idx] = np.diff(primitives, axis=direction)
@@ -87,7 +90,7 @@ def calculate_slopes(
     -----
     The limited slope has two fewer rows/columns in the direction of calculation than the original variables.
     """
-    left_idx, right_idx, directional_inner_idx, _ = directional_indices(
+    left_idx, right_idx, directional_inner_idx = directional_indices(
         ndim, direction_str
     )
     # Use twice indexing: once to eliminate the extra zero due to the size difference between vars and differences

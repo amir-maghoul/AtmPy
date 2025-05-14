@@ -4,7 +4,7 @@ from atmpy.infrastructure.enums import (
     VariableIndices as VI,
     PrimitiveVariableIndices as PVI,
 )
-from atmpy.flux.utility import directional_indices
+from atmpy.infrastructure.utility import directional_indices
 
 
 def modified_hll(
@@ -35,7 +35,7 @@ def modified_hll(
     flux, direction, ndim = args
 
     # Get left, right and directional inner slices for a single variable
-    left_idx, right_idx, directional_inner_idx, _ = directional_indices(
+    left_idx, right_idx, directional_inner_idx = directional_indices(
         ndim, direction, full=False
     )
 

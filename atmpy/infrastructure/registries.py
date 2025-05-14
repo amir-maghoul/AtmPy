@@ -8,8 +8,20 @@ from atmpy.infrastructure.enums import (
     RiemannSolvers,
     FluxReconstructions,
     BoundaryConditions,
+    AdvectionRoutines,
+    LinearSolvers,
+    TimeIntegrators,
+    DiscreteOperators,
+    PressureSolvers,
+    Preconditioners,
 )
 from atmpy.boundary_conditions.boundary_conditions import *
+from atmpy.time_integrators.advection_routines import *
+from atmpy.pressure_solver.linear_solvers import *
+from atmpy.time_integrators.imex_operator_splitting import IMEXTimeIntegrator
+from atmpy.pressure_solver.discrete_operations import *
+from atmpy.pressure_solver.preconditioners import *
+from atmpy.pressure_solver.classical_pressure_solvers import ClassicalPressureSolver
 
 SLOPE_LIMITERS = {
     SlopeLimiters.MINMOD: minmod,
@@ -33,10 +45,39 @@ FLUX_RECONSTRUCTION = {
 }
 
 BOUNDARY_CONDITIONS = {
-    BoundaryConditions.SLIP_WALL: SlipWall,
+    BoundaryConditions.WALL: Wall,
     BoundaryConditions.INFLOW: InflowBoundary,
     BoundaryConditions.OUTFLOW: OutflowBoundary,
     BoundaryConditions.NON_REFLECTIVE_OUTLET: NonReflectiveOutlet,
     BoundaryConditions.PERIODIC: PeriodicBoundary,
-    BoundaryConditions.ReflectiveGravity: ReflectiveGravityBoundary,
+    BoundaryConditions.REFLECTIVE_GRAVITY: ReflectiveGravityBoundary,
+}
+
+ADVECTION_ROUTINES = {
+    AdvectionRoutines.STRANG_SPLIT: upwind_strang_split_advection,
+}
+
+LINEAR_SOLVERS = {
+    LinearSolvers.BICGSTAB: BiCGStabSolver,
+    LinearSolvers.GMRES: GMRESSolver,
+}
+
+TIME_INTEGRATORS = {
+    TimeIntegrators.IMEX: IMEXTimeIntegrator,
+}
+
+DISCRETE_OPERATORS = {DiscreteOperators.CLASSIC_OPERATOR: ClassicalDiscreteOperator}
+
+PRESSURE_SOLVERS = {
+    PressureSolvers.CLASSIC_PRESSURE_SOLVER: ClassicalPressureSolver,
+}
+
+PRECONDITIONERS = {
+    Preconditioners.DIAGONAL: apply_inverse_diagonal,
+    Preconditioners.COLUMN: apply_inverse_tridiagonal,
+}
+
+PRECONDITIONER_COMPONENTS = {
+    Preconditioners.DIAGONAL: compute_inverse_diagonal_components,
+    Preconditioners.COLUMN: compute_tridiagonal_components,
 }

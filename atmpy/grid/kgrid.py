@@ -52,6 +52,10 @@ class Grid:
         The total shape of the cell grid
     nshape : Tuple[int, ...]
         The total shape of the node grid
+    icshape : Tuple[int, ...]
+        The shape of inner cells
+    inshape : Tuple[int, ...]
+        The shape of inner nodes
     x_cells : ndarray
         Coordinate array of cell centers in x-direction
     y_cells : ndarray, optional
@@ -64,10 +68,6 @@ class Grid:
         Coordinate array of nodes in y-direction
     z_nodes : np.ndarray, optional
         Coordinate array of nodes in z-direction
-    cell_mesh : Tuple[np.ndarray, ...]
-        the meshgrid created from the cell centers according to the dimension
-    node_mesh : Tuple[np.ndarray, ...]
-        the meshgrid created from the nodes according to the dimension
     grid_type : str, default="cartesian"
         the grid type
     ng : List[Tuple[int, int]]
@@ -139,24 +139,29 @@ class Grid:
             raise ValueError("Number of ghost cells should at least be 2.")
 
         # Unifying lists of important properties for all dimensions
-        self.dxyz: List[int, ...] = [None] * 3  # Discretization fineness
-        self.nc_total: List[int, ...] = [None] * 3
+        self.dxyz: List[float] = np.ones(3)  # Discretization fineness
+        self.nc: List[int, ...] = [None] * 3  # Number of inner cells in all direction
 
+        ################################
         # Grid parameters in x-direction
+        ################################
         self.nx: int = nx
         self.x_start: float = x_start
         self.x_end: float = x_end
         self.dx: float = (x_end - x_start) / nx
         self.ngx: int = ngx  # Number of ghost cells in x-direction
         self.dxyz[0] = self.dx
+        self.nc[0] = self.nx
 
         # Total number of cells and nodes including ghost cells in x-direction
+
         self.ncx_total: int = nx + 2 * ngx
-        self.nc_total[0] = self.ncx_total
         self.nnx_total: int = self.ncx_total + 1
         self.cshape: Tuple[int, ...] = (self.ncx_total,)
         self.nshape: Tuple[int, ...] = (self.nnx_total,)
-        self.ng = [None]
+        self.icshape: Tuple[int, ...] = (self.nx,)
+        self.inshape: Tuple[int, ...] = (self.nx + 1,)
+        self.ng: List[Tuple[int, int]] = [None]
         self.inner_slice = [None]
 
         # Generate x-coordinate arrays
@@ -177,7 +182,9 @@ class Grid:
         self.ng[0] = (self.ngx, self.ngx)
         self.inner_slice[0] = self.inner_slice_x
 
-        # Check for 2D grid
+        ################################
+        # Grid parameters in y direction
+        ################################
         if (
             ny is not None
             and y_start is not None
@@ -193,6 +200,7 @@ class Grid:
             self.y_start: float = y_start
             self.y_end: float = y_end
             self.dy: float = (y_end - y_start) / ny
+            self.nc[1] = self.ny
             self.dxyz[1] = self.dy
             self.ngy: int = (
                 ngy if ngy is not None else ngx
@@ -200,10 +208,11 @@ class Grid:
 
             # Total number of cells and nodes including ghost cells in y-direction
             self.ncy_total: int = ny + 2 * self.ngy
-            self.nc_total[1] = self.ncy_total
             self.nny_total: int = self.ncy_total + 1
             self.cshape = (self.ncx_total, self.ncy_total)
             self.nshape = (self.nnx_total, self.nny_total)
+            self.icshape = (self.nx, self.ny)
+            self.inshape = (self.nx + 1, self.ny + 1)
 
             # Generate y-coordinate arrays
             self.y_cells: np.ndarray = np.linspace(
@@ -227,7 +236,9 @@ class Grid:
                 "Cannot have mixed of None and not None values for parameters of the ndim."
             )
 
-        # Check for 3D grid
+        ################################
+        # Grid parameters in z direction
+        ################################
         if (
             nz is not None
             and z_start is not None
@@ -244,17 +255,19 @@ class Grid:
             self.z_end: float = z_end
             self.dz: float = (z_end - z_start) / nz
             self.dxyz[2] = self.dz
+            self.nc[2] = self.nz
             self.ngz: int = (
                 ngz if ngz is not None else ngx
             )  # Use ngx if ngz not specified
 
             # Total number of cells and nodes including ghost cells in z-direction
             self.ncz_total: int = nz + 2 * self.ngz
-            self.nc_total[2] = self.ncz_total
             self.nnz_total: int = self.ncz_total + 1
 
             self.cshape = (self.ncx_total, self.ncy_total, self.ncz_total)
             self.nshape = (self.nnx_total, self.nny_total, self.nnz_total)
+            self.icshape = (self.nx, self.ny, self.nz)
+            self.inshape = (self.nx + 1, self.ny + 1, self.nz + 1)
 
             # Generate z-coordinate arrays
             self.z_cells: np.ndarray = np.linspace(
@@ -278,34 +291,8 @@ class Grid:
                 "Cannot have mixed of None and not None values for parameters of the ndim."
             )
 
-    @property
-    def cell_mesh(self):
-        """Create a mesh using the dimension and cell coordinates"""
-
-        if self.ndim == 1:
-            return (self.x_cells,)
-        elif self.ndim == 2:
-            return np.meshgrid(self.x_cells, self.y_cells, indexing="ij")
-        elif self.ndim == 3:
-            return np.meshgrid(
-                self.x_cells,
-                self.y_cells,
-                self.z_cells,
-                indexing="ij",
-            )
-
-    @property
-    def node_mesh(self):
-        """Create a mesh using the dimension and node coordinates"""
-        if self.ndim == 1:
-            return (self.x_nodes,)
-        elif self.ndim == 2:
-            return np.meshgrid(self.x_nodes, self.y_nodes, indexing="ij")
-        elif self.ndim == 3:
-            return np.meshgrid(self.x_nodes, self.y_nodes, self.z_nodes, indexing="ij")
-
-    def get_coordinates(self, axis):
-        """Get method for coordinate values in each direction"""
+    def get_cell_coordinates(self, axis):
+        """Get method for cell coordinate values in each direction"""
         if axis == 0:
             return self.x_cells
         elif axis == 1:
@@ -315,9 +302,20 @@ class Grid:
         else:
             raise ValueError("Invalid value for 'axis'.")
 
-    def get_inner_cells(self) -> Tuple[slice, ...]:
+    def get_node_coordinates(self, axis):
+        """Get method for node coordinate values in each direction"""
+        if axis == 0:
+            return self.x_nodes
+        elif axis == 1:
+            return self.y_nodes
+        elif axis == 2:
+            return self.z_nodes
+        else:
+            raise ValueError("Invalid value for 'axis'.")
+
+    def get_inner_slice(self) -> Tuple[slice, ...]:
         """
-        Get slices corresponding to the inner cells (excluding ghost cells).
+        Get slices corresponding to the inner cells/nodes.
 
         Returns:
             Tuple[slice, ...]: Slices for indexing inner cells.
@@ -385,22 +383,6 @@ class Grid:
             self.normal_z = np.array([0.0, 0.0, 1.0])
         else:
             raise ValueError("Invalid grid dimension. Must be 1, 2, or 3.")
-
-    def get_inner_nodes(self) -> Tuple[slice, ...]:
-        """
-        Get slices corresponding to the inner nodes (excluding ghost nodes).
-
-        Returns:
-            Tuple[slice, ...]: Slices for indexing inner nodes.
-        """
-        if self.ndim == 1:
-            return (self.inner_slice_x,)
-        elif self.ndim == 2:
-            return self.inner_slice_x, self.inner_slice_y
-        elif self.ndim == 3:
-            return self.inner_slice_x, self.inner_slice_y, self.inner_slice_z
-        else:
-            raise ValueError("Invalid grid dimension")
 
     def get_boundary_nodes(self) -> Tuple[slice, ...]:
         """

@@ -2,6 +2,7 @@ from atmpy.grid.kgrid import Grid
 import numpy as np
 from dataclasses import dataclass
 from typing import List
+from atmpy.infrastructure.utility import direction_axis, directional_indices
 
 
 @dataclass

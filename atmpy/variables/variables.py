@@ -1,17 +1,28 @@
 from abc import abstractmethod
 import numpy as np
+from typing import Union, TYPE_CHECKING
+import logging
+
+if TYPE_CHECKING:
+    from atmpy.grid.kgrid import Grid
 from atmpy.infrastructure.enums import (
     VariableIndices as VI,
     PrimitiveVariableIndices as PVI,
 )
-from atmpy.grid.utility import DimensionSpec, create_grid
-from atmpy.physics import eos
 from atmpy.physics.eos import IdealGasEOS, BarotropicEOS, ExnerBasedEOS
+from atmpy.infrastructure.utility import momentum_index
+import warnings
 
 
 class Variables:
     """
     A unified class for storing both cell-centered and node-based conservative variables.
+
+    Notes
+    -----
+    The assumption is that the number of conservative variables and the number of primitive variables are the same. So
+    that if future places such as reconstruction or riemann solvers, one can use the numpy vectorization to do
+    calculations on a combination of both.
 
     Attributes
     ----------
@@ -32,7 +43,7 @@ class Variables:
         Number of spatial ndim.
     """
 
-    def __init__(self, grid, num_vars_cell: int, num_vars_node: int = 1):
+    def __init__(self, grid: "Grid", num_vars_cell: int, num_vars_node: int = 1):
         """
         Initializes the VariableContainer with cell-centered and node-based variables.
 
@@ -45,10 +56,10 @@ class Variables:
         num_vars_node : int (default = 1)
             Number of node-based variables.
         """
-        self.grid = grid
-        self.num_vars_cell = num_vars_cell
-        self.num_vars_node = num_vars_node
-        self.ndim = grid.ndim
+        self.grid: "Grid" = grid
+        self.num_vars_cell: int = num_vars_cell
+        self.num_vars_node: int = num_vars_node
+        self.ndim: int = grid.ndim
 
         if self.ndim not in [1, 2, 3]:
             raise ValueError("Number of ndim not supported.")
@@ -75,6 +86,8 @@ class Variables:
                 "Number of cell-based variables should not be None or less than 4."
             )
 
+        # Notice the hard assumption: The number of primitive variables are the same as
+        # the number of conservative variables
         self.primitives = np.zeros(self.cell_vars.shape)
 
         # Initialize node-based variables
@@ -144,9 +157,7 @@ class Variables:
         Converts cell-centered conservative variables to primitive variables.
 
         The conservative variables are assumed to be ordered as follows:
-        - 1D: [rho, rhoX, rhoY, rho*u]
-        - 2D: [rho, rhoX, rhoY, rho*u, rho*v]
-        - 3D: [rho, rhoX, rhoY, rho*u, rho*v, rho*w]
+        - [rho, rhoX, rhoY, rho*u, [rho*v], [rho*w]]
 
         Parameters
         ----------
@@ -158,8 +169,6 @@ class Variables:
         np.ndarray
             Array of primitive variables with one additional dimension.
         """
-        ndim = self.ndim
-
         if isinstance(eos, IdealGasEOS):
             raise NotImplementedError(
                 "IdealGasEOS not yet supported for primitives: No way to calculate the energy"
@@ -170,26 +179,33 @@ class Variables:
             args = (self.cell_vars[..., VI.RHOY], True)
 
         rho = self.cell_vars[..., VI.RHO]
+        nonzero_idx = np.nonzero(rho)
         self.primitives[..., PVI.P] = eos.pressure(*args)
-        self.primitives[..., PVI.U] = self.cell_vars[..., VI.RHOU] / rho
-        self.primitives[..., PVI.X] = self.cell_vars[..., VI.RHOX] / rho
-        self.primitives[..., PVI.Y] = self.cell_vars[..., VI.RHOY] / rho
+        self.primitives[*nonzero_idx, PVI.U] = (
+            self.cell_vars[*nonzero_idx, VI.RHOU] / rho[nonzero_idx]
+        )
+        self.primitives[*nonzero_idx, PVI.X] = (
+            self.cell_vars[*nonzero_idx, VI.RHOX] / rho[nonzero_idx]
+        )
+        self.primitives[*nonzero_idx, PVI.Y] = (
+            self.cell_vars[*nonzero_idx, VI.RHOY] / rho[nonzero_idx]
+        )
 
-        if ndim == 2:
-            self.primitives[..., PVI.V] = self.cell_vars[..., VI.RHOV] / rho
-        elif ndim == 3:
-            self.primitives[..., PVI.V] = self.cell_vars[..., VI.RHOV] / rho
-            self.primitives[..., PVI.W] = self.cell_vars[..., VI.RHOW] / rho
-
-        elif ndim > 3 or ndim < 1:
-            raise ValueError("Unsupported number of ndim.")
-
-    # -------------------
-    # Node-Based Methods
-    # -------------------
+        warnings.warn(
+            """For a better performance and a good vectorization in calculations, the current assumption of 
+        the project is that the number of primitive variables and the number of conservative variables are the same."""
+        )
+        if PVI.V < self.num_vars_cell:
+            self.primitives[*nonzero_idx, PVI.V] = (
+                self.cell_vars[*nonzero_idx, VI.RHOV] / rho[nonzero_idx]
+            )
+        if PVI.W < self.num_vars_cell:
+            self.primitives[*nonzero_idx, PVI.W] = (
+                self.cell_vars[*nonzero_idx, VI.RHOW] / rho[nonzero_idx]
+            )
 
     def to_conservative(self, rho: np.ndarray) -> None:
-        ndim = self.ndim
+        """Converts the primitive variables to conservative variables using the given rho."""
         self.cell_vars[..., VI.RHO] = rho
         self.cell_vars[..., VI.RHOX] = rho * self.primitives[..., PVI.X]
         self.cell_vars[..., VI.RHOY] = self.primitives[
@@ -197,13 +213,52 @@ class Variables:
         ]  # Remember P = rho*Theta = rho*Y
         self.cell_vars[..., VI.RHOU] = rho * self.primitives[..., PVI.U]
 
-        if ndim == 2:
+        if VI.RHOV < self.num_vars_cell:
             self.cell_vars[..., VI.RHOV] = rho * self.primitives[..., PVI.V]
-        elif ndim == 3:
-            self.cell_vars[..., VI.RHOV] = rho * self.primitives[..., PVI.V]
+        if VI.RHOW < self.num_vars_cell:
             self.cell_vars[..., VI.RHOW] = rho * self.primitives[..., PVI.W]
-        elif ndim > 3 or ndim < 1:
-            raise ValueError("Unsupported number of ndim.")
+
+    def adjust_background_wind(
+        self, wind_speeds: Union[np.ndarray, list], scale: float, in_place: bool = False
+    ) -> np.ndarray:
+        """Modify the momenta using the background wind and the given factor
+
+        Parameters
+        ----------
+        wind_speeds : Union[np.ndarray, list] of shape (3, 1)
+            The list or numpy array containing the wind velocities in each direction.
+        scale : float
+            The scaling factor
+        in_place : bool
+            Whether to update the momenta in place or create a variable
+
+        Returns
+        -------
+        np.ndarray
+        """
+        AXES: int = 3
+        indices = [VI.RHOU, VI.RHOV, VI.RHOW]
+
+        if in_place:
+            adjusted_momenta = self.cell_vars[..., indices]
+        else:
+            adjusted_momenta = np.zeros(self.grid.cshape + (3,))
+        for wind_speed, axis in zip(wind_speeds, range(AXES)):
+            momentum_idx = momentum_index(axis)
+            try:
+                adjusted_momenta[..., axis] = self.cell_vars[..., momentum_idx] + (
+                    wind_speed * scale * self.cell_vars[..., VI.RHO]
+                )
+            except IndexError:
+                print("Calculating the background wind...")
+                print(
+                    f"The cell variables container does not have enough variables. Index {momentum_idx} is missing."
+                )
+        return adjusted_momenta
+
+    # -------------------
+    # Node-Based Methods
+    # -------------------
 
     def get_node_vars(self):
         """

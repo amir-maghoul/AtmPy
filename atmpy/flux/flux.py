@@ -1,9 +1,12 @@
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, TYPE_CHECKING
 from atmpy.flux.utility import create_averaging_kernels
-from atmpy.grid.kgrid import Grid
+
+if TYPE_CHECKING:
+    from atmpy.grid.kgrid import Grid
+    from atmpy.physics.eos import EOS
+
 from atmpy.variables.variables import Variables
-from atmpy.physics.eos import EOS
 from atmpy.infrastructure.enums import (
     VariableIndices as VI,
     PrimitiveVariableIndices as PVI,
@@ -19,7 +22,14 @@ from atmpy.infrastructure.factory import (
     get_slope_limiter,
 )
 import scipy as sp
-from atmpy.flux.utility import directional_indices, direction_mapping
+from atmpy.infrastructure.utility import (
+    directional_indices,
+    direction_axis,
+    velocity_index,
+    one_element_inner_slice,
+)
+
+# from line_profiler import profile
 
 
 class Flux:
@@ -47,10 +57,9 @@ class Flux:
 
     def __init__(
         self,
-        grid: Grid,
+        grid: "Grid",
         variables: Variables,
-        eos: EOS,
-        dt: float,
+        eos: "EOS",
         solver: RiemannSolvers = RiemannSolvers.MODIFIED_HLL,
         reconstruction: FluxReconstructions = FluxReconstructions.MODIFIED_MUSCL,
         limiter: SlopeLimiters = SlopeLimiters.VAN_LEER,
@@ -64,8 +73,6 @@ class Flux:
             The variable container
         eos : :py:class:`atmpy.physics.eos.EOS`
             The equation of state
-        dt : float
-            The time step of the problem.
         solver : RiemannSolvers (Enum)
             An enum name from the implemented RiemannSolvers Enum,
             e.g. RiemannSolvers.HLL, RiemannSolvers.RUSANOV, etc.
@@ -88,7 +95,6 @@ class Flux:
         self.grid = grid
         self.variables = variables
         self.eos = eos
-        self.dt = dt
         self.riemann_solver = get_riemann_solver(solver)
         self.reconstruction = get_reconstruction_method(reconstruction)
         self.limiter = get_slope_limiter(limiter)
@@ -215,7 +221,7 @@ class Flux:
             unphysical_fluxes.values(), self.kernels, directions
         ):
             self.iflux[direction] = sp.signal.fftconvolve(flux, kernel, mode=mode)
-            _, _, _, inner_index = directional_indices(self.ndim, direction, full=False)
+            inner_index = one_element_inner_slice(self.ndim, full=False)
             self.flux[direction][inner_index + (VI.RHOY,)] = self.iflux[direction]
 
     def apply_reconstruction(
@@ -245,35 +251,37 @@ class Flux:
         )
 
         # left and right indices
-        lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
+        lefts_idx, rights_idx, directional_inner_idx = directional_indices(
             self.ndim, direction, full=False
         )
 
         # Index mapping
-        velocity_indices = [PVI.U, PVI.V, PVI.W]
-        direction_int = direction_mapping(direction)
+        direction_int = direction_axis(direction)
+        velocity_idx = velocity_index(direction_int)
 
-        # Find velocity in the direction
-        cell_vars = self.variables.cell_vars
-        velocity = cell_vars[..., velocity_indices[direction_int]]
+        # Find primitive velocity in the direction
+        primitives = self.variables.primitives
+        velocity = primitives[..., velocity_idx]
 
         # Compute the unphysical flux Pu
+        cell_vars = self.variables.cell_vars
         Pu = velocity * cell_vars[..., VI.RHOY]
 
         # Calculate the P = rho*Theta by averaging and advecting
-        lefts.cell_vars[lefts_idx + (VI.RHOY,)] = rights.cell_vars[rights_idx + (VI.RHOY,)]= 0.5 * (
+        lefts.cell_vars[lefts_idx + (VI.RHOY,)] = rights.cell_vars[
+            rights_idx + (VI.RHOY,)
+        ] = 0.5 * (
             (cell_vars[lefts_idx + (VI.RHOY,)] + cell_vars[rights_idx + (VI.RHOY,)])
             - lmbda * (Pu[lefts_idx] + Pu[rights_idx])
         )
 
         # Find the rho conservative variable from the new updated primitive variables
-        left_rho = lefts.cell_vars[..., VI.RHO] / lefts.primitives[..., PVI.Y]
-        right_rho = rights.cell_vars[..., VI.RHO] / rights.primitives[..., PVI.Y]
+        left_rho = lefts.cell_vars[..., VI.RHOY] / lefts.primitives[..., PVI.Y]
+        right_rho = rights.cell_vars[..., VI.RHOY] / rights.primitives[..., PVI.Y]
 
         # Compute the conservative variables for left and right states
         lefts.to_conservative(left_rho)
         rights.to_conservative(right_rho)
-
         return lefts, rights
 
     def apply_riemann_solver(self, lmbda: float, direction: str) -> None:
@@ -292,15 +300,11 @@ class Flux:
         )
 
 
-from line_profiler import profile
-
-
-@profile
 def main():
     from atmpy.grid.utility import DimensionSpec, create_grid
     from atmpy.physics.eos import ExnerBasedEOS
 
-    np.set_printoptions(linewidth=100)
+    np.set_printoptions(linewidth=200)
 
     dt = 0.1
 
@@ -308,7 +312,7 @@ def main():
     ngx = 2
     nnx = nx + 2 * ngx
     ny = 2
-    ngy = 2
+    ngy = 3
     nny = ny + 2 * ngy
 
     dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
@@ -318,7 +322,7 @@ def main():
     rng.shuffle(arr)
     array = arr.reshape(nnx, nny)
 
-    variables = Variables(grid, 5, 1)
+    variables = Variables(grid, 6, 1)
     variables.cell_vars[..., VI.RHO] = 1
     variables.cell_vars[..., VI.RHOU] = array
     variables.cell_vars[..., VI.RHOY] = 2
@@ -327,7 +331,7 @@ def main():
     array = arr.reshape(nnx, nny)
     variables.cell_vars[..., VI.RHOV] = array
     eos = ExnerBasedEOS()
-    flux = Flux(grid, variables, eos, dt)
+    flux = Flux(grid, variables, eos)
     variables.to_primitive(eos)
     primitives = variables.primitives
 
@@ -337,18 +341,16 @@ def main():
         calculate_slopes,
         modified_muscl,
     )
-    from atmpy.flux.utility import directional_indices, direction_mapping
+    from atmpy.infrastructure.utility import directional_indices, direction_axis
 
-    direction = "x"
+    direction = "y"
     diffs = calculate_variable_differences(primitives, 2, direction_str=direction)
     slopes = calculate_slopes(diffs, direction, flux.limiter, 2)
     amplitudes = calculate_amplitudes(
         slopes, np.arange(nnx * nny).reshape(nnx, nny), 1, True
     )
 
-    lefts_idx, rights_idx, directional_inner_idx, inner_idx = directional_indices(
-        2, direction
-    )
+    lefts_idx, rights_idx, directional_inner_idx = directional_indices(2, direction)
 
     cell_vars = variables.cell_vars
     iflux = flux.iflux
@@ -362,8 +364,9 @@ def main():
     flux.apply_riemann_solver(1, direction)
     print(flux.flux[direction][..., VI.RHOU])
     print(flux.variables.cell_vars[..., VI.RHOU])
+    u = variables.cell_vars[..., VI.RHOW]
 
-    # TODO: SHAPE MISMATCH IN HLL
+    print(int(2) + True)
 
 
 if __name__ == "__main__":
