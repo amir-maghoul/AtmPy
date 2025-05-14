@@ -1,6 +1,7 @@
 from abc import abstractmethod
 import numpy as np
 from typing import Union, TYPE_CHECKING
+import logging
 
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid

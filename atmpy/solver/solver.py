@@ -113,6 +113,9 @@ class Solver:
 
         # --- Main Time Loop ---
         while True:
+            logging.info(
+                f" Current time t={self.current_t:.4f}, step={self.current_step}"
+            )
             if self.current_t >= self.tmax - 1e-9:
                 logging.info(f"Reached tmax = {self.tmax:.4f}. Stopping.")
                 break
@@ -359,14 +362,14 @@ class Solver:
                     vars_to_define["v"] = (time_inner_cell_dims, attrs_primitive["v"])
                 if self.grid.ndim >= 3 and PVI.W < self.variables.num_vars_cell:
                     vars_to_define["w"] = (time_inner_cell_dims, attrs_primitive["w"])
-                vars_to_define["Y_prim"] = (
+                vars_to_define["Y"] = (
                     time_inner_cell_dims,
                     attrs_primitive["Y"],
                 )  # Renamed to Y_prim to avoid clash with y-coord
                 if (
                     PVI.X < self.variables.num_vars_cell
                 ):  # Check if X is used in primitives
-                    vars_to_define["X_prim"] = (
+                    vars_to_define["X"] = (
                         time_inner_cell_dims,
                         attrs_primitive["X"],
                     )  # Renamed to X_prim
@@ -375,9 +378,12 @@ class Solver:
                 # Nodal (if any)
                 # Example: p2_nodes
                 # if self.mpv and hasattr(self.mpv, 'p2_nodes'):
-                #     inner_node_dims = tuple(DIM_MAP_NODES[i] for i in range(self.grid.ndim))
-                #     time_inner_node_dims = ("time",) + inner_node_dims
-                #     vars_to_define["p2_nodes"] = (time_inner_node_dims, attrs_nodal["p2_nodes"])
+                inner_node_dims = tuple(dim_map_nodes[i] for i in range(self.grid.ndim))
+                time_inner_node_dims = ("time",) + inner_node_dims
+                vars_to_define["p2_nodes"] = (
+                    time_inner_node_dims,
+                    attrs_nodal["p2_nodes"],
+                )
 
                 for name, (dims, attributes) in vars_to_define.items():
                     # Ensure all dimensions in 'dims' exist before defining
@@ -405,9 +411,9 @@ class Solver:
                 )  # Get EOS from time integrator or config
 
                 # Calculate primitives first
-                self.variables.to_primitive(
-                    eos
-                )  # This populates self.variables.primitives
+                # self.variables.to_primitive(
+                #     eos
+                # )  # This populates self.variables.primitives
 
                 data_to_write = {}
 
@@ -434,49 +440,39 @@ class Solver:
 
                 # Primitive Variables
                 # Ensure PVI enum indices are correct for your self.variables.primitives array
-                data_to_write["p"] = self.variables.primitives[inner_slice + (PVI.P,)]
-                data_to_write["u"] = self.variables.primitives[inner_slice + (PVI.U,)]
-                if self.grid.ndim >= 2 and PVI.V < self.variables.num_vars_cell:
-                    data_to_write["v"] = self.variables.primitives[
-                        inner_slice + (PVI.V,)
-                    ]
-                if self.grid.ndim >= 3 and PVI.W < self.variables.num_vars_cell:
-                    data_to_write["w"] = self.variables.primitives[
-                        inner_slice + (PVI.W,)
-                    ]
-                data_to_write["Y_prim"] = self.variables.primitives[
-                    inner_slice + (PVI.Y,)
-                ]
-                if PVI.X < self.variables.num_vars_cell:
-                    data_to_write["X_prim"] = self.variables.primitives[
-                        inner_slice + (PVI.X,)
-                    ]
+                rho = self.variables.cell_vars[inner_slice + (VI.RHO,)]
+                # data_to_write["p"] = self.variables.cell_vars[inner_slice + (PVI.P,)]
+                u = self.variables.cell_vars[inner_slice + (VI.RHOU,)] / rho
+                from tempfile import TemporaryFile
 
-                # Calculate and save Temperature (T)
-                # This depends on your EOS and available variables.
-                # Example for ExnerBasedEOS: T = (P_exner / (rho * R_gas)) * (P_exner / P_ref)^(-R_gas/cp_gas)
-                # Or more simply if P_exner = rhoY * (R_gas / P_ref)^(R_gas/cp_gas) / P_ref^(R_gas/cp_gas - 1)
-                # and Theta (Y_prim) = T * (P_ref / P_thermo)^(R_gas/cp_gas)
-                # T = Y_prim * (P_thermo / P_ref)^(R_gas/cp_gas)
-                # P_thermo = P_exner * (P_ref)^ (R_gas/cp_gas) / (R_gas/P_ref)^ (R_gas/cp_gas)
-                # For ExnerBasedEOS where rhoY = rho * Theta_nd and P_exner = rhoY (if scaled appropriately)
-                # Theta_nd = Y_prim (from primitives)
-                # T_physical = Theta_nd * T_ref
-                # This assumes Y_prim is the non-dimensional potential temperature.
-                if "Y_prim" in data_to_write:
-                    T_physical = (
-                        data_to_write["Y_prim"] * self.config.global_constants.T_ref
+                outfile = TemporaryFile()
+                outfile = "/home/amir/Projects/Python/Atmpy/u_test.npy"
+                np.save(outfile, u)
+                data_to_write["u"] = (
+                    self.variables.cell_vars[inner_slice + (VI.RHOU,)] / rho
+                )
+                if self.grid.ndim >= 2 and PVI.V < self.variables.num_vars_cell:
+                    data_to_write["v"] = (
+                        self.variables.cell_vars[inner_slice + (VI.RHOV,)] / rho
                     )
-                    data_to_write["T"] = T_physical
-                else:  # Fallback if Y_prim is not available or setup differently
-                    logging.warning(
-                        "Primitive Y (potential temperature) not found, cannot compute Temperature T directly for output."
+                if self.grid.ndim >= 3 and PVI.W < self.variables.num_vars_cell:
+                    data_to_write["w"] = (
+                        self.variables.cell_vars[inner_slice + (VI.RHOW,)] / rho
+                    )
+                data_to_write["Y"] = (
+                    self.variables.cell_vars[inner_slice + (VI.RHOY,)] / rho
+                )
+                if PVI.X < self.variables.num_vars_cell:
+                    data_to_write["X"] = (
+                        self.variables.cell_vars[inner_slice + (VI.RHOX,)] / rho
                     )
 
                 # Nodal variables (if any)
                 # if "p2_nodes" in vars_to_define: # Check if it was successfully defined
                 #    if self.mpv and hasattr(self.mpv, 'p2_nodes'):
-                #        data_to_write["p2_nodes"] = self.mpv.p2_nodes[inner_slice] # Slicing works for nodes too
+                data_to_write["p2_nodes"] = self.mpv.p2_nodes[
+                    inner_slice
+                ]  # Slicing works for nodes too
 
                 # --- Write Data ---
                 writer.write_timestep_data(self.current_t, data_to_write)

@@ -1,6 +1,11 @@
 import numpy as np
 from dataclasses import field  # Removed dataclass, not needed here
 from typing import List, Tuple, Dict, Any, TYPE_CHECKING
+import matplotlib
+
+matplotlib.use("TkAgg")
+
+import logging
 
 from atmpy.infrastructure.utility import (
     one_element_inner_nodal_shape,
@@ -402,7 +407,7 @@ class TravelingVortex(BaseTestCase):
         # would be responsible for performing the initial projection if
         # config.numerics.initial_projection is True.
 
-        print("Solution initialization complete.")
+        logging.info("Solution initialization complete.")
 
 
 if __name__ == "__main__":
@@ -450,16 +455,123 @@ if __name__ == "__main__":
     x_coords = grid.x_cells
     y_coords = grid.y_cells
     cmap = plt.cm.viridis
+    rho = variables.cell_vars[..., VI.RHO]
     rhou = variables.cell_vars[..., VI.RHOU]
-    data_min = rhou.min().item()
-    data_max = rhou.max().item()
+    u = rhou / rho
+    arg = u
+    data_min = arg.min().item()
+    data_max = arg.max().item()
 
     contour = ax.contourf(
         x_coords,
         y_coords,
-        rhou,
+        arg.T,
         cmap=cmap,
         levels=np.linspace(data_min, data_max, 15),
     )
+
+    cbar = fig.colorbar(contour, ax=ax)
+    ax.set_xlabel("X (m)")
+    ax.set_ylabel("Y (m)")
+
+    file = "/home/amir/Projects/Python/Atmpy/u_test.npy"
+    u = np.load(file)
+
+    # contour = ax.contourf(
+    #     x_coords[2:-2],
+    #     y_coords[2:-2],
+    #     u.T,
+    #     cmap=cmap,
+    #     levels=np.linspace(data_min, data_max, 15),
+    # )
+
+    plt.show()
+
+    case = TravelingVortex()
+    config = case.config
+
+    grid = config.grid
+    mpv = MPV(grid)
+    num_vars = 6
+    variables = Variables(grid, num_vars_cell=num_vars, num_vars_node=1)
+    case.initialize_solution(variables, mpv)
+
+    bm_config = (
+        config.get_boundary_manager_config()
+    )  # Not strictly needed for this debug
+    manager = BoundaryManager(bm_config)
+    manager.apply_boundary_on_all_sides(variables.cell_vars)
+
+    fig, ax = plt.subplots()
+    x_coords = grid.x_cells
+    y_coords = grid.y_cells
+    cmap = plt.cm.viridis
+
+    rho = variables.cell_vars[..., VI.RHO]
+    rhou = variables.cell_vars[..., VI.RHOU]
+    #
+    # print(f"--- Debugging Initial U in traveling_vortex.py ---")
+    # print(f"Full rho array min: {rho.min()}, max: {rho.max()}")
+    # print(f"Full rhou array min: {rhou.min()}, max: {rhou.max()}")
+
+    # Check for zeros in rho BEFORE division
+    # if np.any(rho == 0):
+    #     print("WARNING: Zeros found in rho array BEFORE division!")
+    #     zero_rho_indices = np.where(rho == 0)
+    #     print(f"Indices of zero rho: {zero_rho_indices}")
+    #     if len(zero_rho_indices[0]) > 0:  # If any zeros found
+    #         print(f"rhou values at zero rho locations: {rhou[zero_rho_indices]}")
+
+    # Perform division carefully
+    u_initial = np.zeros_like(rhou, dtype=float)  # Ensure float type
+    # Create a mask for non-zero rho to avoid division by zero warnings/errors
+    # Use a small epsilon to also catch near-zero values if they are problematic
+    epsilon = 1e-12
+    valid_rho_mask = np.abs(rho) > epsilon
+
+    # Calculate u_initial only where rho is valid
+    u_initial[valid_rho_mask] = rhou[valid_rho_mask] / rho[valid_rho_mask]
+
+    # Set u_initial to NaN where rho was not valid (or keep as 0, depending on desired plot)
+    # Setting to NaN will make matplotlib skip these points (often appearing white)
+    u_initial[~valid_rho_mask] = np.nan
+
+    print(
+        f"u_initial min (finite): {np.nanmin(u_initial)}, max (finite): {np.nanmax(u_initial)}"
+    )
+    if np.any(np.isinf(u_initial)):
+        print("WARNING: Inf values found in u_initial array AFTER division!")
+    if np.any(np.isnan(u_initial)):
+        print(
+            "WARNING: NaN values found in u_initial array AFTER division (could be from invalid rho)!"
+        )
+        nan_indices = np.where(np.isnan(u_initial))
+        # Optional: print x,y coordinates of NaNs if helpful
+        # print(f"X-coords of NaNs: {x_coords[nan_indices[0]]}") # This indexing might need adjustment based on array structure
+        # print(f"Y-coords of NaNs: {y_coords[nan_indices[1]]}")
+
+    # Determine plot range from finite values
+    data_min_plot = np.nanmin(u_initial)
+    data_max_plot = np.nanmax(u_initial)
+
+    # If after all this, min/max are still problematic, manually set them to expected theoretical range
+    # data_min_plot = 0.70 # Example
+    # data_max_plot = 1.30 # Example
+
+    print(f"Plotting u_initial with min={data_min_plot}, max={data_max_plot}")
+
+    contour = ax.contourf(
+        x_coords,
+        y_coords,
+        u_initial.T,  # Plotting u_initial
+        cmap=cmap,
+        levels=np.linspace(data_min_plot, data_max_plot, 15),
+        # extend='both' # Useful if data goes outside levels
+    )
+
+    cbar = fig.colorbar(contour, ax=ax)
+    ax.set_xlabel("X (m)")
+    ax.set_ylabel("Y (m)")
+    ax.set_title("Initial u = rhou/rho from traveling_vortex.py")
 
     plt.show()

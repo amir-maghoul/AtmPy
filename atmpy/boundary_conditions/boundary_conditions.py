@@ -383,7 +383,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         return image, last, source
 
     def _get_ng_for_side(self):
-        """ Get the number of ghost cells for the side"""
+        """Get the number of ghost cells for the side"""
         ng_tuple: Tuple[int, ...] = self.grid.ng[self.direction]
         if self.facet == "begin":
             ng = ng_tuple[0]
@@ -394,7 +394,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         return ng
 
     def _create_boundary_slice(self, layer: int):
-        """ Choose which one of the boundary should be worked with.
+        """Choose which one of the boundary should be worked with.
         Source, last and image are all lists of size equal to the number of ghost cells. In order to fill the
         boundary layer-by-layer, we choose the corresponding values of source, last and image one by one
 
@@ -414,7 +414,6 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         nsource[self.gravity.axis] = source[layer]
 
         return tuple(nimage), tuple(nlast), tuple(nsource)
-
 
     def _find_facet(self):
         """Find which end of the array is the gravity being applied on"""

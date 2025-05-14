@@ -2,6 +2,7 @@
 
 import logging
 import os
+from line_profiler import profile
 
 import numpy as np
 
@@ -24,6 +25,7 @@ from atmpy.pressure_solver.contexts import (
 from atmpy.scripts import parse_arguments
 from atmpy.solver.solver import Solver
 from atmpy.test_cases.traveling_vortex import TravelingVortex
+from atmpy.test_cases.rising_bubble import RisingBubble
 from atmpy.time_integrators.contexts import TimeIntegratorContext
 from atmpy.variables.multiple_pressure_variables import MPV
 from atmpy.variables.variables import Variables
@@ -33,19 +35,41 @@ np.set_printoptions(suppress=True)
 np.set_printoptions(precision=10)
 
 ################################### Parser #########################################################################
-
 args = parse_arguments()
 
 #################################### Instantiate Test Case and Get Config ##########################################
-case = TravelingVortex()
-# case = RisingBubble()
+if args.case == "TravelingVortex":
+    case = TravelingVortex()
+    logging.info("Selected Test Case: TravelingVortex")
+elif args.case == "RisingBubble":
+    case = RisingBubble()
+    logging.info("Selected Test Case: RisingBubble")
+else:
+    # This should ideally be caught by argparse choices, but as a fallback:
+    raise ValueError(f"Unknown test case specified: {args.case}")
+
 config = case.config  # The SimulationConfig object is now held by the case
 
 # Modify config if needed (e.g., simulation time)
-config.temporal.tmax = 3
-config.temporal.stepmax = 101000  # Limit steps
-config.outputs.output_frequency_steps = 3  # Output every 2 steps
-config.temporal.tout = [0]  # Also output at a specific time
+# These are defaults if not profiling
+config.temporal.tmax = 1
+config.temporal.stepmax = 101000
+config.outputs.output_frequency_steps = 3
+config.temporal.tout = [0]
+
+#################################### Profiler Configuration ############################################################
+# Apply profiling-specific configurations if --profile flag is set
+if args.profile and args.mode in ["run", "run_and_visualize"]:
+    logging.info(f"PROFILING ENABLED: Running for {args.profile_steps} steps.")
+    config.temporal.tmax = 1e9  # Effectively disable tmax, rely on stepmax
+    config.temporal.stepmax = args.profile_steps
+    # Prevent output during profiling runs to not skew timing, unless explicitly very short
+    config.outputs.output_frequency_steps = (
+        args.profile_steps + 10
+    )  # Make sure no output happens
+    config.temporal.tout = []  # Disable specific time outputs during profiling
+    # Potentially disable other verbose logging or non-essential computations for cleaner profiles
+    # Example: config.outputs.enable_console_output = False (if you have such a flag)
 
 #################################### Parser Fill #######################################################################
 # --- Determine output filename for visualization ---
@@ -243,11 +267,15 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 if args.mode in ["visualize_only", "run_and_visualize"]:
+    if args.mode == "visualize_only":
+        ds = xr.open_dataset(output_data_file)
+    elif args.mode == "run_and_visualize":
+        ds = xr.open_dataset(config.outputs.output_filename)
+        print(config.outputs.output_filename)
     logging.info(
         f"Starting visualization in '{args.mode}' mode for file: {output_data_file}"
     )
     try:
-        ds = xr.open_dataset(output_data_file)
         print("\n--- Dataset for Visualization ---")
         print(ds)
 
@@ -255,7 +283,7 @@ if args.mode in ["visualize_only", "run_and_visualize"]:
         fig, ax = plt.subplots()
 
         # Determine data to plot (e.g., rho)
-        data_var = "rhou"  # or 'u', 'v', etc.
+        data_var = "Y"  # or 'u', 'v', etc.
         if data_var not in ds:
             logging.error(
                 f"Variable '{data_var}' not found in {output_data_file}. Cannot animate."

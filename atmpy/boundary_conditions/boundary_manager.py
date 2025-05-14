@@ -99,7 +99,9 @@ class BoundaryManager:
 
     def apply_boundary_on_all_sides(self, cells: "np.ndarray"):
         """Apply the PRIMARY boundary conditions on all sides."""
-        logging.debug("Applying full PRIMARY boundary conditions on *main variables*...")
+        logging.debug(
+            "Applying full PRIMARY boundary conditions on *main variables*..."
+        )
         for side, condition in self.boundary_conditions.items():
             condition.apply(cells)  # Pass context if required
 
@@ -187,7 +189,9 @@ class BoundaryManager:
         contexts: Optional[List["BCApplicationContext"]] = None,
     ):
         """Apply the MPV-specific boundary conditions on all sides."""
-        logging.debug("Applying full MPV boundary conditions on *pressure variables*...")
+        logging.debug(
+            "Applying full MPV boundary conditions on *pressure variables*..."
+        )
         num_bcs = len(self.mpv_boundary_conditions)
         if contexts is None:
             contexts = [BCApplicationContext() for _ in range(num_bcs)]
@@ -216,7 +220,9 @@ class BoundaryManager:
         )
         bc_dict_name = "MPV" if target_mpv else "Primary"
 
-        logging.debug(f"Apply EXTRA boundary conditions ({bc_dict_name}) on the side: {side}")
+        logging.debug(
+            f"Apply EXTRA boundary conditions ({bc_dict_name}) on the side: {side}"
+        )
         if side not in target_dict:
             raise ValueError(
                 f"The side {side} does not exist in the {bc_dict_name} list."
@@ -269,7 +275,9 @@ class BoundaryManager:
             # Handle operations targeting specific sides
             else:
                 target_side = operation.target_side
-                logging.debug(f"Applying extra BC ({bc_dict_name}) on side {target_side}")
+                logging.debug(
+                    f"Applying extra BC ({bc_dict_name}) on side {target_side}"
+                )
                 condition = target_dict.get(target_side)
                 if condition:
                     # Check if operation's target type matches condition's type
