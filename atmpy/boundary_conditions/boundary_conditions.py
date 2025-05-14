@@ -245,81 +245,85 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         """
 
         # calculate the boundary indices
-        nsource, nlast, nimage = self._create_boundary_indices()
+        ng = self._get_ng_for_side()
 
-        # evaluate the Theta on nlast indices
-        Y_last = cell_vars[nlast + (VI.RHOY,)] / cell_vars[nlast + (VI.RHO,)]
+        # Layer by layer filling the boundary:
+        for i in range(ng):
+            nimage, nlast, nsource = self._create_boundary_slice(i)
 
-        # get the coordinate values of the grid in the direction of gravity
-        axis_coordinate_cells = self.gravity.get_coordinate_cells(self.grid)
+            # evaluate the Theta on nlast indices
+            Y_last = cell_vars[nlast + (VI.RHOY,)] / cell_vars[nlast + (VI.RHO,)]
 
-        # calculate the stratification function on the ghost cells
-        strat = 1.0 / self.stratification(
-            axis_coordinate_cells[nimage[self.gravity.axis]]
-        )
+            # get the coordinate values of the grid in the direction of gravity
+            axis_coordinate_cells = self.gravity.get_coordinate_cells(self.grid)
 
-        # sign to calculate the derivative of Pi. -1 if on the topside boundary and 1 if on the downside
-        sign = -1 if self.facet == "end" else 1
-        dr = self.grid.dxyz[
-            self.gravity.axis
-        ]  # discretization fineness in the gravity direction
-
-        # Calculate the derivative of Pi (Exner pressure) in existence/nonexistence of lamb boundary
-        dpi = (
-            sign
-            * self.th.Gamma
-            * 0.5
-            * self.gravity.strength
-            * dr
-            * (1.0 / Y_last + strat)
-        )
-
-        # Calculate the P = rho Theta on the nlast indices in compressible or pseudo-incompressible regimes
-        if self.is_compressible:
-            rhoY = (
-                (cell_vars[nlast + (VI.RHOY,)] ** self.th.gm1) + dpi
-            ) ** self.th.gm1inv
-        else:
-            raise NotImplementedError(
-                "The incompressible boundary condition is not implemented yet."
+            # calculate the stratification function on the ghost cells
+            strat = 1.0 / self.stratification(
+                axis_coordinate_cells[nimage[self.gravity.axis]]
             )
 
-        # Get the index of the velocities in cell_vars for the gravity and nongravity directions
-        gravity_momentum_index = self.gravity.vertical_momentum_index  # VI.RHOV
-        # calculate the Pv for the ghost cells. "v" here is the velocity in the direction of gravity
-        Pv = (
-            -cell_vars[nsource + (gravity_momentum_index,)]
-            * cell_vars[nsource + (VI.RHOY,)]
-            / cell_vars[nsource + (VI.RHO,)]
-        )
+            # sign to calculate the derivative of Pi. -1 if on the topside boundary and 1 if on the downside
+            sign = -1 if self.facet == "end" else 1
+            dr = self.grid.dxyz[
+                self.gravity.axis
+            ]  # discretization fineness in the gravity direction
 
-        # Calculate intermediate rho and evaluate the corresponding ghost cell.
-        rho = rhoY * strat
-        cell_vars[nimage + (VI.RHO,)] = rho
+            # Calculate the derivative of Pi (Exner pressure) in existence/nonexistence of lamb boundary
+            dpi = (
+                sign
+                * self.th.Gamma
+                * 0.5
+                * self.gravity.strength
+                * dr
+                * (1.0 / Y_last + strat)
+            )
 
-        # Find velocity in the direction of gravity and update ghost cells.
-        v = Pv / rhoY
-        Th_slc = 1.0
-        cell_vars[nimage + (gravity_momentum_index,)] = rho * v
+            # Calculate the P = rho Theta on the nlast indices in compressible or pseudo-incompressible regimes
+            if self.is_compressible:
+                rhoY = (
+                    (cell_vars[nlast + (VI.RHOY,)] ** self.th.gm1) + dpi
+                ) ** self.th.gm1inv
+            else:
+                raise NotImplementedError(
+                    "The incompressible boundary condition is not implemented yet."
+                )
 
-        # This is the actual horizontal velocity, since the gravity axis can never be the first axis.
-        u = cell_vars[nsource + (VI.RHOU,)] / cell_vars[nsource + (VI.RHO,)]
-        cell_vars[nimage + (VI.RHOU,)] = rho * u * Th_slc
-
-        # w is a placeholder for the velocity in the direction of non-gravity. First, check whether the variable container
-        # can be indexed that far.
-        perpendicular_momentum_index = self.gravity.perpendicular_momentum_index
-        if perpendicular_momentum_index < cell_vars.shape[-1]:
-            w = (
-                cell_vars[nsource + (perpendicular_momentum_index,)]
+            # Get the index of the velocities in cell_vars for the gravity and nongravity directions
+            gravity_momentum_index = self.gravity.vertical_momentum_index  # VI.RHOV
+            # calculate the Pv for the ghost cells. "v" here is the velocity in the direction of gravity
+            Pv = (
+                -cell_vars[nsource + (gravity_momentum_index,)]
+                * cell_vars[nsource + (VI.RHOY,)]
                 / cell_vars[nsource + (VI.RHO,)]
             )
-            cell_vars[nimage + (perpendicular_momentum_index,)] = rho * w * Th_slc
 
-        # Compute the actual X and evaluate the ghost cells.
-        X = cell_vars[nsource + (VI.RHOX,)] / cell_vars[nsource + (VI.RHO,)]
-        cell_vars[nimage + (VI.RHOY,)] = rhoY
-        cell_vars[nimage + (VI.RHOX,)] = rho * X
+            # Calculate intermediate rho and evaluate the corresponding ghost cell.
+            rho = rhoY * strat
+            cell_vars[nimage + (VI.RHO,)] = rho
+
+            # Find velocity in the direction of gravity and update ghost cells.
+            v = Pv / rhoY
+            Th_slc = 1.0
+            cell_vars[nimage + (gravity_momentum_index,)] = rho * v
+
+            # This is the actual horizontal velocity, since the gravity axis can never be the first axis.
+            u = cell_vars[nsource + (VI.RHOU,)] / cell_vars[nsource + (VI.RHO,)]
+            cell_vars[nimage + (VI.RHOU,)] = rho * u * Th_slc
+
+            # w is a placeholder for the velocity in the direction of non-gravity. First, check whether the variable container
+            # can be indexed that far.
+            perpendicular_momentum_index = self.gravity.perpendicular_momentum_index
+            if perpendicular_momentum_index < cell_vars.shape[-1]:
+                w = (
+                    cell_vars[nsource + (perpendicular_momentum_index,)]
+                    / cell_vars[nsource + (VI.RHO,)]
+                )
+                cell_vars[nimage + (perpendicular_momentum_index,)] = rho * w * Th_slc
+
+            # Compute the actual X and evaluate the ghost cells.
+            X = cell_vars[nsource + (VI.RHOX,)] / cell_vars[nsource + (VI.RHO,)]
+            cell_vars[nimage + (VI.RHOY,)] = rhoY
+            cell_vars[nimage + (VI.RHOX,)] = rho * X
 
     def apply_single_variable(
         self, variable: np.ndarray, context: "BCApplicationContext"
@@ -376,16 +380,41 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         else:
             raise ValueError("Facet must be 'bottom' or 'top'.")
 
+        return image, last, source
+
+    def _get_ng_for_side(self):
+        """ Get the number of ghost cells for the side"""
+        ng_tuple: Tuple[int, ...] = self.grid.ng[self.direction]
+        if self.facet == "begin":
+            ng = ng_tuple[0]
+        elif self.facet == "end":
+            ng = ng_tuple[1]
+        else:
+            raise ValueError("Facet must be 'bottom' or 'top'.")
+        return ng
+
+    def _create_boundary_slice(self, layer: int):
+        """ Choose which one of the boundary should be worked with.
+        Source, last and image are all lists of size equal to the number of ghost cells. In order to fill the
+        boundary layer-by-layer, we choose the corresponding values of source, last and image one by one
+
+        Parameters
+        ----------
+        layer : int
+            The layer to choose from the source, image and last indices
+        """
+        image, last, source = self._create_boundary_indices()
         # Make the indices valid for multi-dimensional array
         nimage: list = [slice(None)] * self.ndim
         nlast: list = [slice(None)] * self.ndim
         nsource: list = [slice(None)] * self.ndim
 
-        nimage[self.gravity.axis] = image
-        nlast[self.gravity.axis] = last
-        nsource[self.gravity.axis] = source
+        nimage[self.gravity.axis] = image[layer]
+        nlast[self.gravity.axis] = last[layer]
+        nsource[self.gravity.axis] = source[layer]
 
-        return tuple(nsource), tuple(nlast), tuple(nimage)
+        return tuple(nimage), tuple(nlast), tuple(nsource)
+
 
     def _find_facet(self):
         """Find which end of the array is the gravity being applied on"""

@@ -1,6 +1,5 @@
 from typing import Dict, List, Tuple, TYPE_CHECKING, Optional
-
-from mypy.stubtest import get_mypy_type_of_runtime_value
+import logging
 
 if TYPE_CHECKING:
     from atmpy.boundary_conditions.boundary_conditions import (
@@ -75,7 +74,7 @@ class BoundaryManager:
         # contexts: List["BCApplicationContext"] = [None], # Keep or adjust as needed
     ):
         """Apply the PRIMARY boundary conditions on a single side."""
-        print(f"Apply boundary conditions *main variables* on side: {side}")
+        logging.debug(f"Apply boundary conditions *main variables* on side: {side}")
         if side not in self.boundary_conditions:  # Check primary dict
             raise ValueError(
                 f"No primary boundary condition configured for side: {side}"
@@ -92,7 +91,7 @@ class BoundaryManager:
     ):
         """Apply the PRIMARY boundary conditions on a single direction."""
         sides: Tuple[BdrySide, BdrySide] = side_direction_mapping(direction)
-        print(f"Apply boundary conditions *main variables* on sides: {sides}")
+        logging.debug(f"Apply boundary conditions *main variables* on sides: {sides}")
         for side in sides:  # Add context iteration if needed
             if side in self.boundary_conditions:
                 condition = self.boundary_conditions[side]
@@ -100,7 +99,7 @@ class BoundaryManager:
 
     def apply_boundary_on_all_sides(self, cells: "np.ndarray"):
         """Apply the PRIMARY boundary conditions on all sides."""
-        print("Applying full PRIMARY boundary conditions on *main variables*...")
+        logging.debug("Applying full PRIMARY boundary conditions on *main variables*...")
         for side, condition in self.boundary_conditions.items():
             condition.apply(cells)  # Pass context if required
 
@@ -111,7 +110,7 @@ class BoundaryManager:
         contexts: List["BCApplicationContext"] = [None],
     ):
         """Apply the PRIMARY boundary for a single variable on one side."""
-        print(f"Apply PRIMARY BC on single variable on the side: {side}")
+        logging.debug(f"Apply PRIMARY BC on single variable on the side: {side}")
         if side not in self.boundary_conditions:
             raise ValueError(
                 f"No primary boundary condition configured for side: {side}"
@@ -127,7 +126,7 @@ class BoundaryManager:
     ):
         """Apply the PRIMARY boundary for a single variable on a single direction."""
         sides = side_direction_mapping(direction)
-        print(f"Apply PRIMARY BC on single variable on the sides: {sides}")
+        logging.debug(f"Apply PRIMARY BC on single variable on the sides: {sides}")
         # Corrected iteration: zip sides with contexts
         for side, context in zip(sides, contexts):
             if side in self.boundary_conditions:
@@ -138,7 +137,7 @@ class BoundaryManager:
         self, variable: "np.ndarray", contexts: List["BCApplicationContext"]
     ):
         """Apply the PRIMARY boundary conditions on all sides for the input variable."""
-        print("Apply PRIMARY BC on single variable on all sides...")
+        logging.debug("Apply PRIMARY BC on single variable on all sides...")
         # Corrected iteration: Use boundary_conditions dict items
         if len(contexts) != len(self.boundary_conditions):
             raise ValueError(
@@ -158,7 +157,7 @@ class BoundaryManager:
         ] = None,  # Context for this specific application
     ):
         """Apply the MPV-specific boundary condition on a single side."""
-        print(f"Apply boundary conditions *MPV variables* on side: {side}")
+        logging.debug(f"Apply boundary conditions *MPV variables* on side: {side}")
         if side not in self.mpv_boundary_conditions:  # Check MPV dict
             raise ValueError(f"No MPV boundary condition configured for side: {side}")
         condition = self.mpv_boundary_conditions[side]
@@ -174,7 +173,7 @@ class BoundaryManager:
     ):
         """Apply the MPV-specific boundary conditions on a single direction."""
         sides: Tuple[BdrySide, BdrySide] = side_direction_mapping(direction)
-        print(f"Apply boundary conditions *MPV variables* on sides: {sides}")
+        logging.debug(f"Apply boundary conditions *MPV variables* on sides: {sides}")
         for side, context in zip(sides, contexts):
             if side in self.mpv_boundary_conditions:
                 condition = self.mpv_boundary_conditions[side]
@@ -188,7 +187,7 @@ class BoundaryManager:
         contexts: Optional[List["BCApplicationContext"]] = None,
     ):
         """Apply the MPV-specific boundary conditions on all sides."""
-        print("Applying full MPV boundary conditions on *pressure variables*...")
+        logging.debug("Applying full MPV boundary conditions on *pressure variables*...")
         num_bcs = len(self.mpv_boundary_conditions)
         if contexts is None:
             contexts = [BCApplicationContext() for _ in range(num_bcs)]
@@ -217,7 +216,7 @@ class BoundaryManager:
         )
         bc_dict_name = "MPV" if target_mpv else "Primary"
 
-        print(f"Apply EXTRA boundary conditions ({bc_dict_name}) on the side: {side}")
+        logging.debug(f"Apply EXTRA boundary conditions ({bc_dict_name}) on the side: {side}")
         if side not in target_dict:
             raise ValueError(
                 f"The side {side} does not exist in the {bc_dict_name} list."
@@ -246,7 +245,7 @@ class BoundaryManager:
 
         if not operations:
             return
-        print(
+        logging.debug(
             f"\n--- Applying Batch of {len(operations)} Specific Operations ({bc_dict_name}) ---"
         )
 
@@ -270,7 +269,7 @@ class BoundaryManager:
             # Handle operations targeting specific sides
             else:
                 target_side = operation.target_side
-                print(f"Applying extra BC ({bc_dict_name}) on side {target_side}")
+                logging.debug(f"Applying extra BC ({bc_dict_name}) on side {target_side}")
                 condition = target_dict.get(target_side)
                 if condition:
                     # Check if operation's target type matches condition's type
