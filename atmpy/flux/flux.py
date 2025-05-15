@@ -106,18 +106,18 @@ class Flux:
         if self.ndim == 1:
             self.flux = {
                 "x": np.zeros(
-                    (grid.ncx_total + 1, variables.num_vars_cell), dtype=np.float32
+                    (grid.ncx_total + 1, variables.num_vars_cell), dtype=np.float64
                 )
             }
         elif self.ndim == 2:
             self.flux = {
                 "x": np.zeros(
                     (grid.ncx_total + 1, grid.ncy_total, variables.num_vars_cell),
-                    dtype=np.float32,
+                    dtype=np.float64,
                 ),
                 "y": np.zeros(
                     (grid.ncx_total, grid.ncy_total + 1, variables.num_vars_cell),
-                    dtype=np.float32,
+                    dtype=np.float64,
                 ),
             }
 
@@ -130,7 +130,7 @@ class Flux:
                         grid.ncz_total,
                         variables.num_vars_cell,
                     ),
-                    dtype=np.float32,
+                    dtype=np.float64,
                 ),
                 "y": np.zeros(
                     (
@@ -139,7 +139,7 @@ class Flux:
                         grid.ncz_total,
                         variables.num_vars_cell,
                     ),
-                    dtype=np.float32,
+                    dtype=np.float64,
                 ),
                 "z": np.zeros(
                     (
@@ -148,7 +148,7 @@ class Flux:
                         grid.ncz_total + 1,
                         variables.num_vars_cell,
                     ),
-                    dtype=np.float32,
+                    dtype=np.float64,
                 ),
             }
 
