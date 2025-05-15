@@ -126,5 +126,5 @@ def calculate_amplitudes(
     """
 
     sign = -1 if left else 1
-    amplitudes = sign * (0.5 * slopes * (1 + sign * lmbda * speed[..., np.newaxis]))
+    amplitudes = -sign * (0.5 * slopes * (1 + sign * lmbda * speed[..., np.newaxis]))
     return amplitudes
