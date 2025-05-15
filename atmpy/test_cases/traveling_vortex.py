@@ -474,9 +474,6 @@ if __name__ == "__main__":
     ax.set_xlabel("X (m)")
     ax.set_ylabel("Y (m)")
 
-    file = "/home/amir/Projects/Python/Atmpy/u_test.npy"
-    u = np.load(file)
-
     # contour = ax.contourf(
     #     x_coords[2:-2],
     #     y_coords[2:-2],
