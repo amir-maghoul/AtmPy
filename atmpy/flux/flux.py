@@ -272,7 +272,7 @@ class Flux:
             rights_idx + (VI.RHOY,)
         ] = 0.5 * (
             (cell_vars[lefts_idx + (VI.RHOY,)] + cell_vars[rights_idx + (VI.RHOY,)])
-            - lmbda * (Pu[lefts_idx] + Pu[rights_idx])
+            - 0.5 * lmbda * (Pu[lefts_idx] + Pu[rights_idx])
         )
 
         # Find the rho conservative variable from the new updated primitive variables
