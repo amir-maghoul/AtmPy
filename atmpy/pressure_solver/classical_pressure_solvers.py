@@ -259,6 +259,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         ########################## Update the full variables using the intermediate variables. #########################
         # Notice the u_incr, v_incr and w_incr are update of Pu, Pv and Pw, where P = rho*Theta. In order to update the
         # main momenta variables (rhou, rhov and rhow) we need to multiply the result by 1.0/Theta = chi.
+        # The plus sign is due to the fact that Pu_incr has an inherent minus sign.
         cellvars[..., VI.RHOU] += chi * Pu_incr
         cellvars[..., VI.RHOV] += chi * Pv_incr if self.ndim > 2 else 0.0
         cellvars[..., VI.RHOW] += chi * Pw_incr if self.ndim == 3 else 0.0
@@ -509,7 +510,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         pi = (1/Msq) * P^(gamma - 1). Therefore, dpi/dP = (gamma - 1)/Msq * P^(gamma - 2). Since we need the inverse
         (dP/dpi), every part of this will be inverted in the code.
 
-        The dt**2 in the denominator has an obvious reason: This will be part of the Helmholtz equation operator, the
+        The dt in the denominator has an obvious reason: This will be part of the Helmholtz equation operator, the
         laplacian and this term should be created as an overall operator, the dt (which basically belongs to the
         laplacian update) should be divided before we create the operator ([C/dt]p₂ + ∇⋅(M_inv⋅(dt*CΘ*∇p₂)) = DivV).
         """
