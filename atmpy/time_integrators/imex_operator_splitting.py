@@ -533,7 +533,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Intermediate variable for current Chi
         currentX = cellvars[..., VI.RHO] * (
             (cellvars[..., VI.RHO] / cellvars[..., VI.RHOY]) - S0c
-        )
+        ) # Calculate the perturbation of Chi, then multiply with density rho
 
         ###############################################################################################################
         # Update the variable
