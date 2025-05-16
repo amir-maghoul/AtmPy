@@ -204,6 +204,7 @@ class Physics:
         ndim = grid_cfg.ndim
         self.gravity = Gravity(self.gravity_strength, ndim)
         self.gravity.strength = g
+        self.gravity.vector[self.gravity.axis] = g
         self.gravity_strength = self.gravity.vector
         self.coriolis = CoriolisOperator(self.coriolis_strength, self.gravity)
         print("Physics derived fields updated.")
