@@ -39,8 +39,8 @@ def calculate_variable_differences(
     ### And then transform back to rho*Theta. Since the reason is still not clear to me, I avoided this.
 
     # # Set the difference slice (one fewer element than the original array) in the corresponding direction
-    # left_idx, right_idx, _, _ = directional_indices(ndim, direction_str, full=False)
-
+    # left_idx, right_idx, _ = directional_indices(ndim, direction_str, full=False)
+    #
     # # Apply np.diff in the direction which results in one less element
     # # Notice the PVI.Y element is calculated differently and np.diff is not applied on it
     # diffs[..., : PVI.Y][left_idx] = np.diff(primitives[..., : PVI.Y], axis=direction)
@@ -126,5 +126,8 @@ def calculate_amplitudes(
     """
 
     sign = -1 if left else 1
-    amplitudes = -sign * (0.5 * slopes * (1 + sign * lmbda * speed[..., np.newaxis]))
+    factor = -sign * 0.5 * slopes
+    amplitudes = factor
+    if lmbda > 0:
+        amplitudes +=  factor*(sign * lmbda * speed[..., np.newaxis])
     return amplitudes

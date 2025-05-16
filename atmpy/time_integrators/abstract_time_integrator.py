@@ -8,7 +8,7 @@ class AbstractTimeIntegrator(ABC):
     """Abstract class for time integrators"""
 
     @abstractmethod
-    def step(self):
+    def step(self, *args, **kwargs):
         """Advance the integration on time step"""
         raise NotImplementedError("step() must be implemented by subclasses")
 

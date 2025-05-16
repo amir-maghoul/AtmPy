@@ -3,6 +3,7 @@
 import numpy as np
 from typing import TYPE_CHECKING
 from atmpy.infrastructure.enums import VariableIndices as VI
+import logging
 
 if TYPE_CHECKING:
     from atmpy.variables.variables import Variables
@@ -63,6 +64,14 @@ def calculate_dynamic_dt(
 
     # Avoid division by zero if rho is zero anywhere (e.g., uninitialized ghosts)
     valid_rho_mask = rho_inner > MACHINE_EPSILON
+
+    Y_prim_inner = np.zeros_like(rho_inner)
+    Y_prim_inner[valid_rho_mask] = (
+            rhoY_inner[valid_rho_mask] / rho_inner[valid_rho_mask]
+    )
+
+    # Physical Temperature: T_phys = Theta_nd * T_ref
+    T_physical_inner = Y_prim_inner * config.global_constants.T_ref
 
     # Calculate primitive potential temperature (Theta_nd)
     # This assumes Y_prim is Theta_nd = Theta_physical / T_ref

@@ -151,7 +151,7 @@ class Solver:
 
             step_start_time = time.time()
             try:
-                self.time_integrator.step()
+                self.time_integrator.step(global_step=self.current_step)
             except Exception as e:
                 logging.error(
                     f"Error during step {self.current_step + 1} (t={self.current_t:.4f}): {e}",
@@ -445,9 +445,6 @@ class Solver:
                 u = self.variables.cell_vars[inner_slice + (VI.RHOU,)] / rho
                 from tempfile import TemporaryFile
 
-                outfile = TemporaryFile()
-                outfile = "/home/amir/Projects/Python/Atmpy/u_test.npy"
-                np.save(outfile, u)
                 data_to_write["u"] = (
                     self.variables.cell_vars[inner_slice + (VI.RHOU,)] / rho
                 )

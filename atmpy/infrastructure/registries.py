@@ -28,6 +28,7 @@ SLOPE_LIMITERS = {
     SlopeLimiters.VAN_LEER: van_leer,
     SlopeLimiters.SUPERBEE: superbee,
     SlopeLimiters.MC_LIMITER: mc_limiter,
+    SlopeLimiters.AVERAGE: average,
 }
 
 RIEMANN_SOLVERS = {
@@ -55,6 +56,7 @@ BOUNDARY_CONDITIONS = {
 
 ADVECTION_ROUTINES = {
     AdvectionRoutines.STRANG_SPLIT: upwind_strang_split_advection,
+    AdvectionRoutines.FIRST_ORDER_RK: first_order_splitting_advection
 }
 
 LINEAR_SOLVERS = {

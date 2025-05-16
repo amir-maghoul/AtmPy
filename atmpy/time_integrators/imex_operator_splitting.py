@@ -5,13 +5,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Union, List, Any, Callable
 
-
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.boundary_conditions.contexts import BCApplicationContext
 from atmpy.infrastructure.utility import (
     directional_indices,
     one_element_inner_slice,
-    one_element_inner_nodal_shape,
+    one_element_inner_nodal_shape, dimension_directions,
 )
 from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
 from atmpy.infrastructure.enums import VariableIndices as VI, Preconditioners
@@ -49,7 +48,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         flux: "Flux",
         boundary_manager: "BoundaryManager",
         pressure_solver: "TPressureSolver",
-        advection_routine: AdvectionRoutines,
+        first_order_advection_routine: AdvectionRoutines,
+        second_order_advection_routine: AdvectionRoutines,
         wind_speed: List[float],
         is_nongeostrophic: bool,
         is_nonhydrostatic: bool,
@@ -75,7 +75,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.pressure_solver.discrete_operator
         )
         self.advection_routine: Callable
-        self._get_advection_routine(advection_routine)
+        self._get_advection_routine(first_order_advection_routine, second_order_advection_routine)
         self.th: "Thermodynamics" = self.pressure_solver.th
         self.dt: float = dt
         self.Msq: float = self.pressure_solver.Msq
@@ -94,144 +94,163 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
     def _get_advection_routine(
-        self, advection_routine_name: "AdvectionRoutines"
+        self, first_order_advection_routine_name: "AdvectionRoutines", second_order_advection_routine_name: "AdvectionRoutines"
     ) -> None:
         """Get the advection routine. The sole raison d'être of this method is to avoid circular import
         issues from factory."""
         from atmpy.infrastructure.factory import get_advection_routines
 
-        self.advection_routine = get_advection_routines(advection_routine_name)
+        self.first_order_advection_routine = get_advection_routines(first_order_advection_routine_name)
+        self.second_order_advection_routine = get_advection_routines(second_order_advection_routine_name)
 
-    def step(self) -> None:
+    def _get_dimensional_sweep_order(self, global_time_step_num: int) -> List[str]:
+        """Determines the order of dimensional sweeps based on the global time step."""
+        base_directions = dimension_directions(self.grid.ndim)
+        if self.grid.ndim == 1:
+            return base_directions
+        if global_time_step_num % 2 == 0:
+            return base_directions
+        else:
+            return base_directions[::-1]
+
+    def step(self, *args, **kwargs) -> None: # Added global_time_step_num
         """
         Performs a single time step using the semi-implicit predictor-corrector
         method based on Benacchio & Klein (2019).
         """
-        logging.info(f"--- Starting time step with dt = {self.dt} ---")
+        global_time_step_num = kwargs.pop("global_step")
+
+        logging.info(f"--- Starting time step {global_time_step_num} with dt = {self.dt} ---")
 
         # --- Save Initial State (t^n) ---
-        initial_vars = np.copy(self.variables.cell_vars)
-        initial_p2 = np.copy(self.mpv.p2_nodes)
-        # It might be necessary to save self.flux too if advection modifies it undesirably
-        # initial_flux_iflux = {k: np.copy(v) for k, v in self.flux.iflux.items() if v is not None}
+        initial_vars_arr = np.copy(self.variables.cell_vars)
+        initial_p2_nodes_arr = np.copy(self.mpv.p2_nodes)
 
-        ####################### Predictor Stage (Calculates fluxes at t^{n+1/2}) #######################################
-        # This modifies self.variables, self.mpv, and self.flux
-        self._predictor_step(self.dt, self.advection_routine)
+        ######################### Predictor Stage: Compute advective fluxes (Pv)^{n+1/2} ###############################
+        # Sol^n and p^n are currently in self.variables and self.mpv
+        self._predictor_step(self.dt, initial_vars_arr, global_time_step_num)
+        # After this, self.flux contains (Pv)^{n+1/2}
+        # self.variables contains Sol^{n+1/2} and self.mpv.p2_nodes contains p^{n+1/2} (these are intermediate)
 
-        ####################### Corrector Stage (Advances state from t^n to t^{n+1}) ###################################
-        # This resets self.variables/mpv internally and uses the predicted fluxes from self.flux
-        self._corrector_step(self.dt, self.advection_routine, initial_vars, initial_p2)
+        ######################### Corrector Stage: Advance state from t^n to t^{n+1} ###################################
+        self._corrector_step(self.dt, initial_vars_arr, initial_p2_nodes_arr, global_time_step_num)
+        # After this, self.variables contains Sol^{n+1} and self.mpv.p2_nodes contains p^{n+1}
 
-        logging.info(f"--- Finished time step ---")
+        logging.info(f"--- Finished time step {global_time_step_num} ---")
 
-    def _predictor_step(self, dt: float, advection_func: Callable) -> None:
-        """
-        Performs the predictor stage of the time step (Eq. 14-15 in BK19).
-        Calculates the state at t + dt/2 to compute advective fluxes for the main step.
-        Modifies self.variables, self.mpv, and self.flux in-place.
-        """
-        logging.debug("--- Starting Predictor Step ---")
+    def _predictor_step(self, dt: float, initial_vars_arr_for_coeffs: np.ndarray, global_time_step_num: int) -> None:
+        logging.debug(f"Predictor (step {global_time_step_num}): Starting")
         half_dt = 0.5 * dt
 
-        ############################## 1. Apply BCs to current state ###################################################
+        # Current state (Sol^n, p^n) is in self.variables, self.mpv ###
+        ################################ 1. Apply BCs to current state (t^n) ###########################################
         self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
         self.boundary_manager.apply_boundary_on_single_var_all_sides(
             self.mpv.p2_nodes, self._nodal_bc_contexts
         )
 
-        ###################### 2. Compute advective fluxes based on state at t^n #######################################
-        # Note: compute_averaging_fluxes computes Pu, Pv, Pw.
-        # The Riemann solver part happens within advection_func.
-        self.flux.compute_averaging_fluxes()
+        ######################## 2. Compute advective mass fluxes (P v)^n based on state at t^n (Sol^n) ################
+        # This updates self.flux[direction][..., VI.RHOY]
+        self.flux.compute_averaging_fluxes() # Uses self.variables (which is Sol^n)
+        logging.debug(f"Predictor (step {global_time_step_num}): Averaging fluxes computed from Sol^n")
 
-        ################### 3. Advect state by dt/2 using fluxes at t^n (Eq. 14a, but integrated) ######################
-        # Result is Sol*
-        advection_func(
+        #################### 3. Advect state by dt/2 using first-order splitting -> Sol* ###############################
+        ##################################### (Eq. 14a of BK19) ########################################################
+        # self.variables.cell_vars (Sol^n) becomes Sol#
+        # Advective mass fluxes in self.flux are based on Sol^n
+        sweep_order = self._get_dimensional_sweep_order(global_time_step_num)
+        self.first_order_advection_routine(
             self.grid,
-            self.variables,
+            self.variables, # Input: Sol^n, Output: Sol#
             self.flux,
             half_dt,
+            sweep_order=sweep_order,
             boundary_manager=self.boundary_manager,
         )
-        logging.debug("Predictor: After advection")
+        logging.debug(f"Predictor (step {global_time_step_num}): After first-order advection (Sol^n -> Sol*)")
 
-        ################### 4. Save current pressure p^n before non-advective updates ##################################
-        # (Needed if compressibility logic requires p2_nodes0 later, but BK19 C code resets p2_nodes later)
-        # p2_nodes_n = np.copy(self.mpv.p2_nodes) # Let's assume implicit step correctly uses current p2
+        ###################### 4. Non-Advective Implicit Euler Substep for dt/2 ########################################
+        #################################### (Eq. 15 of BK19) ##########################################################
+        # Applied to Sol* to get Sol^{n+1/2} and p^{n+1/2}
+        self.backward_update_explicit(half_dt) # Operates on self.variables (Sol*)
+        logging.debug(f"Predictor (step {global_time_step_num}): After backward_update_explicit on Sol*")
 
-        ################### 5. Non-Advective Implicit Euler Substep for dt/2 (Eq. 15) ##################################
-        # Result is Sol^{n+1/2} and p2^{n+1/2}
-        self.backward_update_explicit(half_dt)
-        logging.debug("Predictor: After backward_update_explicit")
-        # Note: backward_update_implicit uses the state modified by backward_update_explicit
-        self.backward_update_implicit(half_dt)
-        logging.debug("Predictor: After backward_update_implicit")
+        # Operator coefficients (PΘ) for implicit solve use Sol^n (initial_vars_arr_for_coeffs)
+        self.backward_update_implicit(half_dt, initial_vars=initial_vars_arr_for_coeffs)
+        # self.variables is now Sol^{n+1/2}, self.mpv.p2_nodes is p^{n+1/2}
+        logging.debug(f"Predictor (step {global_time_step_num}): After backward_update_implicit (Sol* -> Sol^(n+1/2))")
 
-        ################### 6. Compute predicted advective fluxes (Pu, Pv, Pw) at t^{n+1/2} ############################
-        # These will be used by the corrector stage's advection step.
-        # This updates self.flux.iflux and potentially parts of self.flux.flux
-        self.flux.compute_averaging_fluxes()
-        logging.debug("--- Finished Predictor Step (Predicted Fluxes Updated) ---")
+        ######################### 5. Compute predicted advective mass fluxes (Pv)^{n+1/2} ##############################
+        # self.variables.cell_vars is now Sol^{n+1/2}
+        self.flux.compute_averaging_fluxes() # Uses self.variables (Sol^{n+1/2})
+        # This updates self.flux[... ,VI.RHOY] to represent (Pv)^{n+1/2} for the corrector
+        logging.debug(f"Predictor (step {global_time_step_num}): Averaging fluxes (Pv)^(n+1/2) computed from Sol^(n+1/2)")
+        logging.debug(f"--- Predictor (step {global_time_step_num}): Finished ---")
+
 
     def _corrector_step(
-        self,
-        dt: float,
-        advection_func: Callable,
-        initial_vars: np.ndarray,
-        initial_p2: np.ndarray,
+            self,
+            dt: float,
+            initial_vars_arr: np.ndarray,
+            initial_p2_nodes_arr: np.ndarray,
+            global_time_step_num: int
     ) -> None:
-        """
-        Performs the corrector stage of the time step (Eq. 17 in BK19).
-        Advances the state from t^n to t^{n+1} using predicted advective fluxes.
-        """
-        logging.debug("--- Starting Corrector Step ---")
+        logging.debug(f"Corrector (step {global_time_step_num}): Starting")
         half_dt = 0.5 * dt
 
-        ######################### 1. Reset state variables to t^n ######################################################
-        self.variables.cell_vars[...] = initial_vars
-        self.mpv.p2_nodes[...] = initial_p2
-        logging.debug("Corrector: State reset to t^n")
+        ############################ 1. Reset state variables to t^n ###################################################
+        self.variables.cell_vars[...] = initial_vars_arr
+        self.mpv.p2_nodes[...] = initial_p2_nodes_arr
+        logging.debug(f"Corrector (step {global_time_step_num}): State reset to t^n")
 
-        ######################### 2. Apply BCs to state at t^n #########################################################
+        ############################ 2. Apply BCs to state at t^n ######################################################
         self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
         self.boundary_manager.apply_boundary_on_single_var_all_sides(
             self.mpv.p2_nodes, self._nodal_bc_contexts
         )
 
-        ######################### 3. Explicit Predictor (Fast Modes, Eq. 17a) ##########################################
-        # Applies explicit Euler step for non-advective terms based on state n
-        # Result is Sol*
-        self.forward_update(half_dt)
-        logging.debug("Corrector: After forward_update (Eq. 17a)")
+        ########################## 3. Explicit Euler for non-advective terms ###########################################
+        ################################### (Eq. 17a of BK19) ##########################################################
+        # Based on state t^n (Sol^n). Result is Sol*
+        self.forward_update(half_dt)  # Operates on self.variables (Sol^n -> Sol*)
+                                      # self.mpv.p2_nodes is still p^n
+        logging.debug(f"Corrector (step {global_time_step_num}): After forward_update (Sol^n -> Sol*)")
 
-        ######################### 4. Advection (Full Step, Eq. 17b) ####################################################
-        # Uses the predicted fluxes computed at the end of _predictor_step
-        # (These are stored in self.flux)
-        # Result is Sol**
-        advection_func(
+        ######################### 4. Advection using Strang Splitting ##################################################
+        ################################# (Full Step, Eq.17b of BK19) ##################################################
+        # Uses the advective mass fluxes in self.flux[..., RHOY] (which are (Pv)^{n+1/2})
+        # self.variables.cell_vars (Sol*) becomes Sol**
+        self.flux.compute_averaging_fluxes()
+        sweep_order = self._get_dimensional_sweep_order(global_time_step_num)
+
+        self.second_order_advection_routine(
             self.grid,
-            self.variables,
-            self.flux,
-            dt,
+            self.variables, # Input: Sol*, Output: Sol**
+            self.flux,      # Contains (Pv)^{n+1/2}
+            dt,             # Full dt for this advection operation
+            sweep_order=sweep_order,
             boundary_manager=self.boundary_manager,
         )
-        logging.debug("Corrector: After full advection (Eq. 17b)")
+        self.flux.compute_averaging_fluxes()
+        logging.debug(f"Corrector (step {global_time_step_num}): After Strang-split advection (Sol* -> Sol**)")
 
-        ######################### 5. Implicit Corrector (Fast Modes, Eq. 17c) ##########################################
-        # Applies implicit Euler substep for dt/2 to the advected state Sol**
-        # Result is Sol^{n+1} and p2^{n+1}
-        self.backward_update_explicit(half_dt)
-        logging.debug("Corrector: After backward_update_explicit (part of Eq. 17c)")
-        self.backward_update_implicit(half_dt)  # Uses state from previous step
-        logging.debug("Corrector: After backward_update_implicit (part of Eq. 17c)")
+        ######################### 5. Implicit Euler substep for dt/2 ###################################################
+        ################################## (Eq. 17c of BK19) ###########################################################
+        # Applied to Sol** to get Sol^{n+1}
+        self.backward_update_explicit(half_dt)  # Operates on self.variables (Sol**)
+        logging.debug(f"Corrector (step {global_time_step_num}): After backward_update_explicit on Sol**")
 
-        ######################## 6. Final Boundary Conditions ##########################################################
+        # Operator coefficients (PΘ) for implicit solve use current state (Sol**)
+        self.backward_update_implicit(half_dt, initial_vars=self.variables.cell_vars.copy()) # Pass a copy if it's modified
+        # self.variables is now Sol^{n+1}, self.mpv.p2_nodes is p^{n+1}
+        logging.debug(f"Corrector (step {global_time_step_num}): After backward_update_implicit (Sol** -> Sol^(n+1))")
+
+        ######################### 6. Final Boundary Conditions #########################################################
         self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
         self.boundary_manager.apply_boundary_on_single_var_all_sides(
             self.mpv.p2_nodes, self._nodal_bc_contexts
         )
-        logging.debug("--- Finished Corrector Step ---")
+        logging.debug(f"--- Corrector (step {global_time_step_num}): Finished ---")
 
     def forward_update(self, dt: float) -> None:
         """Integrates the problem on time step using the explicit euler in the NON-ADVECTIVE stage. This means

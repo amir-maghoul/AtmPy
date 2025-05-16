@@ -524,6 +524,8 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         # Averaging over the nodes and fill the mpv container
         kernel = np.ones([2] * self.ndim)
+        if np.any(P < 0):
+            print("khar")
         return (
             ccenter
             * sp.signal.fftconvolve(P**cexp, kernel, mode="valid")

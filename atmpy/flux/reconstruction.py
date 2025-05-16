@@ -63,7 +63,7 @@ def modified_muscl(
     speed[inner_idx] = (
         0.5
         * (P[inner_idx][lefts_idx] + P[inner_idx][rights_idx])
-        / cell_vars[..., VI.RHOY][inner_idx]
+        / cell_vars[inner_idx + (VI.RHOY,)]
     )  # This is basically ((Pu)[i-1/2] + (Pu)[i+1/2])/(P[i]/2)
 
     # Compute variable differences (for slope) and slope at interfaces

@@ -46,6 +46,7 @@ class SlopeLimiters(Enum):
     VAN_LEER = "van_leer"
     SUPERBEE = "superbee"
     MC_LIMITER = "mc_limiter"
+    AVERAGE = "average"
 
 
 class RiemannSolvers(Enum):
@@ -109,6 +110,7 @@ class AdvectionRoutines(Enum):
     """Map name to function for the advection solver"""
 
     STRANG_SPLIT = "strang_split"
+    FIRST_ORDER_RK = "first_order_rk"
 
 
 class LinearSolvers(Enum):

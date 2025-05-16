@@ -167,7 +167,7 @@ class RisingBubble(BaseTestCase):
         thermo = Thermodynamics()
         thermo.update(self.config.global_constants.gamma)
         Msq = self.config.model_regimes.Msq
-        T_ref_const = self.config.global_constants.T_ref
+        THETA_0 = 300
 
         self.config.update_all_derived_fields()
 
@@ -194,7 +194,7 @@ class RisingBubble(BaseTestCase):
         )
 
         # Potential Temperature Perturbation (non-dimensional, on full grid)
-        theta_perturbation_nd_full = (self.del_theta_k / T_ref_const) * (
+        theta_perturbation_nd_full = (self.del_theta_k / THETA_0) * (
             np.cos(0.5 * np.pi * r_dist_full) ** 2
         )
         theta_perturbation_nd_full[r_dist_full > 1.0] = 0.0
@@ -238,9 +238,12 @@ class RisingBubble(BaseTestCase):
             rhoY0_hydro_expanded_nd_full, rho_total_nd_full.shape
         )
 
+        temp_X = np.zeros_like(rho_total_nd_full)
+        mask = theta_perturbation_nd_full > 1e9
+        temp_X[mask] = rho_total_nd_full[mask] / theta_perturbation_nd_full[mask]
         # RhoX (Tracers, non-dimensional) - Set to zero
         if VI.RHOX < variables.num_vars_cell:
-            variables.cell_vars[..., VI.RHOX] = 0.0
+            variables.cell_vars[..., VI.RHOX] = temp_X
 
         # Initialize Pressure Perturbation (p2_nodes, non-dimensional, FULL domain)
         # For a bubble initially in hydrostatic balance, dynamic pressure perturbation is zero.

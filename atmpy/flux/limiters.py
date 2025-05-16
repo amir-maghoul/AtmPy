@@ -15,6 +15,9 @@ def minmod(a: np.ndarray, b: np.ndarray):
     )
     return result
 
+def average(a: np.ndarray, b: np.ndarray):
+    """ Averaging as the limiter"""
+    return 0.5 * (a + b)
 
 def van_leer(a: np.ndarray, b: np.ndarray):
     """Van Leer flux limiter using numpy vectorization"""

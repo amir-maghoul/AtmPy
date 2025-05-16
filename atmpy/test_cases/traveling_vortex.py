@@ -173,7 +173,8 @@ class TravelingVortex(BaseTestCase):
         #################################### Numerics  #################################################################
         numerics_updates = {
             "limiter_scalars": LimiterType.VAN_LEER,
-            "advection_routine": AdvectionRoutines.STRANG_SPLIT,
+            "first_order_advection_routine": AdvectionRoutines.FIRST_ORDER_RK,
+            "second_order_advection_routine": AdvectionRoutines.STRANG_SPLIT,
             "initial_projection": True,
         }
         self.set_numerics(numerics_updates)

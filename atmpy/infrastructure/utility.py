@@ -24,7 +24,7 @@ def dimension_directions(ndim: int):
 
 
 def directional_indices(
-    ndim: int, direction_string: str, full: bool = True
+    ndim: int, direction_string: str, full: bool = True, offset: int = 0
 ) -> Tuple[Tuple[slice, ...], Tuple[slice, ...], Tuple[slice, ...]]:
     """Compute the correct indexing of the flux vs. variable for the hll solvers and reconstruction.
 
@@ -53,11 +53,14 @@ def directional_indices(
         [slice(None)] * (ndim + 1),
         [slice(None)] * (ndim + 1),
     )
+    if offset == 0:
+        offset = 1
+
     if direction_string in ["x", "y", "z"]:
         direction = direction_axis(direction_string)
-        left_idx[direction] = slice(0, -1)
-        right_idx[direction] = slice(1, None)
-        directional_inner_idx[direction] = slice(1, -1)
+        left_idx[direction] = slice(0, -offset)
+        right_idx[direction] = slice(offset, None)
+        directional_inner_idx[direction] = slice(offset, -offset)
     else:
         raise ValueError("Invalid direction string")
 
