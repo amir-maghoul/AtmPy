@@ -38,11 +38,11 @@ def calculate_variable_differences(
     ### The following commented part is used got when we replace rho*Theta with Chi in calculating the reconstruction
     ### And then transform back to rho*Theta. Since the reason is still not clear to me, I avoided this.
 
-    # # Set the difference slice (one fewer element than the original array) in the corresponding direction
+    # # # Set the difference slice (one fewer element than the original array) in the corresponding direction
     # left_idx, right_idx, _ = directional_indices(ndim, direction_str, full=False)
-    #
-    # # Apply np.diff in the direction which results in one less element
-    # # Notice the PVI.Y element is calculated differently and np.diff is not applied on it
+    # #
+    # # # Apply np.diff in the direction which results in one less element
+    # # # Notice the PVI.Y element is calculated differently and np.diff is not applied on it
     # diffs[..., : PVI.Y][left_idx] = np.diff(primitives[..., : PVI.Y], axis=direction)
     # diffs[..., PVI.Y][left_idx] = (
     #     1.0 / primitives[..., PVI.Y][right_idx] - 1.0 / primitives[..., PVI.Y][left_idx]
@@ -55,7 +55,6 @@ def calculate_variable_differences(
     left_idx, right_idx, _ = directional_indices(ndim, direction_str, full=True)
 
     # Apply np.diff in the direction which results in one less element
-    # diffs[...][left_idx] = np.diff(primitives, axis=direction)
     diffs[left_idx] = np.diff(primitives, axis=direction)
 
     return diffs
