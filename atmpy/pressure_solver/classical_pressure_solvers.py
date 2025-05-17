@@ -261,7 +261,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         # main momenta variables (rhou, rhov and rhow) we need to multiply the result by 1.0/Theta = chi.
         # The plus sign is due to the fact that Pu_incr has an inherent minus sign.
         cellvars[..., VI.RHOU] += chi * Pu_incr
-        cellvars[..., VI.RHOV] += chi * Pv_incr if self.ndim > 2 else 0.0
+        cellvars[..., VI.RHOV] += chi * Pv_incr if self.ndim >= 2 else 0.0
         cellvars[..., VI.RHOW] += chi * Pw_incr if self.ndim == 3 else 0.0
         cellvars[..., VI.RHOX] += (
             -updt_chi * dt * dS * cellvars[..., self.vertical_momentum_index]
