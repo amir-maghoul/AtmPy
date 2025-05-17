@@ -153,7 +153,7 @@ class Flux:
             }
 
         # Initialize iflux
-        self.compute_averaging_fluxes()
+        # self.compute_averaging_fluxes()
 
     def _compute_unphysical_fluxes(self) -> dict[str, np.ndarray]:
         """
@@ -295,6 +295,10 @@ class Flux:
             The direction of the flux calculation.
         """
         lefts, rights = self.apply_reconstruction(lmbda, direction)
+
+        lefts.to_primitive(self.eos)
+        rights.to_primitive(self.eos)
+
         self.riemann_solver(
             lefts.primitives, rights.primitives, self.flux, direction, self.ndim
         )

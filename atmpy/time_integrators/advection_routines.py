@@ -49,7 +49,7 @@ def first_order_splitting_advection(
     """
 
     for direction_str in sweep_order:
-        _1d_directional_advection(grid, variables, flux, direction_str, dt, boundary_manager)
+        _1d_directional_advection(grid, variables, flux, direction_str, dt, boundary_manager, order=1)
 
 
 # --- Second-Order Strang Splitting ---
@@ -93,7 +93,7 @@ def upwind_strang_split_advection(
 
 
 def _1d_directional_advection(
-    grid: "Grid", variables: "Variables", flux: "Flux", direction: str, dt: float, boundary_manager: "BoundaryManager"
+    grid: "Grid", variables: "Variables", flux: "Flux", direction: str, dt: float, boundary_manager: "BoundaryManager", order: int = 2
 ) -> None:
     """
     Core 1D advection in the given direction. It will be used to update in both 1D and 2D strang splitting routines.
@@ -117,7 +117,7 @@ def _1d_directional_advection(
     ############################## Parameters ##########################################################################
     ndim: int = grid.ndim
     direction_int: int = direction_axis(direction)
-    lmbda: float = dt / grid.dxyz[direction_int]
+    lmbda: float = dt / grid.dxyz[direction_int] if order == 2 else 0
 
     # Find the left and right indices
     left_idx, right_idx, _ = directional_indices(ndim, direction, full=True)

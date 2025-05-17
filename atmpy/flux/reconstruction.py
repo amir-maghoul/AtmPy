@@ -56,13 +56,13 @@ def modified_muscl(
     inner_idx = one_element_inner_slice(ndim, full=False)
 
     # Unphysical Pressure
-    P = flux[direction][..., VI.RHOY]
+    Pu = flux[direction][..., VI.RHOY]
 
     # Compute flow speed
     speed = np.zeros_like(cell_vars[..., VI.RHOY])
     speed[inner_idx] = (
         0.5
-        * (P[inner_idx][lefts_idx] + P[inner_idx][rights_idx])
+        * (Pu[inner_idx][lefts_idx] + Pu[inner_idx][rights_idx])
         / cell_vars[inner_idx + (VI.RHOY,)]
     )  # This is basically ((Pu)[i-1/2] + (Pu)[i+1/2])/(P[i]/2)
 

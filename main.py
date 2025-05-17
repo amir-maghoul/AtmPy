@@ -348,7 +348,7 @@ if args.mode in ["visualize_only", "run_and_visualize"]:
             # interval is delay between frames in ms
             # blit=True means only re-draw the parts that have changed for efficiency
             ani = FuncAnimation(
-                fig, animate, frames=len(times), interval=200, blit=False
+                fig, animate, frames=len(times), interval=2, blit=False
             )
 
             plt.tight_layout()

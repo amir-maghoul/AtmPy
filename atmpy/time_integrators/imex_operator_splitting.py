@@ -220,7 +220,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         ################################# (Full Step, Eq.17b of BK19) ##################################################
         # Uses the advective mass fluxes in self.flux[..., RHOY] (which are (Pv)^{n+1/2})
         # self.variables.cell_vars (Sol*) becomes Sol**
-        self.flux.compute_averaging_fluxes()
         sweep_order = self._get_dimensional_sweep_order(global_time_step_num)
 
         self.second_order_advection_routine(
@@ -231,7 +230,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             sweep_order=sweep_order,
             boundary_manager=self.boundary_manager,
         )
-        self.flux.compute_averaging_fluxes()
         logging.debug(f"Corrector (step {global_time_step_num}): After Strang-split advection (Sol* -> Sol**)")
 
         ######################### 5. Implicit Euler substep for dt/2 ###################################################
