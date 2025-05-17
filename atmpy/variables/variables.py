@@ -208,9 +208,7 @@ class Variables:
         """Converts the primitive variables to conservative variables using the given rho."""
         self.cell_vars[..., VI.RHO] = rho
         self.cell_vars[..., VI.RHOX] = rho * self.primitives[..., PVI.X]
-        self.cell_vars[..., VI.RHOY] = self.primitives[
-            ..., PVI.P
-        ]  # Remember P = rho*Theta = rho*Y
+        self.cell_vars[..., VI.RHOY] = rho * self.primitives[..., PVI.Y]
         self.cell_vars[..., VI.RHOU] = rho * self.primitives[..., PVI.U]
 
         if VI.RHOV < self.num_vars_cell:
