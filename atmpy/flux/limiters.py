@@ -163,19 +163,3 @@ def koren(a: np.ndarray, b: np.ndarray):
 
     return result
 
-
-def mc_limiter(a, b):
-    """monotonized central-difference limiter."""
-    pass
-
-
-def superbee(a, b):
-    pass
-
-
-def main():
-    pass
-
-
-if __name__ == "__main__":
-    main()

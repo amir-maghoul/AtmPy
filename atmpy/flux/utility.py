@@ -34,7 +34,7 @@ def create_averaging_kernels(dimension: int) -> List[np.ndarray]:
         For 3D: [kx, ky, kz]
     """
     if dimension == 1:
-        kx = np.array([0.5, 1.0, 0.5], dtype=np.float32)
+        kx = np.array([1.0, 1.0], dtype=np.float32)
         kx /= kx.sum()
         return [kx]
 

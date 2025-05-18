@@ -157,7 +157,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         #################### 3. Advect state by dt/2 using first-order splitting -> Sol* ###############################
         ##################################### (Eq. 14a of BK19) ########################################################
         # self.variables.cell_vars (Sol^n) becomes Sol#
-        # Advective mass fluxes in self.flux are based on Sol^n
+        # # Advective mass fluxes in self.flux are based on Sol^n
         sweep_order = self._get_dimensional_sweep_order(global_time_step_num)
         self.first_order_advection_routine(
             self.grid,
@@ -171,12 +171,12 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ###################### 4. Non-Advective Implicit Euler Substep for dt/2 ########################################
         #################################### (Eq. 15 of BK19) ##########################################################
-        # Applied to Sol* to get Sol^{n+1/2} and p^{n+1/2}
-        self.backward_update_explicit(half_dt) # Operates on self.variables (Sol*)
+        # Applied to Sol# to get Sol^{n+1/2} and p^{n+1/2}
+        self.backward_update_explicit(half_dt) # Operates on self.variables (Sol#)
         logging.debug(f"Predictor (step {global_time_step_num}): After backward_update_explicit on Sol*")
 
-        # Operator coefficients (PΘ) for implicit solve use Sol^n (initial_vars_arr_for_coeffs)
-        self.backward_update_implicit(half_dt, initial_vars=initial_vars_arr_for_coeffs)
+        # Solve for Exner pressure
+        self.backward_update_implicit(half_dt, self.variables.cell_vars.copy())
         # self.variables is now Sol^{n+1/2}, self.mpv.p2_nodes is p^{n+1/2}
         logging.debug(f"Predictor (step {global_time_step_num}): After backward_update_implicit (Sol* -> Sol^(n+1/2))")
 
@@ -232,8 +232,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
         logging.debug(f"Corrector (step {global_time_step_num}): After Strang-split advection (Sol* -> Sol**)")
 
-        ######################### 5. Implicit Euler substep for dt/2 ###################################################
-        ################################## (Eq. 17c of BK19) ###########################################################
+        ################################ 5. Implicit Euler substep for dt/2 ############################################
+        ########################################### (Eq. 17c of BK19) ##################################################
         # Applied to Sol** to get Sol^{n+1}
         self.backward_update_explicit(half_dt)  # Operates on self.variables (Sol**)
         logging.debug(f"Corrector (step {global_time_step_num}): After backward_update_explicit on Sol**")

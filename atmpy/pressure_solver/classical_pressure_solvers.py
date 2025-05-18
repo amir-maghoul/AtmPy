@@ -330,7 +330,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         is_compressible: bool,
     ):
         """Calculate the full Helmholtz operator:
-        [α_p * (∂P/∂π)°/dt]p₂ + ∇⋅(M_inv⋅(dt*CΘ*∇p₂))
+        [α_p * (∂P/∂π)°/dt]p₂ - ∇⋅(M_inv⋅(dt*(PΘ)°*∇p₂))
 
         Parameters
         ----------
@@ -524,8 +524,6 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         # Averaging over the nodes and fill the mpv container
         kernel = np.ones([2] * self.ndim)
-        if np.any(P < 0):
-            print("khar")
         return (
             ccenter
             * sp.signal.fftconvolve(P**cexp, kernel, mode="valid")

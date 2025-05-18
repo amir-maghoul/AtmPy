@@ -268,12 +268,12 @@ class Flux:
         Pu = velocity * cell_vars[..., VI.RHOY]
 
         # Calculate the P = rho*Theta by averaging and advecting
-        lefts.cell_vars[lefts_idx + (VI.RHOY,)] = rights.cell_vars[
-            rights_idx + (VI.RHOY,)
-        ] = 0.5 * (
+        scale = 0.5 * (
             (cell_vars[lefts_idx + (VI.RHOY,)] + cell_vars[rights_idx + (VI.RHOY,)])
             - 0.5 * lmbda * (Pu[lefts_idx] + Pu[rights_idx])
         )
+        lefts.cell_vars[lefts_idx + (VI.RHOY,)] = scale
+        rights.cell_vars[rights_idx + (VI.RHOY,)] = scale
 
         # Find the rho conservative variable from the new updated primitive variables
         left_rho = lefts.cell_vars[..., VI.RHOY] / lefts.primitives[..., PVI.Y]

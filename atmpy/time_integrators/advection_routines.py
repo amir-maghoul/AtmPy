@@ -48,8 +48,19 @@ def first_order_splitting_advection(
         The sweep order. It indicates whether sweep the dimensions in a standard x-y-z-z-y-x or some alternative way
     """
 
+    ndim: int = grid.ndim
+
+
     for direction_str in sweep_order:
         _1d_directional_advection(grid, variables, flux, direction_str, dt, boundary_manager, order=1)
+
+    for direction_str in sweep_order:
+        direction_int: int = direction_axis(direction_str)
+        left_idx, right_idx, _ = directional_indices(ndim, direction_str, full=True)
+        lmbda: float = dt / grid.dxyz[direction_int]
+        variables.cell_vars[...] += lmbda * (
+            flux.flux[direction_str][left_idx] - flux.flux[direction_str][right_idx]
+        )
 
 
 # --- Second-Order Strang Splitting ---
@@ -122,13 +133,14 @@ def _1d_directional_advection(
     # Find the left and right indices
     left_idx, right_idx, _ = directional_indices(ndim, direction, full=True)
 
-    ################################ Apply Riemann Solver ##############################################################
+    # ################################ Apply Riemann Solver ##############################################################
     flux.apply_riemann_solver(lmbda, direction)
 
     ################################ Update variables ##################################################################
-    variables.cell_vars[...] += lmbda * (
-        flux.flux[direction][left_idx] - flux.flux[direction][right_idx]
-    )
+    if order == 2:
+        variables.cell_vars[...] += lmbda * (
+            flux.flux[direction][left_idx] - flux.flux[direction][right_idx]
+        )
 
     ############################## Apply boundary conditions ###########################################################
     boundary_manager.apply_boundary_on_direction(variables.cell_vars, direction)

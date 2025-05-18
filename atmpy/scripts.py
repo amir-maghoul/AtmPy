@@ -35,8 +35,8 @@ def parse_arguments():
     parser.add_argument(
         "--case",
         type=str,
-        choices=["TravelingVortex", "RisingBubble"],  # Add more cases as needed
-        default="RisingBubble",  # Or your preferred default
+        choices=["TravelingVortex", "RisingBubble", "SineWaveAdvection1D"],  # Add more cases as needed
+        default="TravelingVortex",  # Or your preferred default
         help="Test case to run.",
     )
     parser.add_argument(

@@ -176,24 +176,7 @@ def calculate_dynamic_dt(
         dt_z = cfl_number * grid.dxyz[2] / max_char_speed_z
 
     dt_cfl = min(dt_x, dt_y, dt_z)
-
-    # --- Blend with fixed dt if configured ---
-    # Simplified: primarily use CFL, but allow fixed dt from config to also cap it.
-    # The PyBella ramp-up logic for dtfixed0 to dtfixed is specific;
-    # a more common approach is just `min(dt_cfl, config.temporal.dtfixed)`
-    # if dt_fixed is an *upper bound*. If dt_fixed is *the* dt unless CFL is smaller,
-    # then dt_cfl is the primary driver.
-    # Let's assume we want the smaller of CFL-derived dt and a user-specified fixed dt.
-
-    # If config.temporal.dtfixed is meant to be THE timestep unless CFL demands smaller:
-    # dt = min(dt_cfl, config.temporal.dtfixed)
-    # If dt_cfl is always the primary driver, and dtfixed is only for startup or as a cap:
     dt = dt_cfl  # Default to CFL driven
-
-    if config.temporal.dtfixed > 0:
-        dt = min(dt_cfl, config.temporal.dtfixed)
-    else:
-        dt = dt_cfl
 
     # --- Adjust dt to hit next_output_time precisely ---
     time_to_next_output = next_output_time - current_sim_time

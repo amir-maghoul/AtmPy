@@ -115,10 +115,11 @@ class TravelingVortex(BaseTestCase):
         print("Setting up Traveling Vortex configuration...")
 
         #################################### Grid Configuration ########################################################
+        n = 64
         grid_updates = {
             "ndim": 2,
-            "nx": 64,
-            "ny": 64,
+            "nx": n,
+            "ny": n,
             "nz": 0,
             "xmin": -0.5,
             "xmax": 0.5,
@@ -146,8 +147,8 @@ class TravelingVortex(BaseTestCase):
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
             "CFL": 0.45,
-            "dtfixed": 0.01,
-            "dtfixed0": 0.01,
+            "dtfixed": 0.005,
+            "dtfixed0": 0.005,
             "tout": np.array([10.0]),
             "stepmax": 101,
         }
@@ -316,7 +317,8 @@ class TravelingVortex(BaseTestCase):
         # --- Assign to Cell Variables (Inner Domain Only) ---
         variables.cell_vars[inner_slice + (VI.RHO,)] = rho_total
         variables.cell_vars[inner_slice + (VI.RHOU,)] = rho_total * u_total
-        variables.cell_vars[inner_slice + (VI.RHOV,)] = rho_total * v_total
+        # variables.cell_vars[inner_slice + (VI.RHOV,)] = rho_total * v_total
+        variables.cell_vars[inner_slice + (VI.RHOV,)] = 0
         variables.cell_vars[inner_slice + (VI.RHOW,)] = rho_total * w_total
 
         rhoY0_cells = mpv.hydrostate.cell_vars[..., HI.RHOY0]

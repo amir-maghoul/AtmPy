@@ -24,6 +24,7 @@ from atmpy.pressure_solver.contexts import (
 )
 from atmpy.scripts import parse_arguments
 from atmpy.solver.solver import Solver
+from atmpy.test_cases.sine_advection_1d import SineWaveAdvection1D
 from atmpy.test_cases.traveling_vortex import TravelingVortex
 from atmpy.test_cases.rising_bubble import RisingBubble
 from atmpy.time_integrators.contexts import TimeIntegratorContext
@@ -32,7 +33,7 @@ from atmpy.variables.variables import Variables
 
 np.set_printoptions(linewidth=300)
 np.set_printoptions(suppress=True)
-np.set_printoptions(precision=10)
+np.set_printoptions(precision=7)
 
 ################################### Parser #########################################################################
 args = parse_arguments()
@@ -44,16 +45,20 @@ if args.case == "TravelingVortex":
 elif args.case == "RisingBubble":
     case = RisingBubble()
     logging.info("Selected Test Case: RisingBubble")
+elif args.case == "SineWaveAdvection1D": # Add this condition
+    case = SineWaveAdvection1D()
+    logging.info("Selected Test Case: 1D Sine Wave Advection")
 else:
     # This should ideally be caught by argparse choices, but as a fallback:
     raise ValueError(f"Unknown test case specified: {args.case}")
-
+# case = TravelingVortex()
+case = SineWaveAdvection1D()
 config = case.config  # The SimulationConfig object is now held by the case
 
 # Modify config if needed (e.g., simulation time)
 # These are defaults if not profiling
-config.temporal.tmax = 1
-config.temporal.stepmax = 101000
+config.temporal.tmax = 3
+config.temporal.stepmax = 150
 config.outputs.output_frequency_steps = 3
 config.temporal.tout = [0]
 
@@ -100,7 +105,8 @@ if args.mode in ["run", "run_and_visualize"]:
     mpv = MPV(grid)
 
     ##################################### Variables ####################################################################
-    num_vars = 6
+    from atmpy.infrastructure.enums import VariableIndices as VI
+    num_vars = max(VI.RHO, VI.RHOU, VI.RHOV, VI.RHOW, VI.RHOX, VI.RHOY) + 1
     variables = Variables(
         grid, num_vars_cell=num_vars, num_vars_node=1
     )  # Adjust num_vars if needed
@@ -277,83 +283,139 @@ if args.mode in ["visualize_only", "run_and_visualize"]:
         f"Starting visualization in '{args.mode}' mode for file: {output_data_file}"
     )
     try:
-        print("\n--- Dataset for Visualization ---")
-        print(ds)
-
-        # Example: Animate 'rho' over time
-        fig, ax = plt.subplots()
-
-        # Determine data to plot (e.g., rho)
-        data_var = "Y"  # or 'u', 'v', etc.
-        if data_var not in ds:
-            logging.error(
-                f"Variable '{data_var}' not found in {output_data_file}. Cannot animate."
-            )
-        else:
+        if ds.attrs.get("config_grid_ndim") == 1:  # Check if it's 1D data
+            logging.info("Visualizing 1D data...")
+            fig, ax = plt.subplots(figsize=(10, 5))
             times = ds["time"].values
             x_coords = ds["x"].values
-            y_coords = ds["y"].values
 
-            # Initial plot setup
-            # For the first frame, plot the data at the first timestep
-            # The contourf object will be updated in the animation function
+            data_var = "rho"
 
-            # Get min/max for consistent color scaling across all frames
-            data_min = ds[data_var].min().item()
-            data_max = ds[data_var].max().item()
+            # Plot initial and final RHO
+            ax.plot(x_coords, ds[data_var].isel(time=0).data, 'b-', label=f'RHO (t={times[0]}s)')
 
-            cmap = "viridis"
-
-            # Initial plot for the first time step
-            # contour = ax.contourf(x_coords, y_coords, ds[data_var].isel(time=0).values.T, cmap=cmap, levels=np.linspace(data_min, data_max, 15))
-            # Using .T because xarray usually has (time, y, x) and contourf expects (X, Y, Z) where Z aligns with X,Y
-            # For your data, it seems output is (time, x, y) based on your original visualization
-            contour = ax.contourf(
-                x_coords,
-                y_coords,
-                ds[data_var].isel(time=0).data.T,
-                cmap=cmap,
-                levels=np.linspace(data_min, data_max, 15),
-            )
-
-            cbar = fig.colorbar(contour, ax=ax)
-            cbar.set_label(f"{data_var} ({ds[data_var].attrs.get('units', '')})")
-            ax.set_xlabel("X (m)")
-            ax.set_ylabel("Y (m)")
 
             def animate(i):
                 ax.clear()  # Clear previous frame's contours
                 current_data = ds[data_var].isel(time=i).data
 
-                # If X_coords (1D for x), Y_coords (1D for y), then Z data should be (len(Y_coords), len(X_coords))
-                # Your original plot: plt.contourf(ds['x'], ds['y'], rho[i, :, :])
-                # This implies rho[i] has shape (len(ds['x']), len(ds['y'])) if ds['x'] and ds['y'] are 1D.
-                # If ds[data_var].isel(time=i) gives (nx, ny), then it's fine.
-                # If it gives (ny, nx), you might need .T
-                # Let's assume ds[data_var].isel(time=i) is (nx, ny) as per your original code.
-                cont = ax.contourf(
-                    x_coords,
-                    y_coords,
-                    current_data.T,
-                    cmap=cmap,
-                    levels=np.linspace(data_min, data_max, 15),
-                )
+                cont = ax.plot(x_coords, ds[data_var].isel(time=0).data, 'b-', label=f'RHO (t={times[0]}s)')
                 ax.set_title(f"{data_var} at t={times[i]}s")
                 ax.set_xlabel("X (m)")
                 ax.set_ylabel("Y (m)")
                 # fig.colorbar(cont, ax=ax) # Re-adding colorbar can be slow/messy, update existing one if possible
                 return (cont,)  # Comma is important for blitting
 
-            # Create animation
-            # frames = len(times)
-            # interval is delay between frames in ms
-            # blit=True means only re-draw the parts that have changed for efficiency
+
             ani = FuncAnimation(
                 fig, animate, frames=len(times), interval=2, blit=False
             )
 
-            plt.tight_layout()
+            ax.set_xlabel("X coordinate")
+            ax.set_ylabel("Value")
+            ax.set_title("1D Sine Wave Advection")
+            ax.legend()
+            ax.grid(True)
             plt.show()
+        else:
+            print("\n--- Dataset for Visualization ---")
+            print(ds)
+
+            # Example: Animate 'rho' over time
+            fig, ax = plt.subplots()
+
+            # Determine data to plot (e.g., rho)
+            data_var = "Y"  # or 'u', 'v', etc.
+            if data_var not in ds:
+                logging.error(
+                    f"Variable '{data_var}' not found in {output_data_file}. Cannot animate."
+                )
+            else:
+                times = ds["time"].values
+                x_coords = ds["x"].values
+                y_coords = ds["y"].values
+
+                # Initial plot setup
+                # For the first frame, plot the data at the first timestep
+                # The contourf object will be updated in the animation function
+
+                # Get min/max for consistent color scaling across all frames
+                data_min = ds[data_var].min().item()
+                data_max = ds[data_var].max().item()
+
+                cmap = "viridis"
+
+                # Initial plot for the first time step
+                # contour = ax.contourf(x_coords, y_coords, ds[data_var].isel(time=0).values.T, cmap=cmap, levels=np.linspace(data_min, data_max, 15))
+                # Using .T because xarray usually has (time, y, x) and contourf expects (X, Y, Z) where Z aligns with X,Y
+                # For your data, it seems output is (time, x, y) based on your original visualization
+                contour = ax.contourf(
+                    x_coords,
+                    y_coords,
+                    ds[data_var].isel(time=0).data.T,
+                    cmap=cmap,
+                    levels=np.linspace(data_min, data_max, 15),
+                )
+
+                cbar = fig.colorbar(contour, ax=ax)
+                cbar.set_label(f"{data_var} ({ds[data_var].attrs.get('units', '')})")
+                ax.set_xlabel("X (m)")
+                ax.set_ylabel("Y (m)")
+
+                def animate(i):
+                    ax.clear()  # Clear previous frame's contours
+                    current_data = ds[data_var].isel(time=i).data
+
+                    # If X_coords (1D for x), Y_coords (1D for y), then Z data should be (len(Y_coords), len(X_coords))
+                    # Your original plot: plt.contourf(ds['x'], ds['y'], rho[i, :, :])
+                    # This implies rho[i] has shape (len(ds['x']), len(ds['y'])) if ds['x'] and ds['y'] are 1D.
+                    # If ds[data_var].isel(time=i) gives (nx, ny), then it's fine.
+                    # If it gives (ny, nx), you might need .T
+                    # Let's assume ds[data_var].isel(time=i) is (nx, ny) as per your original code.
+                    cont = ax.contourf(
+                        x_coords,
+                        y_coords,
+                        current_data.T,
+                        cmap=cmap,
+                        levels=np.linspace(data_min, data_max, 15),
+                    )
+                    ax.set_title(f"{data_var} at t={times[i]}s")
+                    ax.set_xlabel("X (m)")
+                    ax.set_ylabel("Y (m)")
+                    # fig.colorbar(cont, ax=ax) # Re-adding colorbar can be slow/messy, update existing one if possible
+                    return (cont,)  # Comma is important for blitting
+
+                # Create animation
+                # frames = len(times)
+                # interval is delay between frames in ms
+                # blit=True means only re-draw the parts that have changed for efficiency
+                ani = FuncAnimation(
+                    fig, animate, frames=len(times), interval=2, blit=False
+                )
+
+                plt.tight_layout()
+                plt.show()
+
+                plt.figure()
+
+                times = len(ds[data_var])-1
+                data =  ds[data_var].isel(time=times).data
+
+                data_min = data.min().item()
+                data_max = data.max().item()
+
+                cmap = "viridis"
+                contour = plt.contourf(
+                    x_coords,
+                    y_coords,
+                    data.T,
+                    cmap=cmap,
+                    levels=np.linspace(data_min, data_max, 15),
+                )
+                ax.set_xlabel("X (m)")
+                ax.set_ylabel("Y (m)")
+                cbar = fig.colorbar(contour)
+                plt.show()
 
             # To save the animation (optional, requires ffmpeg or imagemagick):
             # output_animation_file = os.path.join(config.outputs.output_path, config.outputs.output_folder, "animation.mp4")

@@ -109,7 +109,7 @@ class Temporal:
 
     CFL: float = 0.45
     dtfixed0: float = 0.01
-    dtfixed: float = 0.01
+    dtfixed: float = None
     acoustic_timestep: float = 0.0
     tout: np.ndarray = field(default_factory=lambda: np.array([1.0]))
     tmax: float = 0.05

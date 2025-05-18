@@ -137,15 +137,19 @@ class Solver:
             else:
                 next_target_output_t = self.tmax
 
-            # --- Calculate dynamic dt ---
-            current_dt = calculate_dynamic_dt(
-                self.variables,
-                self.grid,
-                self.config,
-                self.current_t,
-                next_target_output_t,
-                self.current_step,
-            )
+            if self.config.temporal.dtfixed is not None:
+                current_dt = self.config.temporal.dtfixed
+            else:
+                # --- Calculate dynamic dt ---
+                current_dt = calculate_dynamic_dt(
+                    self.variables,
+                    self.grid,
+                    self.config,
+                    self.current_t,
+                    next_target_output_t,
+                    self.current_step,
+                )
+
             # Update the time integrator's dt if it stores it internally
             self.time_integrator.dt = current_dt
 

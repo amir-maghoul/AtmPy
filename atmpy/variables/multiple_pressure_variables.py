@@ -72,7 +72,8 @@ class MPV:
 
     def _create_1D_grid_in_direction(self):
         """Reduce the dimension of the Grid object and create a new one in the given direction"""
-
+        if self.grid.ndim == 1:
+            return self.grid
         start: float = getattr(self.grid, self.direction_str + "_start")
         end: float = getattr(self.grid, self.direction_str + "_end")
         ncells: int = getattr(self.grid, "n" + self.direction_str)
@@ -98,12 +99,16 @@ class MPV:
         equal to the number of cells plus one. The derivative reduces this shape in the direction of gravity to equal to
         the number of cells. After that the resulting 1D array gets tiled to be of the same shape as the grid.cshape.
         """
+
         dr: float = self.grid.dxyz[self.direction]
 
         # Since variables in self.hydrostate are 1D, it suffices to calculate the convolution in their only direction
         # and then divide the result be the correct dx, dy or dz to get the derivative.
         S0: np.ndarray = self.hydrostate.node_vars[..., HI.S0]
         dS: np.ndarray = np.diff(S0) / dr
+
+        if self.grid.ndim == 1:
+            return dS
 
         # Expand and repeat along even axes so that the result matches the cell array shape.
         tile_shape: list = self._get_tile_shape()
@@ -113,6 +118,9 @@ class MPV:
     def get_S0c_on_cells(self):
         """Get method to get the S0c attribute. The S0 variable is assumed to be defined on the cells."""
         S0c: np.ndarray = self.hydrostate.cell_vars[..., HI.S0]
+
+        if self.grid.ndim == 1:
+            return S0c
 
         # Expand and repeat along even axes so that the result matches the cell array shape.
         tile_shape: list = self._get_tile_shape()
