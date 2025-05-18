@@ -152,7 +152,8 @@ if args.mode in ["run", "run_and_visualize"]:
         variables=variables,
         flux=flux,
         boundary_manager=manager,
-        advection_routine=config.numerics.advection_routine,  # Get from config
+        first_order_advection_routine=config.numerics.first_order_advection_routine,  # Get from config
+        second_order_advection_routine=config.numerics.second_order_advection_routine,  # Get from config
         dt=config.temporal.dtfixed,  # Get from config
         extra_dependencies={
             "mpv": mpv,
