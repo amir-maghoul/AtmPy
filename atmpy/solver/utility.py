@@ -67,7 +67,7 @@ def calculate_dynamic_dt(
 
     Y_prim_inner = np.zeros_like(rho_inner)
     Y_prim_inner[valid_rho_mask] = (
-            rhoY_inner[valid_rho_mask] / rho_inner[valid_rho_mask]
+        rhoY_inner[valid_rho_mask] / rho_inner[valid_rho_mask]
     )
 
     # Physical Temperature: T_phys = Theta_nd * T_ref

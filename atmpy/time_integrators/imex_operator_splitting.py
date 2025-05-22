@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import logging
+import numpy as np
+
+np.seterr(all="raise")
 from typing import TYPE_CHECKING, Union, List, Any, Callable
 
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
@@ -10,7 +13,8 @@ from atmpy.boundary_conditions.contexts import BCApplicationContext
 from atmpy.infrastructure.utility import (
     directional_indices,
     one_element_inner_slice,
-    one_element_inner_nodal_shape, dimension_directions,
+    one_element_inner_nodal_shape,
+    dimension_directions,
 )
 from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
 from atmpy.infrastructure.enums import VariableIndices as VI, Preconditioners
@@ -75,7 +79,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.pressure_solver.discrete_operator
         )
         self.advection_routine: Callable
-        self._get_advection_routine(first_order_advection_routine, second_order_advection_routine)
+        self._get_advection_routine(
+            first_order_advection_routine, second_order_advection_routine
+        )
         self.th: "Thermodynamics" = self.pressure_solver.th
         self.dt: float = dt
         self.Msq: float = self.pressure_solver.Msq
@@ -94,14 +100,20 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
     def _get_advection_routine(
-        self, first_order_advection_routine_name: "AdvectionRoutines", second_order_advection_routine_name: "AdvectionRoutines"
+        self,
+        first_order_advection_routine_name: "AdvectionRoutines",
+        second_order_advection_routine_name: "AdvectionRoutines",
     ) -> None:
         """Get the advection routine. The sole raison d'être of this method is to avoid circular import
         issues from factory."""
         from atmpy.infrastructure.factory import get_advection_routines
 
-        self.first_order_advection_routine = get_advection_routines(first_order_advection_routine_name)
-        self.second_order_advection_routine = get_advection_routines(second_order_advection_routine_name)
+        self.first_order_advection_routine = get_advection_routines(
+            first_order_advection_routine_name
+        )
+        self.second_order_advection_routine = get_advection_routines(
+            second_order_advection_routine_name
+        )
 
     def _get_dimensional_sweep_order(self, global_time_step_num: int) -> List[str]:
         """Determines the order of dimensional sweeps based on the global time step."""
@@ -113,14 +125,16 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         else:
             return base_directions[::-1]
 
-    def step(self, *args, **kwargs) -> None: # Added global_time_step_num
+    def step(self, *args, **kwargs) -> None:  # Added global_time_step_num
         """
         Performs a single time step using the semi-implicit predictor-corrector
         method based on Benacchio & Klein (2019).
         """
         global_time_step_num = kwargs.pop("global_step")
 
-        logging.info(f"--- Starting time step {global_time_step_num} with dt = {self.dt} ---")
+        logging.info(
+            f"--- Starting time step {global_time_step_num} with dt = {self.dt} ---"
+        )
 
         # --- Save Initial State (t^n) ---
         initial_vars_arr = np.copy(self.variables.cell_vars)
@@ -133,12 +147,19 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # self.variables contains Sol^{n+1/2} and self.mpv.p2_nodes contains p^{n+1/2} (these are intermediate)
 
         ######################### Corrector Stage: Advance state from t^n to t^{n+1} ###################################
-        self._corrector_step(self.dt, initial_vars_arr, initial_p2_nodes_arr, global_time_step_num)
+        self._corrector_step(
+            self.dt, initial_vars_arr, initial_p2_nodes_arr, global_time_step_num
+        )
         # After this, self.variables contains Sol^{n+1} and self.mpv.p2_nodes contains p^{n+1}
 
         logging.info(f"--- Finished time step {global_time_step_num} ---")
 
-    def _predictor_step(self, dt: float, initial_vars_arr_for_coeffs: np.ndarray, global_time_step_num: int) -> None:
+    def _predictor_step(
+        self,
+        dt: float,
+        initial_vars_arr_for_coeffs: np.ndarray,
+        global_time_step_num: int,
+    ) -> None:
         logging.debug(f"Predictor (step {global_time_step_num}): Starting")
         half_dt = 0.5 * dt
 
@@ -151,8 +172,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ######################## 2. Compute advective mass fluxes (P v)^n based on state at t^n (Sol^n) ################
         # This updates self.flux[direction][..., VI.RHOY]
-        self.flux.compute_averaging_fluxes() # Uses self.variables (which is Sol^n)
-        logging.debug(f"Predictor (step {global_time_step_num}): Averaging fluxes computed from Sol^n")
+        self.flux.compute_averaging_fluxes()  # Uses self.variables (which is Sol^n)
+        logging.debug(
+            f"Predictor (step {global_time_step_num}): Averaging fluxes computed from Sol^n"
+        )
 
         #################### 3. Advect state by dt/2 using first-order splitting -> Sol* ###############################
         ##################################### (Eq. 14a of BK19) ########################################################
@@ -161,39 +184,46 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         sweep_order = self._get_dimensional_sweep_order(global_time_step_num)
         self.first_order_advection_routine(
             self.grid,
-            self.variables, # Input: Sol^n, Output: Sol#
+            self.variables,  # Input: Sol^n, Output: Sol#
             self.flux,
             half_dt,
             sweep_order=sweep_order,
             boundary_manager=self.boundary_manager,
         )
-        logging.debug(f"Predictor (step {global_time_step_num}): After first-order advection (Sol^n -> Sol*)")
+        logging.debug(
+            f"Predictor (step {global_time_step_num}): After first-order advection (Sol^n -> Sol*)"
+        )
 
         ###################### 4. Non-Advective Implicit Euler Substep for dt/2 ########################################
         #################################### (Eq. 15 of BK19) ##########################################################
         # Applied to Sol# to get Sol^{n+1/2} and p^{n+1/2}
-        self.backward_update_explicit(half_dt) # Operates on self.variables (Sol#)
-        logging.debug(f"Predictor (step {global_time_step_num}): After backward_update_explicit on Sol*")
+        self.backward_update_explicit(half_dt)  # Operates on self.variables (Sol#)
+        logging.debug(
+            f"Predictor (step {global_time_step_num}): After backward_update_explicit on Sol*"
+        )
 
         # Solve for Exner pressure
         self.backward_update_implicit(half_dt, self.variables.cell_vars.copy())
         # self.variables is now Sol^{n+1/2}, self.mpv.p2_nodes is p^{n+1/2}
-        logging.debug(f"Predictor (step {global_time_step_num}): After backward_update_implicit (Sol* -> Sol^(n+1/2))")
+        logging.debug(
+            f"Predictor (step {global_time_step_num}): After backward_update_implicit (Sol* -> Sol^(n+1/2))"
+        )
 
         ######################### 5. Compute predicted advective mass fluxes (Pv)^{n+1/2} ##############################
         # self.variables.cell_vars is now Sol^{n+1/2}
-        self.flux.compute_averaging_fluxes() # Uses self.variables (Sol^{n+1/2})
+        self.flux.compute_averaging_fluxes()  # Uses self.variables (Sol^{n+1/2})
         # This updates self.flux[... ,VI.RHOY] to represent (Pv)^{n+1/2} for the corrector
-        logging.debug(f"Predictor (step {global_time_step_num}): Averaging fluxes (Pv)^(n+1/2) computed from Sol^(n+1/2)")
+        logging.debug(
+            f"Predictor (step {global_time_step_num}): Averaging fluxes (Pv)^(n+1/2) computed from Sol^(n+1/2)"
+        )
         logging.debug(f"--- Predictor (step {global_time_step_num}): Finished ---")
 
-
     def _corrector_step(
-            self,
-            dt: float,
-            initial_vars_arr: np.ndarray,
-            initial_p2_nodes_arr: np.ndarray,
-            global_time_step_num: int
+        self,
+        dt: float,
+        initial_vars_arr: np.ndarray,
+        initial_p2_nodes_arr: np.ndarray,
+        global_time_step_num: int,
     ) -> None:
         logging.debug(f"Corrector (step {global_time_step_num}): Starting")
         half_dt = 0.5 * dt
@@ -213,35 +243,44 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         ################################### (Eq. 17a of BK19) ##########################################################
         # Based on state t^n (Sol^n). Result is Sol*
         self.forward_update(half_dt)  # Operates on self.variables (Sol^n -> Sol*)
-                                      # self.mpv.p2_nodes is still p^n
-        logging.debug(f"Corrector (step {global_time_step_num}): After forward_update (Sol^n -> Sol*)")
+        # self.mpv.p2_nodes is still p^n
+        logging.debug(
+            f"Corrector (step {global_time_step_num}): After forward_update (Sol^n -> Sol*)"
+        )
 
         ######################### 4. Advection using Strang Splitting ##################################################
         ################################# (Full Step, Eq.17b of BK19) ##################################################
         # Uses the advective mass fluxes in self.flux[..., RHOY] (which are (Pv)^{n+1/2})
         # self.variables.cell_vars (Sol*) becomes Sol**
         sweep_order = self._get_dimensional_sweep_order(global_time_step_num)
-
         self.second_order_advection_routine(
             self.grid,
-            self.variables, # Input: Sol*, Output: Sol**
-            self.flux,      # Contains (Pv)^{n+1/2}
-            dt,             # Full dt for this advection operation
+            self.variables,  # Input: Sol*, Output: Sol**
+            self.flux,  # Contains (Pv)^{n+1/2}
+            dt,  # Full dt for this advection operation
             sweep_order=sweep_order,
             boundary_manager=self.boundary_manager,
         )
-        logging.debug(f"Corrector (step {global_time_step_num}): After Strang-split advection (Sol* -> Sol**)")
+        logging.debug(
+            f"Corrector (step {global_time_step_num}): After Strang-split advection (Sol* -> Sol**)"
+        )
 
         ################################ 5. Implicit Euler substep for dt/2 ############################################
         ########################################### (Eq. 17c of BK19) ##################################################
         # Applied to Sol** to get Sol^{n+1}
         self.backward_update_explicit(half_dt)  # Operates on self.variables (Sol**)
-        logging.debug(f"Corrector (step {global_time_step_num}): After backward_update_explicit on Sol**")
+        logging.debug(
+            f"Corrector (step {global_time_step_num}): After backward_update_explicit on Sol**"
+        )
 
         # Operator coefficients (PΘ) for implicit solve use current state (Sol**)
-        self.backward_update_implicit(half_dt, initial_vars=self.variables.cell_vars.copy()) # Pass a copy if it's modified
+        self.backward_update_implicit(
+            half_dt, initial_vars=self.variables.cell_vars.copy()
+        )  # Pass a copy if it's modified
         # self.variables is now Sol^{n+1}, self.mpv.p2_nodes is p^{n+1}
-        logging.debug(f"Corrector (step {global_time_step_num}): After backward_update_implicit (Sol** -> Sol^(n+1))")
+        logging.debug(
+            f"Corrector (step {global_time_step_num}): After backward_update_implicit (Sol** -> Sol^(n+1))"
+        )
 
         ######################### 6. Final Boundary Conditions #########################################################
         self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
@@ -550,7 +589,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Intermediate variable for current Chi
         currentX = cellvars[..., VI.RHO] * (
             (cellvars[..., VI.RHO] / cellvars[..., VI.RHOY]) - S0c
-        ) # Calculate the perturbation of Chi, then multiply with density rho
+        )  # Calculate the perturbation of Chi, then multiply with density rho
 
         ###############################################################################################################
         # Update the variable

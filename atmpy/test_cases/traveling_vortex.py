@@ -2,6 +2,7 @@ import numpy as np
 from dataclasses import field  # Removed dataclass, not needed here
 from typing import List, Tuple, Dict, Any, TYPE_CHECKING
 import matplotlib
+from setuptools.sandbox import run_setup
 
 matplotlib.use("TkAgg")
 
@@ -31,6 +32,14 @@ if TYPE_CHECKING:
     from atmpy.variables.multiple_pressure_variables import MPV
 
 
+def traveling_vortex_stratification(y: float) -> float:
+    """
+    Isothermal stratification for the Traveling Vortex case.
+    Returns a constant value (typically 1.0 in non-dimensional setups).
+    """
+    return 1.0
+
+
 class TravelingVortex(BaseTestCase):
     """
     Traveling Vortex test case based on the setup described in PyBella.
@@ -38,9 +47,20 @@ class TravelingVortex(BaseTestCase):
     periodic domain with zero gravity.
     """
 
-    def __init__(self):
+    def __init__(self, config_override: SimulationConfig = None):
         # Initialize with a default SimulationConfig, which will be modified in setup
-        super().__init__(name="TravelingVortex", config=SimulationConfig())
+        _effective_config: SimulationConfig
+        run_setup_method = False
+
+        if config_override is not None:
+            _effective_config = config_override
+        else:
+            # No override, create a default config. BaseTestCase will get this,
+            # and then setup() will populate it.
+            _effective_config = SimulationConfig()
+            run_setup_method = True
+
+        super().__init__(name="TravelingVortex", config=_effective_config)
 
         ############################### Vortex Specific Parameters #####################################################
         self.u0: float = 1.0  # Background velocity U
@@ -58,6 +78,8 @@ class TravelingVortex(BaseTestCase):
         )  # Vortex magnitude factor (affects velocity/pressure)
         self.xc: float = 0.0  # Vortex center x
         self.yc: float = 0.0  # Vortex center y
+
+        self.u0: float = 1.0
 
         ####################### Polynomial coefficients for pressure perturbation ######################################
         self.coe = np.array(
@@ -108,7 +130,8 @@ class TravelingVortex(BaseTestCase):
         )
 
         ###########################3 Call setup to configure the simulation ############################################
-        self.setup()
+        if run_setup_method:
+            self.setup()
 
     def setup(self):
         """Configure the SimulationConfig for the Traveling Vortex case."""
@@ -146,9 +169,9 @@ class TravelingVortex(BaseTestCase):
 
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
-            "CFL": 0.45,
+            "CFL": 0.8,
             "dtfixed": 0.005,
-            "dtfixed0": 0.005,
+            "dtfixed0": None,
             "tout": np.array([10.0]),
             "stepmax": 101,
         }
@@ -159,7 +182,7 @@ class TravelingVortex(BaseTestCase):
             "wind_speed": [self.u0, self.v0, self.w0],
             "gravity_strength": (0.0, 0.0, 0.0),  # Zero gravity case
             "coriolis_strength": (0.0, 0.0, 0.0),
-            "stratification": lambda y: 1.0,  # Isothermal background
+            "stratification": traveling_vortex_stratification,  # Isothermal background
         }
         self.set_physics(physics_updates)
 
@@ -317,8 +340,9 @@ class TravelingVortex(BaseTestCase):
         # --- Assign to Cell Variables (Inner Domain Only) ---
         variables.cell_vars[inner_slice + (VI.RHO,)] = rho_total
         variables.cell_vars[inner_slice + (VI.RHOU,)] = rho_total * u_total
-        # variables.cell_vars[inner_slice + (VI.RHOV,)] = rho_total * v_total
-        variables.cell_vars[inner_slice + (VI.RHOV,)] = 0
+        # variables.cell_vars[inner_slice + (VI.RHOU,)] = 0
+        variables.cell_vars[inner_slice + (VI.RHOV,)] = rho_total * v_total
+        # variables.cell_vars[inner_slice + (VI.RHOV,)] = 0
         variables.cell_vars[inner_slice + (VI.RHOW,)] = rho_total * w_total
 
         rhoY0_cells = mpv.hydrostate.cell_vars[..., HI.RHOY0]

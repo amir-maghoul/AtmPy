@@ -19,6 +19,7 @@ from numba import njit, prange
 #
 #     return result
 
+
 def minmod(a: np.ndarray, b: np.ndarray):
     """Minmod flux slope limiter using numpy vectorization.
     This limiter is the most diffusive but ensures monotonicity.
@@ -57,7 +58,9 @@ def van_leer(a: np.ndarray, b: np.ndarray):
 
     # Apply formula only where denominator is not close to zero
     result_masked = np.zeros_like(a_masked)
-    result_masked[nonzero_mask] = (2 * a_masked[nonzero_mask] * b_masked[nonzero_mask]) / denominator[nonzero_mask]
+    result_masked[nonzero_mask] = (
+        2 * a_masked[nonzero_mask] * b_masked[nonzero_mask]
+    ) / denominator[nonzero_mask]
 
     # Assign to result where a and b have same sign
     result[same_sign_mask] = result_masked
@@ -106,11 +109,7 @@ def superbee(a: np.ndarray, b: np.ndarray):
     second = np.sign(b_masked) * np.minimum(2 * np.abs(a_masked), np.abs(b_masked))
 
     # Superbee takes the maximum by magnitude
-    result[same_sign_mask] = np.where(
-        np.abs(first) > np.abs(second),
-        first,
-        second
-    )
+    result[same_sign_mask] = np.where(np.abs(first) > np.abs(second), first, second)
 
     return result
 
@@ -162,4 +161,3 @@ def koren(a: np.ndarray, b: np.ndarray):
     result[same_sign_mask] = np.maximum(0.0, outer_min) * b_masked
 
     return result
-

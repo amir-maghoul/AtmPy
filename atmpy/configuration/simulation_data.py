@@ -231,6 +231,7 @@ class Diagnostics:
     diag: bool = True
     diag_plot_compare: bool = False
     diag_current_run: str = "atmpy_run"
+    analysis: bool = False
 
 
 @dataclass
@@ -246,6 +247,7 @@ class Outputs:
     output_filename: str = ""
     output_suffix: str = ""
     output_extension: str = ".nc"
+    output_frequency_steps: int = 100
     checkpoint_base_name: str = "_traveling_vortex_checkpoint"
     enable_checkpointing: str = True
     checkpoint_frequency_steps: int = 100

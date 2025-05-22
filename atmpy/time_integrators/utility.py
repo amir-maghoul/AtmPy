@@ -24,8 +24,10 @@ def calculate_dpi_dp(P: np.ndarray, Msq: float) -> float:
     """
     th: Thermodynamics = Thermodynamics()
     ndim: int = P.ndim
-    dpi_temp: np.ndarray = (1 / Msq) * th.gm1 * (P ** (th.gamma - 2.0))
+    dpi_temp: np.ndarray = P ** (th.gamma - 2.0)
     averaging_kernel: np.ndarray = np.ones([2] * ndim)
     return (
-        sp.signal.fftconvolve(dpi_temp, averaging_kernel, mode="valid") / dpi_temp.sum()
+        (th.gm1 / Msq)
+        * sp.signal.fftconvolve(dpi_temp, averaging_kernel, mode="valid")
+        / dpi_temp.sum()
     )

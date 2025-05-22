@@ -33,7 +33,7 @@ def calculate_variable_differences(
     """
 
     direction = direction_axis(direction_str)
-    diffs = np.zeros_like(primitives)  # The final difference array]
+    diffs = np.zeros_like(primitives[..., 1:])  # The final difference array]
 
     ### The following commented part is used got when we replace rho*Theta with Chi in calculating the reconstruction
     ### And then transform back to rho*Theta. Since the reason is still not clear to me, I avoided this.
@@ -50,12 +50,20 @@ def calculate_variable_differences(
     # diffs[..., PVI.Y + 1 :][left_idx] = np.diff(
     #     primitives[..., PVI.Y + 1 :], axis=direction
     # )
-
     # Set the difference slice (one fewer element than the original array) in the corresponding direction
-    left_idx, right_idx, _ = directional_indices(ndim, direction_str, full=True)
+    left_idx, right_idx, _ = directional_indices(ndim, direction_str, full=False)
 
+    # for index in [PVI.U, PVI.V, PVI.W, PVI.X]:
+    #     diffs[left_idx + (index,)] = primitives[right_idx + (index,)] - primitives[left_idx + (index,)]
+    #
+    # diffs[left_idx + (PVI.Y,)] = (
+    #     1.0 / primitives[right_idx + (PVI.Y,)] - 1.0 / primitives[left_idx + (PVI.Y,)]
+    # )
+
+    #
+    #
     # Apply np.diff in the direction which results in one less element
-    diffs[left_idx] = np.diff(primitives, axis=direction)
+    diffs[left_idx] = np.diff(primitives[..., 1:], axis=direction)
 
     return diffs
 
@@ -90,7 +98,7 @@ def calculate_slopes(
     The limited slope has two fewer rows/columns in the direction of calculation than the original variables.
     """
     left_idx, right_idx, directional_inner_idx = directional_indices(
-        ndim, direction_str
+        ndim, direction_str, full=True
     )
     # Use twice indexing: once to eliminate the extra zero due to the size difference between vars and differences
     # (differences should have one less element) and once to obtain the left values
@@ -128,5 +136,5 @@ def calculate_amplitudes(
     factor = -sign * 0.5 * slopes
     amplitudes = factor
     if lmbda > 0:
-        amplitudes +=  factor*(sign * lmbda * speed[..., np.newaxis])
+        amplitudes += factor * (sign * lmbda * speed[..., np.newaxis])
     return amplitudes

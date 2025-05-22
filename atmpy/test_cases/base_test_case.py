@@ -137,9 +137,7 @@ class BaseTestCase(ABC):
         regime = self.config.model_regimes
         if const.R_gas > 0 and const.T_ref > 0:
             denominator = const.R_gas * const.T_ref
-            regime.Msq = (
-                (const.u_ref * const.u_ref) / denominator
-            )
+            regime.Msq = (const.u_ref * const.u_ref) / denominator
         else:
             regime.Msq = 0.0  # Avoid division by zero
             print("Warning: Cannot calculate Msq due to invalid R_gas or T_ref.")

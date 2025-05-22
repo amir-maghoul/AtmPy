@@ -21,14 +21,15 @@ from atmpy.infrastructure.enums import (
 
 from typing import List, Literal
 
+
 # --- First-Order Sequential (Godunov) Splitting ---
 def first_order_splitting_advection(
     grid: "Grid",
     variables: "Variables",
     flux: "Flux",
     dt: float,
-    sweep_order: List[str], # e.g., ['x', 'y', 'z']
-    boundary_manager: "BoundaryManager"
+    sweep_order: List[str],  # e.g., ['x', 'y', 'z']
+    boundary_manager: "BoundaryManager",
 ) -> None:
     """
     Compute the first order advection in all directions. It does a single sweep of advection in
@@ -50,17 +51,18 @@ def first_order_splitting_advection(
 
     ndim: int = grid.ndim
 
-
     for direction_str in sweep_order:
-        _1d_directional_advection(grid, variables, flux, direction_str, dt, boundary_manager, order=1)
-
-    for direction_str in sweep_order:
-        direction_int: int = direction_axis(direction_str)
-        left_idx, right_idx, _ = directional_indices(ndim, direction_str, full=True)
-        lmbda: float = dt / grid.dxyz[direction_int]
-        variables.cell_vars[...] += lmbda * (
-            flux.flux[direction_str][left_idx] - flux.flux[direction_str][right_idx]
+        _1d_directional_advection(
+            grid, variables, flux, direction_str, dt, boundary_manager, order=2
         )
+
+    # for direction_str in sweep_order:
+    #     direction_int: int = direction_axis(direction_str)
+    #     left_idx, right_idx, _ = directional_indices(ndim, direction_str, full=True)
+    #     lmbda: float = dt / grid.dxyz[direction_int]
+    #     variables.cell_vars[...] += lmbda * (
+    #         flux.flux[direction_str][left_idx] - flux.flux[direction_str][right_idx]
+    #     )
 
 
 # --- Second-Order Strang Splitting ---
@@ -70,7 +72,7 @@ def upwind_strang_split_advection(
     flux: "Flux",
     dt: float,
     sweep_order: List[str],
-    boundary_manager: "BoundaryManager"
+    boundary_manager: "BoundaryManager",
 ) -> None:
     """
     Compute the second order Strang-split upwind advection in all directions. It does a double sweep of advection in
@@ -96,15 +98,25 @@ def upwind_strang_split_advection(
 
     ################################ First half-sweep ##################################################################
     for direction_str in current_sweep_order:
-        _1d_directional_advection(grid, variables, flux, direction_str, half_dt, boundary_manager)
+        _1d_directional_advection(
+            grid, variables, flux, direction_str, half_dt, boundary_manager
+        )
 
     ################################# Second half-sweep ################################################################
     for direction_str in current_sweep_order[::-1]:
-        _1d_directional_advection(grid, variables, flux, direction_str, half_dt, boundary_manager)
+        _1d_directional_advection(
+            grid, variables, flux, direction_str, half_dt, boundary_manager
+        )
 
 
 def _1d_directional_advection(
-    grid: "Grid", variables: "Variables", flux: "Flux", direction: str, dt: float, boundary_manager: "BoundaryManager", order: int = 2
+    grid: "Grid",
+    variables: "Variables",
+    flux: "Flux",
+    direction: str,
+    dt: float,
+    boundary_manager: "BoundaryManager",
+    order: int = 2,
 ) -> None:
     """
     Core 1D advection in the given direction. It will be used to update in both 1D and 2D strang splitting routines.
@@ -128,7 +140,7 @@ def _1d_directional_advection(
     ############################## Parameters ##########################################################################
     ndim: int = grid.ndim
     direction_int: int = direction_axis(direction)
-    lmbda: float = dt / grid.dxyz[direction_int] if order == 2 else 0
+    lmbda: float = dt / grid.dxyz[direction_int]  # if order == 2 else 0
 
     # Find the left and right indices
     left_idx, right_idx, _ = directional_indices(ndim, direction, full=True)
@@ -137,10 +149,14 @@ def _1d_directional_advection(
     flux.apply_riemann_solver(lmbda, direction)
 
     ################################ Update variables ##################################################################
-    if order == 2:
-        variables.cell_vars[...] += lmbda * (
-            flux.flux[direction][left_idx] - flux.flux[direction][right_idx]
-        )
+    # if order == 2:
+    #     variables.cell_vars[...] += lmbda * (
+    #         flux.flux[direction][left_idx] - flux.flux[direction][right_idx]
+    #     )
+
+    variables.cell_vars[...] += lmbda * (
+        flux.flux[direction][left_idx] - flux.flux[direction][right_idx]
+    )
 
     ############################## Apply boundary conditions ###########################################################
     boundary_manager.apply_boundary_on_direction(variables.cell_vars, direction)

@@ -522,7 +522,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         # Temp variable for rhoTheta=P for readability
         P = cellvars[..., VI.RHOY]
 
-        # Averaging over the nodes and fill the mpv container
+        # Averaging over the nodes and fill the mpv container (Eq. 29 BK19)
         kernel = np.ones([2] * self.ndim)
         return (
             ccenter

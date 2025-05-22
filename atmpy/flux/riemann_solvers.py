@@ -61,13 +61,13 @@ def modified_hll(
 
     #  Compute the ADVECTED values
     # Exclude VI.RHO from other variables
-    variables_slice = (slice(1, None),)
+    variable_indices = slice(1, None)
 
     # Compute the advected values. Rho separately
     flux[direction][directional_inner_idx + (VI.RHO,)] = left_factor + right_factor
-    flux[direction][directional_inner_idx + variables_slice] = (
-        left_factor[..., np.newaxis] * left_state[left_idx + variables_slice]
-        + right_factor[..., np.newaxis] * right_state[right_idx + variables_slice]
+    flux[direction][directional_inner_idx + (variable_indices,)] = (
+        left_factor[..., np.newaxis] * left_state[left_idx + (variable_indices,)]
+        + right_factor[..., np.newaxis] * right_state[right_idx + (variable_indices,)]
     )
 
 

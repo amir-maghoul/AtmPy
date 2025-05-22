@@ -56,7 +56,7 @@ BOUNDARY_CONDITIONS = {
 
 ADVECTION_ROUTINES = {
     AdvectionRoutines.STRANG_SPLIT: upwind_strang_split_advection,
-    AdvectionRoutines.FIRST_ORDER_RK: first_order_splitting_advection
+    AdvectionRoutines.FIRST_ORDER_RK: first_order_splitting_advection,
 }
 
 LINEAR_SOLVERS = {

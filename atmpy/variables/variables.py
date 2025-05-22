@@ -180,7 +180,7 @@ class Variables:
 
         rho = self.cell_vars[..., VI.RHO]
         nonzero_idx = np.nonzero(rho)
-        self.primitives[..., PVI.P] = eos.pressure(*args)
+        self.primitives[..., PVI.RHO] = rho
         self.primitives[*nonzero_idx, PVI.U] = (
             self.cell_vars[*nonzero_idx, VI.RHOU] / rho[nonzero_idx]
         )
