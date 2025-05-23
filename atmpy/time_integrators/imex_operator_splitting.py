@@ -14,7 +14,7 @@ from atmpy.infrastructure.utility import (
     directional_indices,
     one_element_inner_slice,
     one_element_inner_nodal_shape,
-    dimension_directions,
+    dimension_directions, momentum_index,
 )
 from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
 from atmpy.infrastructure.enums import VariableIndices as VI, Preconditioners
@@ -299,7 +299,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # Calculate the buoyancy PX'
         dbuoy = cellvars[..., VI.RHOY] * cellvars[..., VI.RHOX] / cellvars[..., VI.RHO]
-
         ###################### Update variables
         self._forward_momenta_update(cellvars, dt, p2n, dbuoy, g)
         self._forward_buoyancy_update(cellvars, dt)
@@ -539,14 +538,12 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
     ):
         """Update the Exner pressure."""
 
-        # Compute the weighting factor Y = (rhoY / rho) = Theta
-        Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
-
         # Compute the divergence of the pressure-weighted momenta: (Pu)_x + (Pv)_y + (Pw)_z where
-        # P = rho*Y = rho*Theta
+        # # P = rho*Y = rho*Theta
         pressure_weighted_momenta = self._calculate_enthalpy_weighted_momenta(
             self.variables.cell_vars
         )
+
         inner_slice = one_element_inner_slice(self.grid.ndim, full=False)
         self.mpv.rhs[inner_slice] = self.discrete_operator.divergence(
             pressure_weighted_momenta,
@@ -564,12 +561,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Calculate the derivative of the Exner pressure with respect to P
         dpidP = calculate_dpi_dp(cellvars[..., VI.RHOY], self.Msq)
 
-        # Create node-to-cell index (slice(1, -1) in all directions)
-        inner_idx = one_element_inner_slice(self.grid.ndim, full=False)
 
         # Create a nodal variable to store the intermediate updates
         dp2n = np.zeros_like(p2n)
-        dp2n[inner_idx] -= dt * dpidP * self.mpv.rhs[inner_slice]
+        dp2n[inner_slice] -= dt * dpidP * self.mpv.rhs[inner_slice]
         self.mpv.p2_nodes[...] += self.is_compressible * dp2n
 
     def _forward_buoyancy_update(self, cellvars: np.ndarray, dt: float):

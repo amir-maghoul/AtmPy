@@ -1,7 +1,7 @@
 """This module handles multiple pressure variables. It is used to calculate the hydrostate pressure.
 The code is the modified version of what appears in PyBella project.
 """
-
+import scipy as sp
 import numpy as np
 from typing import List, Union, TYPE_CHECKING
 

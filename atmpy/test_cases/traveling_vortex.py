@@ -353,7 +353,7 @@ class TravelingVortex(BaseTestCase):
             p_total_safe = np.maximum(p_total, 1e-9)
             variables.cell_vars[inner_slice + (VI.RHOY,)] = p_total_safe**thermo.gamminv
         else:
-            variables.cell_vars[inner_slice + (VI.RHOY,)] = rho_total * rhoY0_cells
+            variables.cell_vars[inner_slice + (VI.RHOY,)] = rho_total * rhoY0_cells[inner_slice[1]]
 
         # Calculate rhoX (Tracers) - Set to zero if not used
         if VI.RHOX < variables.num_vars_cell:
@@ -377,8 +377,8 @@ class TravelingVortex(BaseTestCase):
             * self.fac**2
             * np.divide(
                 p2c_unscaled,
-                rhoY0_cells[inner_slice[0]],
-                where=rhoY0_cells[inner_slice[0]] != 0,
+                rhoY0_cells[inner_slice[1]],
+                where=rhoY0_cells[inner_slice[1]] != 0,
             )
         )
 

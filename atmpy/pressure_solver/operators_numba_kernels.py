@@ -238,123 +238,123 @@ def _divergence_1d_numba(
 # =============================================================================
 # 2D Numba Kernel for Node-Centered Divergence
 # =============================================================================
-# @nb.njit(**_NJIT_OPTIONS)
-# def _divergence_2d_numba(
-#     vector_field: np.ndarray, dx: float, dy: float  # Shape (nx, ny, 2) - Cell-centered
-# ) -> np.ndarray:
-#     """
-#     Calculates 2D divergence at nodes based on cell-centered vector components.
-#     Output shape: (nnx-2, nny-2) - Node-centered
-#     """
-#     nx, ny = vector_field.shape[0], vector_field.shape[1]
-#     nnx = nx - 1
-#     nny = ny - 1
-#     dtype = vector_field.dtype
-#
-#     if nnx == 0 or nny == 0:
-#         return np.empty((nnx, nny), dtype=dtype)
-#
-#     div_result = np.empty((nnx, nny), dtype=dtype)
-#     inv_dx = 1.0 / dx
-#     inv_dy = 1.0 / dy
-#     scale_xy = 0.5  # Averaging factor
-#
-#     u = vector_field[:, :, 0]  # Component along axis 0
-#     v = vector_field[:, :, 1]  # Component along axis 1
-#
-#     for i in range(nnx):  # Node index i
-#         for j in range(nny):  # Node index j
-#             # Term d(u)/dx: diff along axis 0, average along axis 1
-#             diff_u_j = u[i + 1, j] - u[i, j]
-#             diff_u_jp1 = u[i + 1, j + 1] - u[i, j + 1]
-#             term_x = scale_xy * (diff_u_j + diff_u_jp1) * inv_dx
-#
-#             # Term d(v)/dy: diff along axis 1, average along axis 0
-#             diff_v_i = v[i, j + 1] - v[i, j]
-#             diff_v_ip1 = v[i + 1, j + 1] - v[i + 1, j]
-#             term_y = scale_xy * (diff_v_i + diff_v_ip1) * inv_dy
-#
-#             div_result[i, j] = term_x + term_y
-#
-#     return div_result
-
-
 @nb.njit(**_NJIT_OPTIONS)
 def _divergence_2d_numba(
-    vector_field: np.ndarray,
-    dx: float,
-    dy: float,
-    is_x_periodic: bool = False,
-    is_y_periodic: bool = False,
+    vector_field: np.ndarray, dx: float, dy: float  # Shape (nx, ny, 2) - Cell-centered
 ) -> np.ndarray:
     """
-    Extended version with proper boundary handling.
-
-    Input:
-        vector_field: Cell-centered vector field with shape (nx, ny, 2)
-        dx, dy: Grid spacing in x and y directions
-        is_x_periodic, is_y_periodic: Flags for periodic boundary conditions
-
-    Output:
-        Divergence at nodes with shape (nx+1, ny+1)
+    Calculates 2D divergence at nodes based on cell-centered vector components.
+    Output shape: (nnx-2, nny-2) - Node-centered
     """
     nx, ny = vector_field.shape[0], vector_field.shape[1]
-    nnx = nx + 1
-    nny = ny + 1
+    nnx = nx - 1
+    nny = ny - 1
     dtype = vector_field.dtype
 
-    # Use ones for scaling factors by default (can be modified for special boundaries)
-    x_scaling = np.ones((ny, 2), dtype=dtype)  # [j, 0/1] - left/right boundary scaling
-    y_scaling = np.ones((nx, 2), dtype=dtype)  # [i, 0/1] - bottom/top boundary scaling
+    if nnx == 0 or nny == 0:
+        return np.empty((nnx, nny), dtype=dtype)
 
-    # Initialize divergence array
-    div_result = np.zeros((nnx, nny), dtype=dtype)
+    div_result = np.empty((nnx, nny), dtype=dtype)
+    inv_dx = 1.0 / dx
+    inv_dy = 1.0 / dy
+    scale_xy = 0.5  # Averaging factor
 
-    oodx = 1.0 / dx
-    oody = 1.0 / dy
+    u = vector_field[:, :, 0]  # Component along axis 0
+    v = vector_field[:, :, 1]  # Component along axis 1
 
-    # Extract vector components
-    u = vector_field[:, :, 0]
-    v = vector_field[:, :, 1]
+    for i in range(nnx):  # Node index i
+        for j in range(nny):  # Node index j
+            # Term d(u)/dx: diff along axis 0, average along axis 1
+            diff_u_j = u[i + 1, j] - u[i, j]
+            diff_u_jp1 = u[i + 1, j + 1] - u[i, j + 1]
+            term_x = scale_xy * (diff_u_j + diff_u_jp1) * inv_dx
 
-    # Process interior and periodic boundary cells
-    for j in range(ny):
-        for i in range(nx):
-            # Skip ghost cells if not periodic
-            if (not is_x_periodic and (i < 1 or i >= nx - 1)) or (
-                not is_y_periodic and (j < 1 or j >= ny - 1)
-            ):
-                continue
+            # Term d(v)/dy: diff along axis 1, average along axis 0
+            diff_v_i = v[i, j + 1] - v[i, j]
+            diff_v_ip1 = v[i + 1, j + 1] - v[i + 1, j]
+            term_y = scale_xy * (diff_v_i + diff_v_ip1) * inv_dy
 
-            # Calculate contributions
-            tmpfx = 0.25 * oodx * u[i, j]
-            tmpfy = 0.25 * oody * v[i, j]
+            div_result[i, j] = term_x + term_y
 
-            # Apply scaling for boundary cells (like Xbot/Xtop in C code)
-            scale_bottom = 1.0 if j > 0 else y_scaling[i, 0]
-            scale_top = 1.0 if j < ny - 1 else y_scaling[i, 1]
+    return div_result
 
-            # Node indices - handle periodic wrapping
-            i_next = (i + 1) % nx if is_x_periodic else i + 1
-            j_next = (j + 1) % ny if is_y_periodic else j + 1
 
-            # Scatter to the four surrounding nodes
-            div_result[i, j] += (+tmpfx + tmpfy) * scale_bottom
-            div_result[i_next, j] += (-tmpfx + tmpfy) * scale_bottom
-            div_result[i, j_next] += (+tmpfx - tmpfy) * scale_top
-            div_result[i_next, j_next] += (-tmpfx - tmpfy) * scale_top
-
-    # Additional boundary flux corrections could be added here
-    # similar to the C code's wall flux corrections
-
-    # For comparison with the gathering approach, we'll trim ghost cells
-    result = (
-        div_result[1:-1, 1:-1]
-        if not is_x_periodic and not is_y_periodic
-        else div_result
-    )
-
-    return result
+# @nb.njit(**_NJIT_OPTIONS)
+# def _divergence_2d_numba(
+#     vector_field: np.ndarray,
+#     dx: float,
+#     dy: float,
+#     is_x_periodic: bool = False,
+#     is_y_periodic: bool = False,
+# ) -> np.ndarray:
+#     """
+#     Extended version with proper boundary handling.
+#
+#     Input:
+#         vector_field: Cell-centered vector field with shape (nx, ny, 2)
+#         dx, dy: Grid spacing in x and y directions
+#         is_x_periodic, is_y_periodic: Flags for periodic boundary conditions
+#
+#     Output:
+#         Divergence at nodes with shape (nx+1, ny+1)
+#     """
+#     nx, ny = vector_field.shape[0], vector_field.shape[1]
+#     nnx = nx + 1
+#     nny = ny + 1
+#     dtype = vector_field.dtype
+#
+#     # Use ones for scaling factors by default (can be modified for special boundaries)
+#     x_scaling = np.ones((ny, 2), dtype=dtype)  # [j, 0/1] - left/right boundary scaling
+#     y_scaling = np.ones((nx, 2), dtype=dtype)  # [i, 0/1] - bottom/top boundary scaling
+#
+#     # Initialize divergence array
+#     div_result = np.zeros((nnx, nny), dtype=dtype)
+#
+#     oodx = 1.0 / dx
+#     oody = 1.0 / dy
+#
+#     # Extract vector components
+#     u = vector_field[:, :, 0]
+#     v = vector_field[:, :, 1]
+#
+#     # Process interior and periodic boundary cells
+#     for j in range(ny):
+#         for i in range(nx):
+#             # Skip ghost cells if not periodic
+#             if (not is_x_periodic and (i < 1 or i >= nx - 1)) or (
+#                 not is_y_periodic and (j < 1 or j >= ny - 1)
+#             ):
+#                 continue
+#
+#             # Calculate contributions
+#             tmpfx = 0.25 * oodx * u[i, j]
+#             tmpfy = 0.25 * oody * v[i, j]
+#
+#             # Apply scaling for boundary cells (like Xbot/Xtop in C code)
+#             scale_bottom = 1.0 if j > 0 else y_scaling[i, 0]
+#             scale_top = 1.0 if j < ny - 1 else y_scaling[i, 1]
+#
+#             # Node indices - handle periodic wrapping
+#             i_next = (i + 1) % nx if is_x_periodic else i + 1
+#             j_next = (j + 1) % ny if is_y_periodic else j + 1
+#
+#             # Scatter to the four surrounding nodes
+#             div_result[i, j] += (+tmpfx + tmpfy) * scale_bottom
+#             div_result[i_next, j] += (-tmpfx + tmpfy) * scale_bottom
+#             div_result[i, j_next] += (+tmpfx - tmpfy) * scale_top
+#             div_result[i_next, j_next] += (-tmpfx - tmpfy) * scale_top
+#
+#     # Additional boundary flux corrections could be added here
+#     # similar to the C code's wall flux corrections
+#
+#     # For comparison with the gathering approach, we'll trim ghost cells
+#     result = (
+#         div_result[1:-1, 1:-1]
+#         if not is_x_periodic and not is_y_periodic
+#         else div_result
+#     )
+#
+#     return result
 
 
 # =============================================================================

@@ -140,10 +140,14 @@ def parse_arguments():
                 f"Static plot: Using first time index {args.steps[0]} from {args.steps}."
             )
             args.steps = [args.steps[0]]
-        elif args.plot_type == "animate" and args.steps and len(args.steps) > 2:
-            logging.warning(
-                f"Animate plot: Using range {args.steps[0]}-{args.steps[-1]} from {args.steps}."
-            )
-            args.steps = [args.steps[0], args.steps[-1]]
+        elif args.plot_type == "animate":
+            if args.steps and len(args.steps) >= 2:
+                logging.warning(
+                    f"Animate plot: Using range {args.steps[0]}-{args.steps[-1]} from {args.steps}."
+                )
+                args.steps = [args.steps[0], args.steps[-1]]
+            elif args.steps and len(args.steps) < 2:
+                args.steps = [0, -1]
+
 
     return args

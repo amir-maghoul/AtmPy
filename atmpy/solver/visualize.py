@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)  # Use a dedicated logger for this module
 
 def _get_time_slice(
     ds: xr.Dataset, time_indices: Optional[List[int]]
-) -> Union[xr.DataArray, slice]:
+):
     """
     Helper function to determine the time slice for plotting.
     For static plots, expects one index (or defaults to last).
@@ -60,7 +60,10 @@ def plot_1d_static(
 
     data_var = ds[variable_name]
     time_value = ds["time"].isel(time=time_index).item()
-    x_coords = ds["x"].values
+    if variable_name == "p2_nodes":
+        x_coords = ds["x_nodes"].values
+    else:
+        x_coords = ds["x"].values
 
     ax.plot(
         x_coords,
@@ -97,7 +100,7 @@ def animate_1d(
         return None
 
     data_var = ds[variable_name]
-    x_coords = ds["x"].values
+    x_coords = data_var["x"].values
 
     start_index, end_index = min(time_indices_range), max(time_indices_range)
     if start_index == end_index:  # Animate a single frame if range is just one step
@@ -158,8 +161,12 @@ def plot_2d_static(
 
     data_var = ds[variable_name]
     time_value = ds["time"].isel(time=time_index).item()
-    x_coords = ds["x"].values
-    y_coords = ds["y"].values
+    if variable_name == "p2_nodes":
+        x_coords = ds["x_node"].values
+        y_coords = ds["y_node"].values
+    else:
+        x_coords = ds["x"].values
+        y_coords = ds["y"].values
 
     plot_data = data_var.isel(time=time_index).data
     # contourf expects Z with dimensions (Y, X)
@@ -219,8 +226,12 @@ def animate_2d(
         return None
 
     data_var = ds[variable_name]
-    x_coords = ds["x"].values
-    y_coords = ds["y"].values
+    if variable_name == "p2_nodes":
+        x_coords = ds["x_node"].values
+        y_coords = ds["y_node"].values
+    else:
+        x_coords = ds["x"].values
+        y_coords = ds["y"].values
 
     start_index, end_index = min(time_indices_range), max(time_indices_range)
     if start_index == end_index:  # Animate a single frame if range is just one step
@@ -463,7 +474,7 @@ def visualize_data(
                 ds, variable_name, anim_time_indices_range, fig=fig, ax=ax
             )
         elif ndim == 2:
-            if fig.axes[0].name == "3d":  # If previous plot (e.g. 3D static) made it 3d
+            if fig.axes[0].name == "2d":
                 fig.clear()  # Clear figure
                 ax = fig.add_subplot(111)  # Add new 2D axes
             animation_object = animate_2d(
