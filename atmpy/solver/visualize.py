@@ -296,7 +296,7 @@ def animate_2d(
         return cont.collections  # FuncAnimation expects an iterable of artists
 
     ani = FuncAnimation(
-        fig, update, frames=len(frames_indices), interval=100, blit=False
+        fig, update, frames=len(frames_indices), interval=0.2, blit=False
     )  # blit=True is tricky with contourf and clear()
     return ani
 

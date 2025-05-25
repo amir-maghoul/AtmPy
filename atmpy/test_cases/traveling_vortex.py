@@ -169,11 +169,12 @@ class TravelingVortex(BaseTestCase):
 
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
-            "CFL": 0.8,
+            "CFL": 0.5,
             "dtfixed": 0.005,
             "dtfixed0": None,
             "tout": np.array([10.0]),
             "stepmax": 101,
+            "use_acoustic_cfl": False, # If True adds max_sound_speed to the speed, therefore smaller dt in dynamic
         }
         self.set_temporal(temporal_updates)
 
@@ -286,8 +287,8 @@ class TravelingVortex(BaseTestCase):
         dy = YC - self.yc
 
         # Account for periodicity: find the closest image
-        dx = dx - Lx * np.round(np.abs(dx / Lx))
-        dy = dy - Ly * np.round(np.abs(dy / Ly))
+        dx = dx - Lx * np.round(dx / Lx)
+        dy = dy - Ly * np.round(dy / Ly)
 
         r_cell = np.sqrt(dx**2 + dy**2)
         r_over_R0_cell = np.divide(r_cell, self.R0, where=self.R0 != 0)
@@ -421,14 +422,17 @@ class TravelingVortex(BaseTestCase):
             * np.divide(p2_nodes_unscaled, rhoY0_cells[ngy : -ngy + 1])  # Divide by 1.0
         )
 
+
+
         # --- Set dp2_nodes (used in pressure solver) ---
         # PyBella sets dp2_nodes = p2_nodes initially after hydrostatics.initial_pressure
         # Here, we can initialize it similarly or set to zero. Let's initialize.
-        mpv.dp2_nodes[...] = mpv.p2_nodes[...]
+        mpv.p0 = self.p0
+        mpv.dp2_nodes[...] = 0.0
 
         # --- Initial Projection ---
         # The PyBella code calls lm_sp.euler_backward_non_advective_impl_part here.
-        # As requested, we *do not* include this logic here. It belongs in the
+        # we *do not* include this logic here. It belongs in the
         # time integrator or a separate initialization step *after* the test case
         # setup and variable initialization. The solver calling this test case
         # would be responsible for performing the initial projection if

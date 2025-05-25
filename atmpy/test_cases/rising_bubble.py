@@ -30,8 +30,20 @@ class RisingBubble(BaseTestCase):
     and then relies on boundary conditions to correct ghost cells.
     """
 
-    def __init__(self):
-        super().__init__(name="RisingBubble", config=SimulationConfig())
+    def __init__(self, config_override: SimulationConfig = None):
+        # Initialize with a default SimulationConfig, which will be modified in setup
+        _effective_config: SimulationConfig
+        run_setup_method = False
+
+        if config_override is not None:
+            _effective_config = config_override
+        else:
+            # No override, create a default config. BaseTestCase will get this,
+            # and then setup() will populate it.
+            _effective_config = SimulationConfig()
+            run_setup_method = True
+
+        super().__init__(name="TravelingVortex", config=_effective_config)
 
         # Case-specific parameters
         self.del_theta_k: float = 2.0  # Initial potential temperature perturbation [K]
@@ -82,10 +94,11 @@ class RisingBubble(BaseTestCase):
         # Temporal Setting
         temporal_updates = {
             "CFL": 0.5,
-            "dtfixed": 0.002,
-            "dtfixed0": 0.002,
+            "dtfixed": 0.001,
+            "dtfixed0": 0.1,
             "tout": np.arange(0.1, 0.71, 0.1),
             "stepmax": 10000,
+            "use_acoustic_cfl": True
         }
         self.set_temporal(temporal_updates)
 

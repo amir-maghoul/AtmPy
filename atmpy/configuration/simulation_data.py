@@ -114,6 +114,7 @@ class Temporal:
     tout: np.ndarray = field(default_factory=lambda: np.array([1.0]))
     tmax: float = 0.05
     stepmax: int = 101
+    use_acoustic_cfl: bool = False
 
 
 @dataclass

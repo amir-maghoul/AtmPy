@@ -150,7 +150,7 @@ def calculate_dynamic_dt(
     # --- Calculate CFL based on acoustic or advective speeds ---
     # config.temporal might need a new flag like 'use_acoustic_cfl'
     use_acoustic_cfl = getattr(
-        config.temporal, "use_acoustic_cfl", True
+        config.temporal, "use_acoustic_cfl", False
     )  # Default to True
 
     if use_acoustic_cfl:
