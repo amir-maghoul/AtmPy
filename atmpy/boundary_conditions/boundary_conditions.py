@@ -287,7 +287,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
                     (cell_vars[nlast + (VI.RHOY,)] ** self.th.gm1) + dpi
                 ) ** self.th.gm1inv
             else:
-                rhoY = self.mpv.hydrostate.cell_vars[..., HI.RHOY0]
+                rhoY = self.mpv.hydrostate.cell_vars[nimage[self.gravity.axis], HI.RHOY0]
 
             # Get the index of the velocities in cell_vars for the gravity and nongravity directions
             gravity_momentum_index = self.gravity.vertical_momentum_index  # VI.RHOV
