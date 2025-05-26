@@ -87,6 +87,7 @@ if args.mode == "run":
     else:
         logger.error(f"Unknown test case specified for run: {args.case}")
         sys.exit(1)
+
     config = case.config  # This 'config' has the definitive grid for THIS run.
 
     # Set defaults if not present in config
@@ -132,7 +133,7 @@ if args.mode == "run":
     num_vars_cell = max(VI.RHO, VI.RHOU, VI.RHOV, VI.RHOW, VI.RHOX, VI.RHOY) + 1
     variables = Variables(grid, num_vars_cell=num_vars_cell, num_vars_node=1)
     case.initialize_solution(variables, mpv)
-    bm_config = config.get_boundary_manager_config()
+    bm_config = config.get_boundary_manager_config(mpv)
     manager = BoundaryManager(bm_config)
     manager.apply_boundary_on_all_sides(variables.cell_vars)
     eos = ExnerBasedEOS()

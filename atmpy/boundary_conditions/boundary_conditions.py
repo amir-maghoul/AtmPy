@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         ReflectiveGravityBCInstantiationOptions as RFBCInstantiationOptions,
     )
     from atmpy.boundary_conditions.bc_extra_operations import ExtraBCOperation
+    from atmpy.variables.multiple_pressure_variables import MPV
 
 from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
 from atmpy.infrastructure.utility import (
@@ -36,6 +37,7 @@ from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
     BoundarySide,
     VariableIndices as VI,
+    HydrostateIndices as HI,
 )
 from atmpy.physics.gravity import Gravity
 
@@ -224,6 +226,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
                 "Reflective gravity is not implemented for 1 dimensional problem."
             )
         self.th: "Thermodynamics" = inst_opts.thermodynamics
+        self.mpv: "MPV" = inst_opts.mpv
         self.gravity: Gravity = Gravity(inst_opts.gravity, self.ndim)
         if self.gravity.strength == 0.0:
             raise ValueError(
@@ -284,9 +287,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
                     (cell_vars[nlast + (VI.RHOY,)] ** self.th.gm1) + dpi
                 ) ** self.th.gm1inv
             else:
-                raise NotImplementedError(
-                    "The incompressible boundary condition is not implemented yet."
-                )
+                rhoY = self.mpv.hydrostate.cell_vars[..., HI.RHOY0]
 
             # Get the index of the velocities in cell_vars for the gravity and nongravity directions
             gravity_momentum_index = self.gravity.vertical_momentum_index  # VI.RHOV

@@ -6,6 +6,7 @@ from atmpy.physics.thermodynamics import Thermodynamics
 
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
+    from atmpy.variables.multiple_pressure_variables import MPV
 from atmpy.infrastructure.enums import (
     BoundarySide as BdrySide,
     BoundaryConditions as BdryType,
@@ -32,11 +33,12 @@ class BCInstantiationOptions:
     stratification: callable = lambda x: x
     thermodynamics: Thermodynamics = field(default_factory=Thermodynamics)
     is_compressible: bool = field(default=True)
+    mpv: Optional["MPV"] = None
 
     def __post_init__(self):
         # Initialize the mpv_boundary_type to match the main boundary type in case there is no gravity.
         if (
-            not self.type == BdryType.REFLECTIVE_GRAVITY
+            self.type != BdryType.REFLECTIVE_GRAVITY
             and self.mpv_boundary_type is None
         ):
             self.mpv_boundary_type = self.type

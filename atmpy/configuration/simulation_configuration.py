@@ -65,12 +65,17 @@ class SimulationConfig:
         """Updates multiple boundary condition specifications."""
         self.boundary_conditions.conditions.update(bc_specs)
 
-    def get_boundary_manager_config(self) -> BoundaryConditionsConfiguration:
+    def get_boundary_manager_config(self, mpv: "MPV" = None) -> BoundaryConditionsConfiguration:
         """
         Generates the configuration object needed to instantiate the BoundaryManager.
+
+        Parameters
+        ----------
+        mpv : MPV
+            The MPV needed for some BC.
         """
         options_list: List[BCInstantiationOptions] = []
-        grid = self.grid  # Use the grid object from self
+        grid = self.spatial_grid.grid  # Use the grid object from self
 
         # Determine direction for each side (assuming standard Cartesian mapping)
         side_to_direction_map = {
@@ -106,6 +111,7 @@ class SimulationConfig:
                 stratification=self.physics.stratification,
                 thermodynamics=th,
                 is_compressible=bool(self.model_regimes.is_compressible),
+                mpv=mpv,
             )
             options_list.append(opts)
 
