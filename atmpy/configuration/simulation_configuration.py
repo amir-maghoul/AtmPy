@@ -43,6 +43,7 @@ class SimulationConfig:
 
     def update_all_derived_fields(self):
         """Central method to update all dependent configurations."""
+        self.global_constants.update_global_constants()
         self.physics.update_derived_fields(self.global_constants, self.spatial_grid)
         self.model_regimes.update_derived_fields(self.global_constants)
 
@@ -65,7 +66,9 @@ class SimulationConfig:
         """Updates multiple boundary condition specifications."""
         self.boundary_conditions.conditions.update(bc_specs)
 
-    def get_boundary_manager_config(self, mpv: "MPV" = None) -> BoundaryConditionsConfiguration:
+    def get_boundary_manager_config(
+        self, mpv: "MPV" = None
+    ) -> BoundaryConditionsConfiguration:
         """
         Generates the configuration object needed to instantiate the BoundaryManager.
 

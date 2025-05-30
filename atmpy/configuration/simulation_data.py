@@ -139,6 +139,9 @@ class GlobalConstants:
     Cs: float = field(init=False)
 
     def __post_init__(self):
+        self.update_global_constants()
+
+    def update_global_constants(self):
         # Ensure gamma != 1 before calculating cp_gas
         if np.isclose(self.gamma, 1.0):
             raise ValueError("Gamma (ratio of specific heats) cannot be 1.")
