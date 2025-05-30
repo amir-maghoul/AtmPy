@@ -52,13 +52,6 @@ def calculate_dynamic_dt(
     inner_slice = grid.get_inner_slice()
 
     # --- Calculate local sound speed (c) ---
-    # This depends heavily on your EOS and variable definitions.
-    # Assuming ExnerBasedEOS and rhoY stores rho * Theta_nd (non-dim potential temp)
-    # P_exner_nd ~ rhoY (if scaled appropriately in your system)
-    # c_physical = sqrt(gamma * R_gas * T_physical)
-    # c_nondim = c_physical / u_ref
-    # T_physical = (rhoY / rho) * T_ref (if rhoY/rho is Theta_nd)
-
     rho_inner = variables.cell_vars[inner_slice + (VI.RHO,)]
     rhoY_inner = variables.cell_vars[inner_slice + (VI.RHOY,)]
 

@@ -40,111 +40,45 @@ def _gradient_1d_numba(p: np.ndarray, dx: float) -> Tuple[np.ndarray]:
     return (Dpx,)
 
 
-# @nb.njit(**_NJIT_OPTIONS)
-# def _gradient_2d_numba(
-#     p: np.ndarray, dx: float, dy: float
-# ) -> Tuple[np.ndarray, np.ndarray]:
-#     """Numba kernel for 2D gradient (cell-centered).
-#
-#     Parameters
-#     ----------
-#     p : np.ndarray of shape (nnx, nny)
-#         The input scalar function (mostly pressure or exner pressure perturbation) defined on nodes.
-#     dx, dy : float
-#         The discretization fineness in each coordinate direction
-#
-#     Returns
-#     -------
-#     Dpx, Dpy : np.ndarray of shape(nnx-1, nny-1)
-#         The derivative in each coordinate direction
-#     """
-#     nx = p.shape[0] - 1
-#     ny = p.shape[1] - 1
-#
-#     # Preallocate for derivatives
-#     Dpx = np.empty((nx, ny), dtype=p.dtype)
-#     Dpy = np.empty((nx, ny), dtype=p.dtype)
-#
-#     inv_dx_half = 0.5 / dx
-#     inv_dy_half = 0.5 / dy
-#
-#     for i in range(nx):
-#         for j in range(ny):
-#             p_i_j = p[i, j]
-#             p_ip1_j = p[i + 1, j]
-#             p_i_jp1 = p[i, j + 1]
-#             p_ip1_jp1 = p[i + 1, j + 1]
-#
-#             # Dpx = avg gradient in x across the cell (i,j)
-#             Dpx[i, j] = (p_ip1_j + p_ip1_jp1 - p_i_j - p_i_jp1) * inv_dx_half
-#             # Dpy = avg gradient in y across the cell (i,j)
-#             Dpy[i, j] = (p_i_jp1 + p_ip1_jp1 - p_i_j - p_ip1_j) * inv_dy_half
-#
-#     return Dpx, Dpy
-
-
 @nb.njit(**_NJIT_OPTIONS)
 def _gradient_2d_numba(
     p: np.ndarray, dx: float, dy: float
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Calculates 2D gradient at cells using the same approach as the C code.
+    """Numba kernel for 2D gradient (cell-centered).
 
-    This follows the pattern of the C code's correction_increments_nodes function,
-    but adapted for 2D instead of 3D.
-
-    Parameters:
-    -----------
+    Parameters
+    ----------
     p : np.ndarray of shape (nnx, nny)
-        The input scalar function defined on nodes
+        The input scalar function (mostly pressure or exner pressure perturbation) defined on nodes.
     dx, dy : float
-        Grid spacing in each direction
+        The discretization fineness in each coordinate direction
 
-    Returns:
-    --------
-    Dpx, Dpy : np.ndarray of shape (nnx-1, nny-1)
-        Gradient components at cell centers
+    Returns
+    -------
+    Dpx, Dpy : np.ndarray of shape(nnx-1, nny-1)
+        The derivative in each coordinate direction
     """
-    nnx, nny = p.shape
-    nx = nnx - 1  # Number of cells in x
-    ny = nny - 1  # Number of cells in y
+    nx = p.shape[0] - 1
+    ny = p.shape[1] - 1
 
-    # Initialize gradient components
+    # Preallocate for derivatives
     Dpx = np.empty((nx, ny), dtype=p.dtype)
     Dpy = np.empty((nx, ny), dtype=p.dtype)
 
-    # Inverse grid spacing
-    oodx = 1.0 / dx
-    oody = 1.0 / dy
+    inv_dx_half = 0.5 / dx
+    inv_dy_half = 0.5 / dy
 
-    # We keep 0.25 to maintain the same structure as the C code
-    factor_x = 0.5 * oodx
-    factor_y = 0.5 * oody
+    for i in range(nx):
+        for j in range(ny):
+            p00 = p[i, j]
+            p10 = p[i + 1, j]
+            p01 = p[i, j + 1]
+            p11 = p[i + 1, j + 1]
 
-    for j in range(ny):
-        for i in range(nx):
-            # Node indices - corners of the current cell (i,j)
-            # Following the same naming convention as the C code:
-            #    n01 --- n11
-            #     |       |
-            #    n00 --- n10
-            n00 = (i, j)  # bottom-left
-            n10 = (i + 1, j)  # bottom-right
-            n01 = (i, j + 1)  # top-left
-            n11 = (i + 1, j + 1)  # top-right
-
-            # Get pressure values at nodes
-            p00 = p[n00]
-            p10 = p[n10]
-            p01 = p[n01]
-            p11 = p[n11]
-
-            # Calculate gradients using the same pattern as the C code
-            # Dpx calculation - differences in x-direction
-            Dpx[i, j] = factor_x * (p10 - p00 + p11 - p01)
-
-            # Dpy calculation - differences in y-direction
-            Dpy[i, j] = factor_y * (p01 - p00 + p11 - p10)
+            # Dpx = avg gradient in x across the cell (i,j)
+            Dpx[i, j] = (p10 + p11 - p00 - p01) * inv_dx_half
+            # Dpy = avg gradient in y across the cell (i,j)
+            Dpy[i, j] = (p01 + p11 - p00 - p10) * inv_dy_half
 
     return Dpx, Dpy
 
@@ -277,84 +211,6 @@ def _divergence_2d_numba(
             div_result[i, j] = term_x + term_y
 
     return div_result
-
-
-# @nb.njit(**_NJIT_OPTIONS)
-# def _divergence_2d_numba(
-#     vector_field: np.ndarray,
-#     dx: float,
-#     dy: float,
-#     is_x_periodic: bool = False,
-#     is_y_periodic: bool = False,
-# ) -> np.ndarray:
-#     """
-#     Extended version with proper boundary handling.
-#
-#     Input:
-#         vector_field: Cell-centered vector field with shape (nx, ny, 2)
-#         dx, dy: Grid spacing in x and y directions
-#         is_x_periodic, is_y_periodic: Flags for periodic boundary conditions
-#
-#     Output:
-#         Divergence at nodes with shape (nx+1, ny+1)
-#     """
-#     nx, ny = vector_field.shape[0], vector_field.shape[1]
-#     nnx = nx + 1
-#     nny = ny + 1
-#     dtype = vector_field.dtype
-#
-#     # Use ones for scaling factors by default (can be modified for special boundaries)
-#     x_scaling = np.ones((ny, 2), dtype=dtype)  # [j, 0/1] - left/right boundary scaling
-#     y_scaling = np.ones((nx, 2), dtype=dtype)  # [i, 0/1] - bottom/top boundary scaling
-#
-#     # Initialize divergence array
-#     div_result = np.zeros((nnx, nny), dtype=dtype)
-#
-#     oodx = 1.0 / dx
-#     oody = 1.0 / dy
-#
-#     # Extract vector components
-#     u = vector_field[:, :, 0]
-#     v = vector_field[:, :, 1]
-#
-#     # Process interior and periodic boundary cells
-#     for j in range(ny):
-#         for i in range(nx):
-#             # Skip ghost cells if not periodic
-#             if (not is_x_periodic and (i < 1 or i >= nx - 1)) or (
-#                 not is_y_periodic and (j < 1 or j >= ny - 1)
-#             ):
-#                 continue
-#
-#             # Calculate contributions
-#             tmpfx = 0.25 * oodx * u[i, j]
-#             tmpfy = 0.25 * oody * v[i, j]
-#
-#             # Apply scaling for boundary cells (like Xbot/Xtop in C code)
-#             scale_bottom = 1.0 if j > 0 else y_scaling[i, 0]
-#             scale_top = 1.0 if j < ny - 1 else y_scaling[i, 1]
-#
-#             # Node indices - handle periodic wrapping
-#             i_next = (i + 1) % nx if is_x_periodic else i + 1
-#             j_next = (j + 1) % ny if is_y_periodic else j + 1
-#
-#             # Scatter to the four surrounding nodes
-#             div_result[i, j] += (+tmpfx + tmpfy) * scale_bottom
-#             div_result[i_next, j] += (-tmpfx + tmpfy) * scale_bottom
-#             div_result[i, j_next] += (+tmpfx - tmpfy) * scale_top
-#             div_result[i_next, j_next] += (-tmpfx - tmpfy) * scale_top
-#
-#     # Additional boundary flux corrections could be added here
-#     # similar to the C code's wall flux corrections
-#
-#     # For comparison with the gathering approach, we'll trim ghost cells
-#     result = (
-#         div_result[1:-1, 1:-1]
-#         if not is_x_periodic and not is_y_periodic
-#         else div_result
-#     )
-#
-#     return result
 
 
 # =============================================================================

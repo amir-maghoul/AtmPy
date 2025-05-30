@@ -142,7 +142,7 @@ class Solver:
                 current_dt = self.config.temporal.dtfixed0
             elif (
                 self.config.temporal.dtfixed0 is not None
-                and self.config.temporal.dtfixed0 > 0
+                and self.current_step > 0
             ):  # Original line was "if self.config.temporal.dtfixed0 is not None:"
                 current_dt = (
                     self.config.temporal.dtfixed

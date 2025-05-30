@@ -1,6 +1,7 @@
 """This module handles multiple pressure variables. It is used to calculate the hydrostate pressure.
 The code is the modified version of what appears in PyBella project.
 """
+
 import scipy as sp
 import numpy as np
 from typing import List, Union, TYPE_CHECKING
@@ -50,9 +51,9 @@ class MPV:
         self.p2_nodes0: np.ndarray = np.zeros(grid.nshape)
         self.dp2_nodes: np.ndarray = np.zeros(grid.nshape)
 
-        self.u: np.ndarray = np.zeros(grid.cshape)
-        self.v: np.ndarray = np.zeros(grid.cshape)
-        self.w: np.ndarray = np.zeros(grid.cshape)
+        self.Pu: np.ndarray = np.zeros(grid.cshape)
+        self.Pv: np.ndarray = np.zeros(grid.cshape)
+        self.Pw: np.ndarray = np.zeros(grid.cshape)
 
         # Containers for the pressure equation
         self.rhs: np.ndarray = np.zeros(
@@ -131,6 +132,9 @@ class MPV:
         tile_shape = list(self.grid.cshape)
         tile_shape[self.direction] = 1
         return tile_shape
+
+    def set_rhs_to_zero(self):
+        self.rhs[...] = 0.0
 
     def state(self, gravity_strength: Union[np.ndarray, list, tuple], Msq: float):
         """Computes the initial values for the multiple pressure variables

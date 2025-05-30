@@ -89,6 +89,7 @@ class BaseTestCase(ABC):
                 setattr(physics_config, key, value)
             else:
                 print(f"Warning: Physics setting '{key}' not found in config.")
+        self.config.update_all_derived_fields()
 
     def set_model_regimes(self, model_regime_updates: dict):
         """Update the model regime configuration."""
