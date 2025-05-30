@@ -37,10 +37,7 @@ class BCInstantiationOptions:
 
     def __post_init__(self):
         # Initialize the mpv_boundary_type to match the main boundary type in case there is no gravity.
-        if (
-            self.type != BdryType.REFLECTIVE_GRAVITY
-            and self.mpv_boundary_type is None
-        ):
+        if self.type != BdryType.REFLECTIVE_GRAVITY and self.mpv_boundary_type is None:
             self.mpv_boundary_type = self.type
 
 

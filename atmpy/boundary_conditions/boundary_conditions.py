@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from atmpy.boundary_conditions.bc_extra_operations import ExtraBCOperation
     from atmpy.variables.multiple_pressure_variables import MPV
 
-from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
+from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment, WallFluxCorrection
 from atmpy.infrastructure.utility import (
     direction_axis,
     momentum_index,
@@ -287,7 +287,9 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
                     (cell_vars[nlast + (VI.RHOY,)] ** self.th.gm1) + dpi
                 ) ** self.th.gm1inv
             else:
-                rhoY = self.mpv.hydrostate.cell_vars[nimage[self.gravity.axis], HI.RHOY0]
+                rhoY = self.mpv.hydrostate.cell_vars[
+                    nimage[self.gravity.axis], HI.RHOY0
+                ]
 
             # Get the index of the velocities in cell_vars for the gravity and nongravity directions
             gravity_momentum_index = self.gravity.vertical_momentum_index  # VI.RHOV
@@ -494,21 +496,29 @@ class Wall(BaseBoundaryCondition):
             mode=mode,
         )
 
-    def apply_extra(self, variable: np.ndarray, operation: "ExtraBCOperation") -> None:
+    def apply_extra(self, variables: np.ndarray, operation: "ExtraBCOperation") -> None:
         """This is applied on a nodal variable. Rescale nodes at the boundary by a factor.
 
         Parameters
         ----------
         variable : np.ndarray
-            The nodal variable to apply the extra boundary condition on.
+            The variables to apply the extra boundary condition on. The compatibility of variables with the
+            extra BC is on the user.
         operation: ExtraBCOperation
             The ExtraBCOperation object to be applied.
         """
 
         if isinstance(operation, WallAdjustment):
+            # Assumption: Variables is a single nodal variable
             factor = operation.factor
-            boundary_nodes_slice = self._boundary_nodes()
-            variable[boundary_nodes_slice] *= factor
+            boundary_nodes_slice = self._boundary_slice()
+            variables[boundary_nodes_slice] *= factor
+        elif isinstance(operation, WallFluxCorrection):
+            # Assumption: Variables is the momenta stacked on the last axis.
+            factor = operation.factor
+            pad_slice = self.padded_slices()
+            for i in range(variables.shape[-1]):
+                variables[pad_slice + (i,)] *= factor
         else:
             pass
 
@@ -525,8 +535,8 @@ class Wall(BaseBoundaryCondition):
         inner_slice[self.direction] = slc
         return tuple(inner_slice)
 
-    def _boundary_nodes(self) -> Tuple[slice, ...]:
-        """Create the slice for the nodes at the boundary. This is used to rescale those nodes."""
+    def _boundary_slice(self) -> Tuple[slice, ...]:
+        """Create the slice for the nodes/cells at the boundary."""
         # Notice in backward indexing, the third to last element in the last inner node (boundary node).
         # Therefore, in backward indexing -ig - 1 is the correct index of the last inner node.
         idx = (
@@ -610,7 +620,7 @@ def example_usage():
         "is_lamb": False,
         "is_compressible": True,
     }
-    x = ReflectiveGravityBoundary(**params)
+    x = Wall(**params)
     print(variables.cell_vars[..., VI.RHO])
     x.apply(variables.cell_vars)
     print(variables.cell_vars[..., VI.RHO])

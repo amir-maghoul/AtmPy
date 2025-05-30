@@ -59,6 +59,14 @@ class WallAdjustment(ExtraBCOperation):
     def get_identifier(self) -> str:
         return f"WallAdjustment(factor={self.factor}, target={self.get_target_description()})"
 
+class WallFluxCorrection(ExtraBCOperation):
+    def __init__(self, factor: float, **kwargs):
+        super().__init__(**kwargs)
+        self.target_type = BdryType.WALL
+        self.factor = factor
+
+    def get_identifier(self) -> str:
+        return f"WallFluxCorrection(factor={self.factor}, target={self.get_target_description()})"
 
 ######################################
 # Operation for PERIODIC BCs
