@@ -102,8 +102,6 @@ class Flux:
         self.ndim = self.grid.ndim
         self.kernels = create_averaging_kernels(self.ndim)  # [kernel_x, kernel_y, ...]
 
-        self.iflux = {"x": None, "y": None, "z": None}
-
         if self.ndim == 1:
             self.flux = {
                 "x": np.zeros(
@@ -152,9 +150,6 @@ class Flux:
                     dtype=np.float64,
                 ),
             }
-
-        # Initialize iflux
-        # self.compute_averaging_fluxes()
 
     def _compute_unphysical_fluxes(self) -> dict[str, np.ndarray]:
         """
@@ -221,9 +216,10 @@ class Flux:
         for flux, kernel, direction in zip(
             unphysical_fluxes.values(), self.kernels, directions
         ):
-            self.iflux[direction] = sp.signal.fftconvolve(flux, kernel, mode=mode)
             inner_index = one_element_inner_slice(self.ndim, full=False)
-            self.flux[direction][inner_index + (VI.RHOY,)] = self.iflux[direction]
+            self.flux[direction][inner_index + (VI.RHOY,)] = sp.signal.fftconvolve(
+                flux, kernel, mode=mode
+            )
 
     def apply_reconstruction(
         self, lmbda: float, direction: str
@@ -247,7 +243,7 @@ class Flux:
         )
 
         # Use reconstruction scheme (MUSCL) to create left and right primitive variables
-        lefts.primitives, rights.primitives = self.reconstruction(
+        lefts.primitives[...], rights.primitives[...] = self.reconstruction(
             self.variables, self.flux, self.eos, self.limiter, lmbda, direction
         )
 
@@ -273,6 +269,7 @@ class Flux:
             (cell_vars[lefts_idx + (VI.RHOY,)] + cell_vars[rights_idx + (VI.RHOY,)])
             - 0.5 * lmbda * (Pu[rights_idx] - Pu[lefts_idx])
         )
+
         lefts.cell_vars[lefts_idx + (VI.RHOY,)] = scale
         rights.cell_vars[rights_idx + (VI.RHOY,)] = scale
 
@@ -296,9 +293,6 @@ class Flux:
             The direction of the flux calculation.
         """
         lefts, rights = self.apply_reconstruction(lmbda, direction)
-
-        lefts.to_primitive(self.eos)
-        rights.to_primitive(self.eos)
 
         self.riemann_solver(
             lefts.primitives, rights.primitives, self.flux, direction, self.ndim

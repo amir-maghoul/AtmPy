@@ -39,7 +39,7 @@ def modified_hll(
         ndim, direction, full=False
     )
 
-    # Compute the Pu= rhoTheta*u. u example placeholder for all velocities
+    # Compute the Pu = rhoTheta*u. u example placeholder for all velocities
     Pu = flux[direction][..., VI.RHOY]
 
     # Compute the upwind factor based on the sign of Pu
@@ -60,8 +60,8 @@ def modified_hll(
     )
 
     #  Compute the ADVECTED values
-    # Exclude VI.RHO from other variables
-    variable_indices = slice(1, None)
+    # Exclude VI.RHO and VI.RHOY from other variables
+    variable_indices = slice(2, None)
 
     # Compute the advected values. Rho separately
     flux[direction][directional_inner_idx + (VI.RHO,)] = left_factor + right_factor

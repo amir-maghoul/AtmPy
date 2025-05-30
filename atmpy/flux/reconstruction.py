@@ -69,25 +69,14 @@ def modified_muscl(
     diffs = calculate_variable_differences(primitives, ndim, direction)
     slopes = calculate_slopes(diffs, direction, limiter, ndim)
 
-    indices = [PVI.U, PVI.V, PVI.W, PVI.X]
-
     # left amplitudes and slope
     amplitudes = calculate_amplitudes(slopes, speed, lmbda, left=True)
     lefts = np.zeros_like(primitives)
-    # for index in indices:
-    #     lefts[..., index] = primitives[..., index] + amplitudes[..., index]
-    #
-    # lefts[..., PVI.Y] = 1.0 / ((1.0 / primitives[..., PVI.Y]) + amplitudes[..., PVI.Y])
-
     lefts[..., 1:] = primitives[..., 1:] + amplitudes
 
     # right amplitudes and slope
     amplitudes = calculate_amplitudes(slopes, speed, lmbda, left=False)
     rights = np.zeros_like(primitives)
-    # for index in indices:
-    #     rights[..., index] = primitives[..., index] + amplitudes[..., index]
-    #
-    # rights[..., PVI.Y] = 1.0 / ((1.0 / primitives[..., PVI.Y]) + amplitudes[..., PVI.Y])
     rights[..., 1:] = primitives[..., 1:] + amplitudes
     return lefts, rights
 
