@@ -3,6 +3,7 @@ import logging
 import os
 import pickle
 import sys
+from argparse import ArgumentTypeError
 from typing import Optional
 
 import numpy as np
@@ -87,7 +88,7 @@ if args.mode == "run":
     else:
         logger.error(f"Unknown test case specified for run: {args.case}")
         sys.exit(1)
-
+    # case = RisingBubble()
     config = case.config  # This 'config' has the definitive grid for THIS run.
 
     # Set defaults if not present in config
@@ -142,7 +143,7 @@ if args.mode == "run":
     ps_context: PressureContext[ClassicalPressureSolver] = PressureContext(
         solver_type=PressureSolvers.CLASSIC_PRESSURE_SOLVER,
         op_context=op_context,
-        linear_solver_type=LinearSolvers.BICGSTAB,
+        linear_solver_type=LinearSolvers.GMRES,
         precondition_type=Preconditioners.DIAGONAL,
         extra_dependencies={
             "grid": grid,
@@ -222,41 +223,47 @@ elif args.mode == "visualize":
         sys.exit(1)
 
     # Determine effective grid dimensions for path construction
-    nx_to_use = args.nx if args.nx is not None else base_vis_config.spatial_grid.nx
-    ny_to_use = None
-    nz_to_use = None
-    ndim_to_use = base_vis_config.spatial_grid.ndim
+    if args.file is not None and (args.nx is not None or args.ny is not None or args.nz is not None):
+        raise ArgumentTypeError("Cannot specify both --file and --nx or --ny or --nz at the same time.")
 
-    if ndim_to_use >= 2:
-        ny_to_use = args.ny if args.ny is not None else base_vis_config.spatial_grid.ny
-    elif args.ny is not None:
-        logger.warning(f"Ignoring --ny for {ndim_to_use}D case '{args.case}'.")
-    if ndim_to_use >= 3:
-        nz_to_use = args.nz if args.nz is not None else base_vis_config.spatial_grid.nz
-    elif args.nz is not None:
-        logger.warning(f"Ignoring --nz for {ndim_to_use}D case '{args.case}'.")
+    elif args.file is not None:
+        input_file_to_visualize = args.file[0]
+    else:
+        nx_to_use = args.nx
+        ny_to_use = None
+        nz_to_use = None
+        ndim_to_use = base_vis_config.spatial_grid.ndim
 
-    logger.info(
-        f"Visualizing for effective grid: Nx={nx_to_use}, Ny={ny_to_use}, Nz={nz_to_use} (Ndim={ndim_to_use})"
-    )
+        if ndim_to_use >= 2:
+            ny_to_use = args.ny if args.ny is not None else base_vis_config.spatial_grid.ny
+        elif args.ny is not None:
+            logger.warning(f"Ignoring --ny for {ndim_to_use}D case '{args.case}'.")
+        if ndim_to_use >= 3:
+            nz_to_use = args.nz if args.nz is not None else base_vis_config.spatial_grid.nz
+        elif args.nz is not None:
+            logger.warning(f"Ignoring --nz for {ndim_to_use}D case '{args.case}'.")
 
-    # --- Generate output filename for VISUALIZATION using the utility ---
-    try:
-        input_file_to_visualize = generate_output_filepath(
-            config_outputs=base_vis_config.outputs,  # Use output settings from default config
-            case_name=args.case,
-            nx=nx_to_use,
-            ny=ny_to_use,
-            nz=nz_to_use,
-            ndim=ndim_to_use,
+        logger.info(
+            f"Visualizing for effective grid: Nx={nx_to_use}, Ny={ny_to_use}, Nz={nz_to_use} (Ndim={ndim_to_use})"
         )
-    except (
-        ValueError
-    ) as e:  # Handles missing ny/nz for 2D/3D in generate_output_filepath
-        logger.error(f"Error generating filepath for visualization: {e}")
-        sys.exit(1)
 
-    logger.info(f"Attempting to visualize file: {input_file_to_visualize}")
+        # --- Generate output filename for VISUALIZATION using the utility ---
+        try:
+            input_file_to_visualize = generate_output_filepath(
+                config_outputs=base_vis_config.outputs,  # Use output settings from default config
+                case_name=args.case,
+                nx=nx_to_use,
+                ny=ny_to_use,
+                nz=nz_to_use,
+                ndim=ndim_to_use,
+            )
+        except (
+            ValueError
+        ) as e:  # Handles missing ny/nz for 2D/3D in generate_output_filepath
+            logger.error(f"Error generating filepath for visualization: {e}")
+            sys.exit(1)
+
+        logger.info(f"Attempting to visualize file: {input_file_to_visualize}")
 
     if not os.path.exists(input_file_to_visualize):
         error_msg = (

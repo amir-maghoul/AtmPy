@@ -95,6 +95,12 @@ def parse_arguments():
         default=[-1],
         help="Time indices to plot. For static: one index. For animate: one or two for range. (Visualize mode only)",
     )
+    vis_group.add_argument(
+        "--file",
+        type=str,
+        nargs="*",
+        help="The file to read visualization from",
+    )
 
     args = parser.parse_args()
 
@@ -148,6 +154,5 @@ def parse_arguments():
                 args.steps = [args.steps[0], args.steps[-1]]
             elif args.steps and len(args.steps) < 2:
                 args.steps = [0, -1]
-
 
     return args
