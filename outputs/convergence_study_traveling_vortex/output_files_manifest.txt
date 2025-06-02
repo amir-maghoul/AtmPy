@@ -1,3 +1,0 @@
-16:/home/amir/Projects/Python/Atmpy/outputs/convergence_study_traveling_vortex/run_nx16/_traveling_vortex_64_64.nc
-32:/home/amir/Projects/Python/Atmpy/outputs/convergence_study_traveling_vortex/run_nx32/_traveling_vortex_64_64.nc
-64:/home/amir/Projects/Python/Atmpy/outputs/convergence_study_traveling_vortex/run_nx64/_traveling_vortex_64_64.nc
