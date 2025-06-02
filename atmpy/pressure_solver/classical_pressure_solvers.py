@@ -153,17 +153,17 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         inner_slice = one_element_inner_slice(self.ndim, full=False)
         self.mpv.wcenter[inner_slice] = dPdpi
 
-        #################### Update the boundary nodes for the dP/dpi container. ######################################
-        # Create the operation context to scale down the nodes. Notice the side is set to be BdrySide.ALL.
-        # This will apply the 'extra' method whenever the boundary is defined to be WALL.
-        boundary_operation = [
-            WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
-            )
-        ]
-        self.boundary_manager.apply_extra_all_sides(
-            self.mpv.wcenter, boundary_operation, target_mpv=False
-        )
+        # #################### Update the boundary nodes for the dP/dpi container. ######################################
+        # # Create the operation context to scale down the nodes. Notice the side is set to be BdrySide.ALL.
+        # # This will apply the 'extra' method whenever the boundary is defined to be WALL.
+        # boundary_operation = [
+        #     WallAdjustment(
+        #         target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
+        #     )
+        # ]
+        # self.boundary_manager.apply_extra_all_sides(
+        #     self.mpv.wcenter, boundary_operation, target_mpv=False
+        # )
 
     def calculate_enthalpy_weighted_pressure_gradient(
         self, p: np.ndarray, dt: float, is_nongeostrophic: bool, is_nonhydrostatic: bool
@@ -197,7 +197,6 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         pTheta = self._calculate_coefficient_pTheta(
             cellvars
         )  # Capital P. it is written small for naming in Python.
-
         ##################### Calculate exner pressure gradient times coefficient (cell-centered) ######################
         ##################### These are the nominator terms under the divergence in the Helmholtz equation #############
         Pu = -dt * pTheta * dpdx
@@ -247,7 +246,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         ################################ Calculate the RHS of momenta equations  #######################################
         Pu_incr, Pv_incr, Pw_incr = self.calculate_enthalpy_weighted_pressure_gradient(
-            p, dt, is_nongeostrophic, is_nonhydrostatic
+            coeff_vars, p, dt, is_nongeostrophic, is_nonhydrostatic
         )
 
         ################################# Create the necessary variables  ##############################################
@@ -302,8 +301,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         ######### Calculate the needed term inside the divergence: M_inv ⋅ ( dt * (PΘ)° * ∇p )  ########################
         # The results are cell-centered
+        # WARNING: note the sign of dt.
         u, v, w = self.calculate_enthalpy_weighted_pressure_gradient(
-            p, dt, is_nongeostrophic, is_nonhydrostatic
+            p, -dt, is_nongeostrophic, is_nonhydrostatic
         )
 
         ######### Stack the values above so that they can be passed to the divergence ##################################
@@ -311,13 +311,8 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             ..., : self.ndim
         ]  # Ensure correct dims
 
-        ######### Apply divergence #####################################################################################
-        divergence = self.discrete_operator.divergence(vector_field_cell)
-
-        ######### Negate the result and flatten for future usage in scipy LinearOperator ###############################
-        laplacian = (
-            -divergence
-        )  # This is the sign between the first and second term in the Helmholtz equation
+        #################################### Apply divergence ##########################################################
+        laplacian = self.discrete_operator.divergence(vector_field_cell)
 
         return laplacian
 
@@ -362,7 +357,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         ####### Creating the pressure term corresponding to the dPdpi and add it to the laplacian ######################
         inner_slice = self.grid.get_inner_slice()
-        helmholtz_result = laplacian + self.mpv.wcenter[inner_slice] * p[inner_slice]
+        helmholtz_result = laplacian - self.mpv.wcenter[inner_slice] * p[inner_slice]
 
         return helmholtz_result
 
@@ -467,12 +462,15 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         solution_flat, info = self.linear_solver.solve(
             A, rhs_flat, rtol=rtol, max_iter=max_iter, M=M_op
         )
+        iterations = getattr(self.linear_solver, 'iterations_', 'N/A (solver does not store iterations)')
 
-        # Optional Logging
+        # Logging
         if info > 0:
             print(f"WARNING: Linear solver did not converge in {info} iterations.")
         elif info < 0:
             print(f"ERROR: Linear solver failed with error code {info}.")
+        else:
+            print(f"Linear solver converged. Iterations: {iterations}. Exit code: {info}")
 
         return solution_flat, info
 
@@ -512,20 +510,29 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         The dt in the denominator has an obvious reason: This will be part of the Helmholtz equation operator, the
         laplacian and this term should be created as an overall operator, the dt (which basically belongs to the
-        laplacian update) should be divided before we create the operator ([C/dt]p₂ + ∇⋅(M_inv⋅(dt*CΘ*∇p₂)) = DivV).
+        laplacian update) should be divided before we create the operator ([C/dt]p₂ - ∇⋅(M_inv⋅(dt*CΘ*∇p₂)) = DivV).
         """
 
         # Calculate the coefficient and the exponent of the dP/dpi using the formula directly. (see the docstring)
-        ccenter = -self.Msq * self.th.gm1inv / (dt)
-        cexp = 2.0 - self.th.gamma
+        coeff = self.Msq * self.th.gm1inv / (dt)
+        exponent = 2.0 - self.th.gamma
 
         # Temp variable for rhoTheta=P for readability
         P = cellvars[..., VI.RHOY]
 
         # Averaging over the nodes and fill the mpv container (Eq. 29 BK19)
         kernel = np.ones([2] * self.ndim)
-        return (
-            ccenter
-            * sp.signal.fftconvolve(P**cexp, kernel, mode="valid")
+        dPdpi = (
+            coeff
+            * sp.signal.fftconvolve(P**exponent, kernel, mode="valid")
             / kernel.sum()
         )
+
+        boundary_operation = [
+            WallAdjustment(
+                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
+            )
+        ]
+        self.boundary_manager.apply_extra_all_sides(dPdpi, boundary_operation)
+
+        return dPdpi

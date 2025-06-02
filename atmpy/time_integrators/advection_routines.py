@@ -53,7 +53,7 @@ def first_order_splitting_advection(
 
     for direction_str in sweep_order:
         _1d_directional_advection(
-            grid, variables, flux, direction_str, dt, boundary_manager, order=2
+            grid, variables, flux, direction_str, dt, boundary_manager
         )
 
     # for direction_str in sweep_order:
@@ -91,9 +91,8 @@ def upwind_strang_split_advection(
     sweep_order: List[str]
         The sweep order. It indicates whether sweep the dimensions in a standard x-y-z-z-y-x or some alternative way
     """
-
-    ################################ Prepare timestep and sweep order in directions ####################################
     half_dt = 0.5 * dt
+    ################################ Prepare timestep and sweep order in directions ####################################
     current_sweep_order = list(sweep_order)
 
     ################################ First half-sweep ##################################################################
@@ -112,11 +111,10 @@ def upwind_strang_split_advection(
 def _1d_directional_advection(
     grid: "Grid",
     variables: "Variables",
-    flux: "Flux",
+    flux_obj: "Flux",
     direction: str,
     dt: float,
     boundary_manager: "BoundaryManager",
-    order: int = 2,
 ) -> None:
     """
     Core 1D advection in the given direction. It will be used to update in both 1D and 2D strang splitting routines.
@@ -140,78 +138,17 @@ def _1d_directional_advection(
     ############################## Parameters ##########################################################################
     ndim: int = grid.ndim
     direction_int: int = direction_axis(direction)
-    lmbda: float = dt / grid.dxyz[direction_int]  # if order == 2 else 0
+    lmbda: float = dt / grid.dxyz[direction_int]
 
     # Find the left and right indices
     left_idx, right_idx, _ = directional_indices(ndim, direction, full=True)
 
     # ################################ Apply Riemann Solver ##############################################################
-    flux.apply_riemann_solver(lmbda, direction)
+    flux_obj.apply_riemann_solver(lmbda, direction)
 
     ################################ Update variables ##################################################################
-    # if order == 2:
-    #     variables.cell_vars[...] += lmbda * (
-    #         flux.flux[direction][left_idx] - flux.flux[direction][right_idx]
-    #     )
-
     variables.cell_vars[...] += lmbda * (
-        flux.flux[direction][left_idx] - flux.flux[direction][right_idx]
+        flux_obj.flux[direction][left_idx] - flux_obj.flux[direction][right_idx]
     )
-
     ############################## Apply boundary conditions ###########################################################
     boundary_manager.apply_boundary_on_direction(variables.cell_vars, direction)
-
-
-if __name__ == "__main__":
-    from atmpy.physics.eos import ExnerBasedEOS
-    from atmpy.grid.utility import DimensionSpec, create_grid
-    from atmpy.variables.variables import Variables
-    from atmpy.flux.flux import Flux
-    from atmpy.boundary_conditions.utility import create_params
-    from atmpy.infrastructure.enums import (
-        BoundarySide as BdrySide,
-        BoundaryConditions as BdryType,
-    )
-    from atmpy.boundary_conditions.boundary_manager import BoundaryManager
-
-    np.set_printoptions(linewidth=100)
-
-    dt = 0.1
-
-    nx = 1
-    ngx = 2
-    nnx = nx + 2 * ngx
-    ny = 2
-    ngy = 2
-    nny = ny + 2 * ngy
-
-    dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
-    grid = create_grid(dim)
-    rng = np.random.default_rng()
-    arr = np.arange(nnx * nny)
-    rng.shuffle(arr)
-    array = arr.reshape(nnx, nny)
-
-    variables = Variables(grid, 5, 1)
-    variables.cell_vars[..., VI.RHO] = 1
-    variables.cell_vars[..., VI.RHO][1:-1, 1:-1] = 4
-    variables.cell_vars[..., VI.RHOU] = array
-    variables.cell_vars[..., VI.RHOY] = 2
-
-    rng.shuffle(arr)
-    array = arr.reshape(nnx, nny)
-    variables.cell_vars[..., VI.RHOV] = array
-    eos = ExnerBasedEOS()
-    flux = Flux(grid, variables, eos, dt)
-
-    bc_data = {}
-    create_params(bc_data, BdrySide.LEFT, BdryType.PERIODIC, direction="x", grid=grid)
-    create_params(bc_data, BdrySide.RIGHT, BdryType.PERIODIC, direction="x", grid=grid)
-    create_params(bc_data, BdrySide.BOTTOM, BdryType.PERIODIC, direction="y", grid=grid)
-    create_params(bc_data, BdrySide.TOP, BdryType.PERIODIC, direction="y", grid=grid)
-
-    manager = BoundaryManager()
-    manager.setup_conditions(bc_data)
-
-    upwind_strang_split_advection(grid, variables, flux, dt, boundary_manager=manager)
-    print(variables.cell_vars[..., VI.RHOU])

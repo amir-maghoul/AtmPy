@@ -8,13 +8,14 @@ import numpy as np
 np.seterr(all="raise")
 from typing import TYPE_CHECKING, Union, List, Any, Callable
 
-from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
+from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment, WallFluxCorrection
 from atmpy.boundary_conditions.contexts import BCApplicationContext
 from atmpy.infrastructure.utility import (
     directional_indices,
     one_element_inner_slice,
     one_element_inner_nodal_shape,
-    dimension_directions, momentum_index,
+    dimension_directions,
+    momentum_index,
 )
 from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
 from atmpy.infrastructure.enums import VariableIndices as VI, Preconditioners
@@ -161,7 +162,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         global_time_step_num: int,
     ) -> None:
         logging.debug(f"Predictor (step {global_time_step_num}): Starting")
+
         half_dt = 0.5 * dt
+        # self.variables.cell_vars[...] = initial_vars_arr_for_coeffs
 
         # Current state (Sol^n, p^n) is in self.variables, self.mpv ###
         ################################ 1. Apply BCs to current state (t^n) ###########################################
@@ -177,7 +180,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             f"Predictor (step {global_time_step_num}): Averaging fluxes computed from Sol^n"
         )
 
-        #################### 3. Advect state by dt/2 using first-order splitting -> Sol* ###############################
+        #################### 3.a Advect state by dt/2 using first-order splitting -> Sol* ###############################
         ##################################### (Eq. 14a of BK19) ########################################################
         # self.variables.cell_vars (Sol^n) becomes Sol#
         # # Advective mass fluxes in self.flux are based on Sol^n
@@ -191,8 +194,13 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             boundary_manager=self.boundary_manager,
         )
         logging.debug(
-            f"Predictor (step {global_time_step_num}): After first-order advection (Sol^n -> Sol*)"
+            f"Predictor (step {global_time_step_num}): After first-order advection (Sol^n -> Sol#)"
         )
+
+        #################################### 3.b Save the value of pressure after advection ############################
+        self.mpv.p2_nodes0[...] = self.mpv.p2_nodes
+        # Save Sol# and return
+        predictor_end_vars = np.copy(self.variables.cell_vars)
 
         ###################### 4. Non-Advective Implicit Euler Substep for dt/2 ########################################
         #################################### (Eq. 15 of BK19) ##########################################################
@@ -202,8 +210,17 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             f"Predictor (step {global_time_step_num}): After backward_update_explicit on Sol*"
         )
 
+        if not self.is_compressible:
+            predictor_coeff_vars = np.copy(predictor_end_vars)
+        else:
+            predictor_coeff_vars = self.variables.cell_vars
+
         # Solve for Exner pressure
-        self.backward_update_implicit(half_dt, self.variables.cell_vars.copy())
+        self.backward_update_implicit(
+            half_dt, initial_vars=predictor_coeff_vars
+        )
+
+
         # self.variables is now Sol^{n+1/2}, self.mpv.p2_nodes is p^{n+1/2}
         logging.debug(
             f"Predictor (step {global_time_step_num}): After backward_update_implicit (Sol* -> Sol^(n+1/2))"
@@ -363,7 +380,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Update all other variables on the boundary.
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
 
-    def backward_update_implicit(self, dt: float, initial_vars: np.ndarray = None):
+    def backward_update_implicit(
+        self, dt: float, initial_vars: np.ndarray=None
+    ):
         """Compute the one step of the implicit part of the Euler backward scheme. This is a part of the BK19 algorithm.
         Notice before the call to this method, the coefficient variables must be created at half timestep. Then going back
         to the initial variables, we start anew to advance the time stepping in a implicit trapezoidal rule
@@ -414,11 +433,19 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # [Pu, Pv, Pw]
         pressure_weighted_momenta = self._calculate_enthalpy_weighted_momenta(cellvars)
 
+        ########################### Zero the momentum ghost cells to pass to divergence ################################
+        boundary_operation = [
+            WallFluxCorrection(
+                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.0
+            )
+        ]
+        self.boundary_manager.apply_extra_all_sides(pressure_weighted_momenta, boundary_operation)
+
+        ################################################################################################################
         # Calculate divergence on one element inner nodes [shape: (nx-1, ny-1, nz-1)]
         # Since the current momenta contain the pressure gradient update, this divergence
         # is basically ∇⋅(M_inv⋅(dt*(PΘ)*∇p₂)) where M is extended coriolis inverse
         divergence_inner = self.discrete_operator.divergence(pressure_weighted_momenta)
-
         laplacian_inner_node_slice = laplacian_inner_slice(self.grid.ng)
         # Final RHS for A * delta_p = rhs
         rhs_flat = divergence_inner[laplacian_inner_node_slice].flatten()
@@ -427,12 +454,14 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.mpv.wcenter *= self.is_compressible
 
         ############################ 6. Solve the elliptic helmholtz equation ##########################################
+        rtol = 1.0e-7
         p2_inner_flat, solver_info = self.pressure_solver.solve_helmholtz(
             rhs_flat,
             dt,
             self.is_nongeostrophic,
             self.is_nonhydrostatic,
             self.is_compressible,
+            rtol=rtol,
             # Add tol/max_iter if needed, e.g., tol=1e-7
         )
 
@@ -496,7 +525,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             The gravity strength
         """
         coriolis = self.coriolis.strength
-        adjusted_momenta = self.variables.adjust_background_wind(self.wind_speed, -1.0)
+        adjusted_momenta = self.variables.adjust_background_wind(self.wind_speed, -1.0, in_place=True)
 
         # pressure gradient factor: (P/Gamma)
         rhoYovG = self.pressure_solver._calculate_P_over_Gamma(cellvars)
@@ -529,26 +558,40 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # Updates: The momentum in the direction of gravity
         # Find vertical vs horizontal velocities:
-        cellvars[..., self.pressure_solver.vertical_momentum_index] -= dt * (
-            (g / self.Msq) * dbuoy * self.is_nonhydrostatic
-        )
+        if self.grid.ndim >= 2 and self.pressure_solver.vertical_momentum_index < cellvars.shape[-1]:
+            cellvars[..., self.pressure_solver.vertical_momentum_index] -= dt * (
+                (g / self.Msq) * dbuoy * self.is_nonhydrostatic
+            )
 
     def _forward_pressure_update(
         self, cellvars: np.ndarray, dt: float, p2n: np.ndarray
     ):
         """Update the Exner pressure."""
 
+        ################################################################################################################
         # Compute the divergence of the pressure-weighted momenta: (Pu)_x + (Pv)_y + (Pw)_z where
         # # P = rho*Y = rho*Theta
         pressure_weighted_momenta = self._calculate_enthalpy_weighted_momenta(
             self.variables.cell_vars
         )
+        ################################################################################################################
+        # Zero out the container and the ghost cells of momenta
+        self.mpv.set_rhs_to_zero()
+        # boundary_operation = [
+        #     WallAdjustment(
+        #         target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.0
+        #     )
+        # ]
+        # self.boundary_manager.apply_extra_all_sides(pressure_weighted_momenta, boundary_operation)
 
+        ################################################################################################################
+        # Divergence
         inner_slice = one_element_inner_slice(self.grid.ndim, full=False)
         self.mpv.rhs[inner_slice] = self.discrete_operator.divergence(
             pressure_weighted_momenta,
         )
 
+        ################################################################################################################
         # Adjust wall boundary nodes (scale). Notice the side is set to be BdrySide.ALL.
         # This will apply the 'extra' method whenever the boundary is defined to be WALL.
         boundary_operation = [
@@ -556,11 +599,14 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
                 target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=2.0
             )
         ]
+        self.boundary_manager.apply_boundary_on_single_var_all_sides(
+            self.mpv.rhs, self._nodal_bc_contexts
+        )
         self.boundary_manager.apply_extra_all_sides(self.mpv.rhs, boundary_operation)
 
+        ############################## Divide the divergence by dP/dpi #################################################
         # Calculate the derivative of the Exner pressure with respect to P
         dpidP = calculate_dpi_dp(cellvars[..., VI.RHOY], self.Msq)
-
 
         # Create a nodal variable to store the intermediate updates
         dp2n = np.zeros_like(p2n)
