@@ -8,7 +8,10 @@ import numpy as np
 np.seterr(all="raise")
 from typing import TYPE_CHECKING, Union, List, Any, Callable
 
-from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment, WallFluxCorrection
+from atmpy.boundary_conditions.bc_extra_operations import (
+    WallAdjustment,
+    WallFluxCorrection,
+)
 from atmpy.boundary_conditions.contexts import BCApplicationContext
 from atmpy.infrastructure.utility import (
     directional_indices,
@@ -216,10 +219,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             predictor_coeff_vars = self.variables.cell_vars
 
         # Solve for Exner pressure
-        self.backward_update_implicit(
-            half_dt, initial_vars=predictor_coeff_vars
-        )
-
+        self.backward_update_implicit(half_dt, initial_vars=predictor_coeff_vars)
 
         # self.variables is now Sol^{n+1/2}, self.mpv.p2_nodes is p^{n+1/2}
         logging.debug(
@@ -380,9 +380,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Update all other variables on the boundary.
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
 
-    def backward_update_implicit(
-        self, dt: float, initial_vars: np.ndarray=None
-    ):
+    def backward_update_implicit(self, dt: float, initial_vars: np.ndarray = None):
         """Compute the one step of the implicit part of the Euler backward scheme. This is a part of the BK19 algorithm.
         Notice before the call to this method, the coefficient variables must be created at half timestep. Then going back
         to the initial variables, we start anew to advance the time stepping in a implicit trapezoidal rule
@@ -439,7 +437,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
                 target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.0
             )
         ]
-        self.boundary_manager.apply_extra_all_sides(pressure_weighted_momenta, boundary_operation)
+        self.boundary_manager.apply_extra_all_sides(
+            pressure_weighted_momenta, boundary_operation
+        )
 
         ################################################################################################################
         # Calculate divergence on one element inner nodes [shape: (nx-1, ny-1, nz-1)]
@@ -525,7 +525,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             The gravity strength
         """
         coriolis = self.coriolis.strength
-        adjusted_momenta = self.variables.adjust_background_wind(self.wind_speed, -1.0, in_place=True)
+        adjusted_momenta = self.variables.adjust_background_wind(
+            self.wind_speed, -1.0, in_place=True
+        )
 
         # pressure gradient factor: (P/Gamma)
         rhoYovG = self.pressure_solver._calculate_P_over_Gamma(cellvars)
@@ -558,7 +560,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # Updates: The momentum in the direction of gravity
         # Find vertical vs horizontal velocities:
-        if self.grid.ndim >= 2 and self.pressure_solver.vertical_momentum_index < cellvars.shape[-1]:
+        if (
+            self.grid.ndim >= 2
+            and self.pressure_solver.vertical_momentum_index < cellvars.shape[-1]
+        ):
             cellvars[..., self.pressure_solver.vertical_momentum_index] -= dt * (
                 (g / self.Msq) * dbuoy * self.is_nonhydrostatic
             )

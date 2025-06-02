@@ -8,17 +8,21 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import numpy as np
 
+
 ########################################################################################################################
 ############################################ ITERATION COUNTERS ########################################################
 ########################################################################################################################
 class IterationCounter:
     def __init__(self):
         self.count = 0
-        self.residuals = [] # Optional: to store residual history
+        self.residuals = []  # Optional: to store residual history
 
-    def __call__(self, residual_norm): # For bicgstab, the callback receives the residual norm
+    def __call__(
+        self, residual_norm
+    ):  # For bicgstab, the callback receives the residual norm
         self.count += 1
         self.residuals.append(residual_norm)
+
 
 ########################################################################################################################
 ######################################### SOLVERS ######################################################################
@@ -46,7 +50,9 @@ class BiCGStabSolver(ILinearSolver):
         M: "np.ndarray",
     ):
         iterations = IterationCounter()
-        x, info = sp.sparse.linalg.bicgstab(A, b, rtol=rtol, maxiter=max_iter, M=M, callback=iterations)
+        x, info = sp.sparse.linalg.bicgstab(
+            A, b, rtol=rtol, maxiter=max_iter, M=M, callback=iterations
+        )
         self.iterations_ = iterations.count
         return x, info
 
@@ -61,6 +67,8 @@ class GMRESSolver(ILinearSolver):
         M: "np.ndarray",
     ):
         iterations = IterationCounter()
-        x, info = sp.sparse.linalg.gmres(A, b, rtol=rtol, maxiter=max_iter, M=M, callback=iterations)
+        x, info = sp.sparse.linalg.gmres(
+            A, b, rtol=rtol, maxiter=max_iter, M=M, callback=iterations
+        )
         self.iterations_ = iterations.count
         return x, info

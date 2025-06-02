@@ -12,9 +12,7 @@ import numpy as np
 logger = logging.getLogger(__name__)  # Use a dedicated logger for this module
 
 
-def _get_time_slice(
-    ds: xr.Dataset, time_indices: Optional[List[int]]
-):
+def _get_time_slice(ds: xr.Dataset, time_indices: Optional[List[int]]):
     """
     Helper function to determine the time slice for plotting.
     For static plots, expects one index (or defaults to last).
@@ -169,6 +167,13 @@ def plot_2d_static(
         y_coords = ds["y"].values
 
     plot_data = data_var.isel(time=time_index).data
+
+    # if variable_name == "p2_nodes":
+    #     var2 = "rhoY"
+    #     data_var2 = ds[var2]
+    #     plot_data2 = data_var2.isel(time=time_index).data
+    #     plot_data[1:-1, 1:-1] = plot_data[1:-1, 1:-1] / plot_data2[1:, 1:]
+
     # contourf expects Z with dimensions (Y, X)
     # If data_var is (time, x, y), then .data.T might be needed if x is first dim after time
     # If data_var is (time, y, x), then .data is fine.
@@ -181,6 +186,7 @@ def plot_2d_static(
     if plot_data.shape[0] == len(x_coords) and plot_data.shape[1] == len(y_coords):
         plot_data_for_contour = plot_data.T  # Transpose if (nx, ny)
     elif plot_data.shape[0] == len(y_coords) and plot_data.shape[1] == len(x_coords):
+        plot_data_for_contour = np.zeros_like(plot_data)
         plot_data_for_contour = plot_data  # Already (ny, nx)
     else:
         logger.error(
@@ -296,7 +302,7 @@ def animate_2d(
         return cont.collections  # FuncAnimation expects an iterable of artists
 
     ani = FuncAnimation(
-        fig, update, frames=len(frames_indices), interval=0.2, blit=False
+        fig, update, frames=len(frames_indices), interval=0.1, blit=False
     )  # blit=True is tricky with contourf and clear()
     return ani
 

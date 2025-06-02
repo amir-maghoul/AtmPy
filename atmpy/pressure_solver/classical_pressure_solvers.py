@@ -246,7 +246,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         ################################ Calculate the RHS of momenta equations  #######################################
         Pu_incr, Pv_incr, Pw_incr = self.calculate_enthalpy_weighted_pressure_gradient(
-            coeff_vars, p, dt, is_nongeostrophic, is_nonhydrostatic
+            p, dt, is_nongeostrophic, is_nonhydrostatic
         )
 
         ################################# Create the necessary variables  ##############################################
@@ -462,7 +462,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         solution_flat, info = self.linear_solver.solve(
             A, rhs_flat, rtol=rtol, max_iter=max_iter, M=M_op
         )
-        iterations = getattr(self.linear_solver, 'iterations_', 'N/A (solver does not store iterations)')
+        iterations = getattr(
+            self.linear_solver, "iterations_", "N/A (solver does not store iterations)"
+        )
 
         # Logging
         if info > 0:
@@ -470,7 +472,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         elif info < 0:
             print(f"ERROR: Linear solver failed with error code {info}.")
         else:
-            print(f"Linear solver converged. Iterations: {iterations}. Exit code: {info}")
+            print(
+                f"Linear solver converged. Iterations: {iterations}. Exit code: {info}"
+            )
 
         return solution_flat, info
 

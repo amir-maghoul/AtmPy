@@ -27,7 +27,10 @@ if TYPE_CHECKING:
     from atmpy.boundary_conditions.bc_extra_operations import ExtraBCOperation
     from atmpy.variables.multiple_pressure_variables import MPV
 
-from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment, WallFluxCorrection
+from atmpy.boundary_conditions.bc_extra_operations import (
+    WallAdjustment,
+    WallFluxCorrection,
+)
 from atmpy.infrastructure.utility import (
     direction_axis,
     momentum_index,

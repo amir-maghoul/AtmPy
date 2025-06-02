@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     import numpy as np
     from atmpy.boundary_conditions.bc_extra_operations import (
         ExtraBCOperation,
-)
+    )
 from atmpy.infrastructure.factory import get_boundary_conditions
 from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
@@ -302,7 +302,10 @@ def boundary_manager_2d_updated():
     from atmpy.variables.variables import Variables
     from atmpy.variables.multiple_pressure_variables import MPV  # Import MPV
     from atmpy.infrastructure.enums import VariableIndices as VI
-    from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment, WallFluxCorrection
+    from atmpy.boundary_conditions.bc_extra_operations import (
+        WallAdjustment,
+        WallFluxCorrection,
+    )
     from atmpy.boundary_conditions.contexts import (
         BCInstantiationOptions,
         BoundaryConditionsConfiguration,
@@ -411,7 +414,9 @@ def boundary_manager_2d_updated():
     )
 
     boundary_operation = [
-        WallFluxCorrection(target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0)
+        WallFluxCorrection(
+            target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0
+        )
     ]
     manager.apply_extra_all_sides(
         variables.cell_vars, boundary_operation, target_mpv=False
@@ -421,6 +426,7 @@ def boundary_manager_2d_updated():
         " RHOU (EXTRA applied on Y boundaries, PERIODIC on X):\n",
         variables.cell_vars[..., VI.RHOU],
     )
+
 
 if __name__ == "__main__":
     boundary_manager_2d_updated()

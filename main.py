@@ -223,8 +223,12 @@ elif args.mode == "visualize":
         sys.exit(1)
 
     # Determine effective grid dimensions for path construction
-    if args.file is not None and (args.nx is not None or args.ny is not None or args.nz is not None):
-        raise ArgumentTypeError("Cannot specify both --file and --nx or --ny or --nz at the same time.")
+    if args.file is not None and (
+        args.nx is not None or args.ny is not None or args.nz is not None
+    ):
+        raise ArgumentTypeError(
+            "Cannot specify both --file and --nx or --ny or --nz at the same time."
+        )
 
     elif args.file is not None:
         input_file_to_visualize = args.file[0]
@@ -235,11 +239,15 @@ elif args.mode == "visualize":
         ndim_to_use = base_vis_config.spatial_grid.ndim
 
         if ndim_to_use >= 2:
-            ny_to_use = args.ny if args.ny is not None else base_vis_config.spatial_grid.ny
+            ny_to_use = (
+                args.ny if args.ny is not None else base_vis_config.spatial_grid.ny
+            )
         elif args.ny is not None:
             logger.warning(f"Ignoring --ny for {ndim_to_use}D case '{args.case}'.")
         if ndim_to_use >= 3:
-            nz_to_use = args.nz if args.nz is not None else base_vis_config.spatial_grid.nz
+            nz_to_use = (
+                args.nz if args.nz is not None else base_vis_config.spatial_grid.nz
+            )
         elif args.nz is not None:
             logger.warning(f"Ignoring --nz for {ndim_to_use}D case '{args.case}'.")
 
@@ -266,17 +274,7 @@ elif args.mode == "visualize":
         logger.info(f"Attempting to visualize file: {input_file_to_visualize}")
 
     if not os.path.exists(input_file_to_visualize):
-        error_msg = (
-            f"Visualization input file not found: {input_file_to_visualize}\n"
-            f"Searched for case '{args.case}' with effective grid Nx={nx_to_use}"
-        )
-        if ny_to_use is not None:
-            error_msg += f", Ny={ny_to_use}"
-        if nz_to_use is not None:
-            error_msg += f", Nz={nz_to_use}"
-        error_msg += ".\nEnsure simulation was run with these settings and filename convention matches."
-        logger.error(error_msg)
-        sys.exit(1)
+        error_msg = f"Visualization input file not found: {input_file_to_visualize}\n"
 
     visualizer.visualize_data(
         input_file=input_file_to_visualize,

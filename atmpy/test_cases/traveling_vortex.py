@@ -4,6 +4,8 @@ from typing import List, Tuple, Dict, Any, TYPE_CHECKING
 import matplotlib
 from setuptools.sandbox import run_setup
 
+from atmpy.boundary_conditions.contexts import BCApplicationContext
+
 matplotlib.use("TkAgg")
 
 import logging
@@ -79,8 +81,6 @@ class TravelingVortex(BaseTestCase):
         self.xc: float = 0.0  # Vortex center x
         self.yc: float = 0.0  # Vortex center y
 
-        self.u0: float = 1.0
-
         ####################### Polynomial coefficients for pressure perturbation ######################################
         self.coe = np.array(
             [
@@ -138,7 +138,7 @@ class TravelingVortex(BaseTestCase):
         print("Setting up Traveling Vortex configuration...")
 
         #################################### Grid Configuration ########################################################
-        n = 64
+        n = 256
         grid_updates = {
             "ndim": 2,
             "nx": n,
@@ -169,12 +169,12 @@ class TravelingVortex(BaseTestCase):
 
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
-            "CFL": 0.5,
-            "dtfixed": 0.005,
+            "CFL": 0.8,
+            "dtfixed": 0.0005,
             "dtfixed0": None,
             "tout": np.array([10.0]),
             "stepmax": 101,
-            "use_acoustic_cfl": False, # If True adds max_sound_speed to the speed, therefore smaller dt in dynamic
+            "use_acoustic_cfl": False,  # If True adds max_sound_speed to the speed, therefore smaller dt in dynamic
         }
         self.set_temporal(temporal_updates)
 
@@ -228,7 +228,7 @@ class TravelingVortex(BaseTestCase):
             "R_gas": 287.4,
             "p_ref": 1.0e5,
             "T_ref": 300.0,
-            "h_ref": 10000.0,
+            "h_ref": 10_000.0,
             "t_ref": 100.0,
             "grav": 0.0,
         }
@@ -248,15 +248,10 @@ class TravelingVortex(BaseTestCase):
         """Initialize density, momentum, potential temperature, and pressure fields."""
         print("Initializing solution for Traveling Vortex...")
 
-        grid = self.config.grid
+        grid = self.config.spatial_grid.grid
         thermo = Thermodynamics()
         thermo.update(self.config.global_constants.gamma)
         Msq = self.config.model_regimes.Msq
-
-        if Msq <= 0 and self.config.model_regimes.is_compressible:
-            print(
-                "Warning: Msq is zero or negative, but is_compressible=1. Pressure perturbation might be zero."
-            )
 
         # Get slices for inner domain (excluding ghost cells)
         inner_slice = grid.get_inner_slice()
@@ -348,13 +343,16 @@ class TravelingVortex(BaseTestCase):
 
         rhoY0_cells = mpv.hydrostate.cell_vars[..., HI.RHOY0]
         # Calculate rhoY (Potential Temperature * Density)
-        if self.config.model_regimes.is_compressible:
+        # if self.config.model_regimes.is_compressible:
+        if True:
             p_total = self.p0 + dp2c  # Add perturbation to base pressure
             # Ensure pressure is positive before taking power
             p_total_safe = np.maximum(p_total, 1e-9)
             variables.cell_vars[inner_slice + (VI.RHOY,)] = p_total_safe**thermo.gamminv
         else:
-            variables.cell_vars[inner_slice + (VI.RHOY,)] = rho_total * rhoY0_cells[inner_slice[1]]
+            variables.cell_vars[inner_slice + (VI.RHOY,)] = (
+                rho_total * rhoY0_cells[inner_slice[1]]
+            )
 
         # Calculate rhoX (Tracers) - Set to zero if not used
         if VI.RHOX < variables.num_vars_cell:
@@ -415,191 +413,17 @@ class TravelingVortex(BaseTestCase):
             self.alpha * p2_nodes_unscaled + self.alpha_const * p2n_const_unscaled
         )
 
-        ngy = self.config.grid.ng[1][0]  # get number of ghost cells in y direction.
+        ngy = self.config.spatial_grid.grid.ng[1][
+            0
+        ]  # get number of ghost cells in y direction.
         mpv.p2_nodes[inner_slice] = (
             thermo.Gamma
             * self.fac**2
             * np.divide(p2_nodes_unscaled, rhoY0_cells[ngy : -ngy + 1])  # Divide by 1.0
         )
+        # mpv.p2_nodes[...] = 0.0
 
-
-
-        # --- Set dp2_nodes (used in pressure solver) ---
-        # PyBella sets dp2_nodes = p2_nodes initially after hydrostatics.initial_pressure
-        # Here, we can initialize it similarly or set to zero. Let's initialize.
-        mpv.p0 = self.p0
-        mpv.dp2_nodes[...] = 0.0
-
-        # --- Initial Projection ---
-        # The PyBella code calls lm_sp.euler_backward_non_advective_impl_part here.
-        # we *do not* include this logic here. It belongs in the
-        # time integrator or a separate initialization step *after* the test case
-        # setup and variable initialization. The solver calling this test case
-        # would be responsible for performing the initial projection if
-        # config.numerics.initial_projection is True.
+        # x = mpv.hydrostate.node_vars[..., HI.P0] / self.config.model_regimes.Msq
+        # mpv.p2_nodes = np.repeat(x.reshape(1, -1), self.config.spatial_grid.grid.nshape[0], axis=0)
 
         logging.info("Solution initialization complete.")
-
-
-if __name__ == "__main__":
-    from atmpy.boundary_conditions.boundary_manager import BoundaryManager
-    import matplotlib.pyplot as plt
-    from atmpy.variables.multiple_pressure_variables import MPV
-    from atmpy.variables.variables import Variables
-
-    case = TravelingVortex()
-    # case = RisingBubble()
-    config = case.config  # The SimulationConfig object is now held by the case
-
-    # Modify config if needed (e.g., simulation time)
-    config.temporal.tmax = 3
-    config.temporal.stepmax = 101000  # Limit steps
-    config.outputs.output_frequency_steps = 3  # Output every 2 steps
-    config.temporal.tout = [0]  # Also output at a specific time
-
-    grid = config.grid
-    gravity_vec = config.physics.gravity_strength
-    Msq = config.model_regimes.Msq
-    th = Thermodynamics()
-    th.update(config.global_constants.gamma)
-
-    ##################################### MPV ##########################################################################
-    mpv = MPV(grid)
-
-    ##################################### Variables ####################################################################
-    num_vars = 6
-    variables = Variables(
-        grid, num_vars_cell=num_vars, num_vars_node=1
-    )  # Adjust num_vars if needed
-
-    # --- Initialize Solution using Test Case
-    case.initialize_solution(variables, mpv)  # This now uses the case object
-
-    bm_config = config.get_boundary_manager_config()
-    manager = BoundaryManager(bm_config)
-    # Apply initial BCs (though initialize_solution might handle inner domain, ghosts need update)
-    manager.apply_boundary_on_all_sides(variables.cell_vars)
-    # nodal_bc_contexts = ([manager.get_context_for_side(i, is_nodal=True) for i in range(grid.ndim * 2)]) # Get contexts for p2
-    # manager.apply_boundary_on_single_var_all_sides(mpv.p2_nodes, nodal_bc_contexts)
-
-    fig, ax = plt.subplots()
-    x_coords = grid.x_cells
-    y_coords = grid.y_cells
-    cmap = plt.cm.viridis
-    rho = variables.cell_vars[..., VI.RHO]
-    rhou = variables.cell_vars[..., VI.RHOU]
-    u = rhou / rho
-    arg = u
-    data_min = arg.min().item()
-    data_max = arg.max().item()
-
-    contour = ax.contourf(
-        x_coords,
-        y_coords,
-        arg.T,
-        cmap=cmap,
-        levels=np.linspace(data_min, data_max, 15),
-    )
-
-    cbar = fig.colorbar(contour, ax=ax)
-    ax.set_xlabel("X (m)")
-    ax.set_ylabel("Y (m)")
-
-    # contour = ax.contourf(
-    #     x_coords[2:-2],
-    #     y_coords[2:-2],
-    #     u.T,
-    #     cmap=cmap,
-    #     levels=np.linspace(data_min, data_max, 15),
-    # )
-
-    plt.show()
-
-    case = TravelingVortex()
-    config = case.config
-
-    grid = config.grid
-    mpv = MPV(grid)
-    num_vars = 6
-    variables = Variables(grid, num_vars_cell=num_vars, num_vars_node=1)
-    case.initialize_solution(variables, mpv)
-
-    bm_config = (
-        config.get_boundary_manager_config()
-    )  # Not strictly needed for this debug
-    manager = BoundaryManager(bm_config)
-    manager.apply_boundary_on_all_sides(variables.cell_vars)
-
-    fig, ax = plt.subplots()
-    x_coords = grid.x_cells
-    y_coords = grid.y_cells
-    cmap = plt.cm.viridis
-
-    rho = variables.cell_vars[..., VI.RHO]
-    rhou = variables.cell_vars[..., VI.RHOU]
-    #
-    # print(f"--- Debugging Initial U in traveling_vortex.py ---")
-    # print(f"Full rho array min: {rho.min()}, max: {rho.max()}")
-    # print(f"Full rhou array min: {rhou.min()}, max: {rhou.max()}")
-
-    # Check for zeros in rho BEFORE division
-    # if np.any(rho == 0):
-    #     print("WARNING: Zeros found in rho array BEFORE division!")
-    #     zero_rho_indices = np.where(rho == 0)
-    #     print(f"Indices of zero rho: {zero_rho_indices}")
-    #     if len(zero_rho_indices[0]) > 0:  # If any zeros found
-    #         print(f"rhou values at zero rho locations: {rhou[zero_rho_indices]}")
-
-    # Perform division carefully
-    u_initial = np.zeros_like(rhou, dtype=float)  # Ensure float type
-    # Create a mask for non-zero rho to avoid division by zero warnings/errors
-    # Use a small epsilon to also catch near-zero values if they are problematic
-    epsilon = 1e-12
-    valid_rho_mask = np.abs(rho) > epsilon
-
-    # Calculate u_initial only where rho is valid
-    u_initial[valid_rho_mask] = rhou[valid_rho_mask] / rho[valid_rho_mask]
-
-    # Set u_initial to NaN where rho was not valid (or keep as 0, depending on desired plot)
-    # Setting to NaN will make matplotlib skip these points (often appearing white)
-    u_initial[~valid_rho_mask] = np.nan
-
-    print(
-        f"u_initial min (finite): {np.nanmin(u_initial)}, max (finite): {np.nanmax(u_initial)}"
-    )
-    if np.any(np.isinf(u_initial)):
-        print("WARNING: Inf values found in u_initial array AFTER division!")
-    if np.any(np.isnan(u_initial)):
-        print(
-            "WARNING: NaN values found in u_initial array AFTER division (could be from invalid rho)!"
-        )
-        nan_indices = np.where(np.isnan(u_initial))
-        # Optional: print x,y coordinates of NaNs if helpful
-        # print(f"X-coords of NaNs: {x_coords[nan_indices[0]]}") # This indexing might need adjustment based on array structure
-        # print(f"Y-coords of NaNs: {y_coords[nan_indices[1]]}")
-
-    # Determine plot range from finite values
-    data_min_plot = np.nanmin(u_initial)
-    data_max_plot = np.nanmax(u_initial)
-
-    # If after all this, min/max are still problematic, manually set them to expected theoretical range
-    # data_min_plot = 0.70 # Example
-    # data_max_plot = 1.30 # Example
-
-    print(f"Plotting u_initial with min={data_min_plot}, max={data_max_plot}")
-
-    contour = ax.contourf(
-        x_coords,
-        y_coords,
-        u_initial.T,  # Plotting u_initial
-        cmap=cmap,
-        levels=np.linspace(data_min_plot, data_max_plot, 15),
-        # extend='both' # Useful if data goes outside levels
-    )
-
-    cbar = fig.colorbar(contour, ax=ax)
-    ax.set_xlabel("X (m)")
-    ax.set_ylabel("Y (m)")
-    ax.set_title("Initial u = rhou/rho from traveling_vortex.py")
-
-    plt.show()
