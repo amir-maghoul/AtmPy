@@ -14,6 +14,8 @@ from atmpy.infrastructure.enums import (
     SlopeLimiters as LimiterType,
     VariableIndices as VI,
     HydrostateIndices as HI,
+    FluxReconstructions,
+    RiemannSolvers,
 )
 from atmpy.physics.thermodynamics import Thermodynamics
 
@@ -137,7 +139,9 @@ class RisingBubble(BaseTestCase):
 
         # Numerics
         numerics_updates = {
-            "limiter_scalars": LimiterType.VAN_LEER,  # UPDATED Limiter
+            "limiter": LimiterType.VAN_LEER,  # UPDATED Limiter
+            "riemann_solver": RiemannSolvers.MODIFIED_HLL,
+            "reconstruction": FluxReconstructions.MODIFIED_MUSCL,
             "first_order_advection_routine": AdvectionRoutines.FIRST_ORDER_RK,
             "second_order_advection_routine": AdvectionRoutines.STRANG_SPLIT,
             "tol": 1.0e-8,

@@ -65,7 +65,30 @@ def get_base_config_for_case(case_name: str) -> SimulationConfig:
 
 args = parse_arguments()
 
-if args.mode == "run":
+if args.mode == "debug":
+    if args.debugger == "pycharm":
+        try:
+            import pydevd_pycharm
+
+            # NOTE: Remember to use your actual local IP if 'localhost' fails.
+            host_ip = 'localhost'
+            print("--- DEBUG MODE ---")
+            print(f"Attempting to connect to PyCharm debugger at {host_ip}:{args.debug_port}...")
+            print("Start the Python Debug Server in your IDE now.")
+            pydevd_pycharm.settrace(host_ip, port=args.debug_port, stdoutToServer=True, stderrToServer=True,
+                                    suspend=True)
+            print("Debugger connected successfully.")
+        except ImportError:
+            print("ERROR: pydevd_pycharm module not found. Please install it.")
+            pass
+        except ConnectionRefusedError:
+            print(f"ERROR: Connection refused. Is the PyCharm Debug Server listening on port {args.debug_port}?")
+            pass
+        except Exception as e:
+            print(f"ERROR: Could not connect to PyCharm debugger: {e}")
+            pass
+
+if args.mode in ["run", "debug"]:
     logger.info(f"Starting in RUN mode for case: {args.case}")
     loaded_config_override: Optional[SimulationConfig] = None
     if args.config_pickle_path:
@@ -138,7 +161,7 @@ if args.mode == "run":
     manager = BoundaryManager(bm_config)
     manager.apply_boundary_on_all_sides(variables.cell_vars)
     eos = ExnerBasedEOS()
-    flux = Flux(grid, variables, eos)
+    flux = Flux(grid, variables, eos, config.numerics.riemann_solver, config.numerics.reconstruction, config.numerics.limiter)
     op_context = DiscreteOperatorsContext(DiscreteOperators.CLASSIC_OPERATOR, grid=grid)
     ps_context: PressureContext[ClassicalPressureSolver] = PressureContext(
         solver_type=PressureSolvers.CLASSIC_PRESSURE_SOLVER,
@@ -215,12 +238,12 @@ if args.mode == "run":
 
 elif args.mode == "visualize":
     logger.info(f"Starting in VISUALIZE mode for case: {args.case}")
-
-    try:
-        base_vis_config = get_base_config_for_case(args.case)  # Gets default config
-    except ValueError as e:
-        logger.error(str(e))
-        sys.exit(1)
+    if args.file is None:
+        try:
+            base_vis_config = get_base_config_for_case(args.case)  # Gets default config
+        except ValueError as e:
+            logger.error(str(e))
+            sys.exit(1)
 
     # Determine effective grid dimensions for path construction
     if args.file is not None and (
@@ -254,6 +277,7 @@ elif args.mode == "visualize":
         logger.info(
             f"Visualizing for effective grid: Nx={nx_to_use}, Ny={ny_to_use}, Nz={nz_to_use} (Ndim={ndim_to_use})"
         )
+
 
         # --- Generate output filename for VISUALIZATION using the utility ---
         try:

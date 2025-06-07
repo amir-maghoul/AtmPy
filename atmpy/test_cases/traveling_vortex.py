@@ -21,6 +21,8 @@ from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
     BoundarySide,
     AdvectionRoutines,
+    RiemannSolvers,
+    FluxReconstructions
 )
 from atmpy.infrastructure.enums import (
     VariableIndices as VI,
@@ -138,11 +140,13 @@ class TravelingVortex(BaseTestCase):
         print("Setting up Traveling Vortex configuration...")
 
         #################################### Grid Configuration ########################################################
-        n = 256
+        nx = 8
+        ny = 10
+
         grid_updates = {
             "ndim": 2,
-            "nx": n,
-            "ny": n,
+            "nx": nx,
+            "ny": ny,
             "nz": 0,
             "xmin": -0.5,
             "xmax": 0.5,
@@ -169,12 +173,12 @@ class TravelingVortex(BaseTestCase):
 
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
-            "CFL": 0.8,
+            "CFL": 0.45,
             "dtfixed": 0.0005,
             "dtfixed0": None,
             "tout": np.array([10.0]),
             "stepmax": 101,
-            "use_acoustic_cfl": False,  # If True adds max_sound_speed to the speed, therefore smaller dt in dynamic
+            "use_acoustic_cfl": True,  # If True adds max_sound_speed to the speed, therefore smaller dt in dynamic
         }
         self.set_temporal(temporal_updates)
 
@@ -197,7 +201,9 @@ class TravelingVortex(BaseTestCase):
 
         #################################### Numerics  #################################################################
         numerics_updates = {
-            "limiter_scalars": LimiterType.VAN_LEER,
+            "limiter": LimiterType.AVERAGE,
+            "riemann_solver": RiemannSolvers.MODIFIED_HLL,
+            "reconstruction": FluxReconstructions.MODIFIED_MUSCL,
             "first_order_advection_routine": AdvectionRoutines.FIRST_ORDER_RK,
             "second_order_advection_routine": AdvectionRoutines.STRANG_SPLIT,
             "initial_projection": True,
@@ -422,6 +428,7 @@ class TravelingVortex(BaseTestCase):
             * np.divide(p2_nodes_unscaled, rhoY0_cells[ngy : -ngy + 1])  # Divide by 1.0
         )
         # mpv.p2_nodes[...] = 0.0
+        # mpv.p2_nodes /= 2
 
         # x = mpv.hydrostate.node_vars[..., HI.P0] / self.config.model_regimes.Msq
         # mpv.p2_nodes = np.repeat(x.reshape(1, -1), self.config.spatial_grid.grid.nshape[0], axis=0)
