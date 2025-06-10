@@ -7,7 +7,7 @@ import numpy as np
 from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
     BoundarySide,
-    AdvectionRoutines, RiemannSolvers, FluxReconstructions
+    AdvectionRoutines, RiemannSolvers, FluxReconstructions, LinearSolvers, Preconditioners
 )
 from atmpy.infrastructure.enums import SlopeLimiters as LimiterType
 from atmpy.grid.utility import DimensionSpec, create_grid
@@ -224,6 +224,8 @@ class Numerics:
     reconstruction: FluxReconstructions = FluxReconstructions.MODIFIED_MUSCL
     first_order_advection_routine: AdvectionRoutines = AdvectionRoutines.FIRST_ORDER_RK
     second_order_advection_routine: AdvectionRoutines = AdvectionRoutines.STRANG_SPLIT
+    linear_solver: LinearSolvers = LinearSolvers.BICGSTAB
+    preconditioner: Preconditioners = Preconditioners.DIAGONAL
     tol: float = 1e-8
     max_iterations: int = 6000
     initial_projection: bool = True

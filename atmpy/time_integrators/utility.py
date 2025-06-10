@@ -29,5 +29,5 @@ def calculate_dpi_dp(P: np.ndarray, Msq: float) -> float:
     return (
         (th.gm1 / Msq)
         * sp.signal.fftconvolve(dpi_temp, averaging_kernel, mode="valid")
-        / dpi_temp.sum()
+        / averaging_kernel.sum()
     )

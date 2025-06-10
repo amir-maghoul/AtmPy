@@ -166,8 +166,8 @@ if args.mode in ["run", "debug"]:
     ps_context: PressureContext[ClassicalPressureSolver] = PressureContext(
         solver_type=PressureSolvers.CLASSIC_PRESSURE_SOLVER,
         op_context=op_context,
-        linear_solver_type=LinearSolvers.GMRES,
-        precondition_type=Preconditioners.DIAGONAL,
+        linear_solver_type=config.numerics.linear_solver,
+        precondition_type=config.numerics.preconditioner,
         extra_dependencies={
             "grid": grid,
             "variables": variables,

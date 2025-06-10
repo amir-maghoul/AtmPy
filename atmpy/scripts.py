@@ -7,6 +7,8 @@ DEFAULT_PROFILE_STEPS = 20
 DEFAULT_VIS_VAR = "rho"
 DEFAULT_RUN_CASE = "TravelingVortex"
 CASE_CHOICES = ["TravelingVortex", "RisingBubble", "SineWaveAdvection1D"]
+DEFAULT_DEBUG_PORT = 5678 # Default port for PyCharm debugger
+
 
 
 def parse_arguments():
@@ -16,7 +18,7 @@ def parse_arguments():
     parser.add_argument(
         "mode_or_case",
         nargs="?",
-        help="Execution mode ('run', 'visualize') or test case name (if mode is 'run' and omitted).",
+        help="Execution mode ('run', 'visualize', 'debug') or test case name (if mode is 'run' and omitted).",
     )
 
     parser.add_argument(
@@ -24,6 +26,21 @@ def parse_arguments():
         type=str,
         choices=CASE_CHOICES,
         help=f"Test case to run or visualize. Defaults to '{DEFAULT_RUN_CASE}' for run mode if not specified.",
+    )
+
+    debug_group = parser.add_argument_group("Debug Mode Options")
+    debug_group.add_argument(
+        "--debugger",
+        type=str,
+        choices=["pycharm"],
+        default="pycharm",
+        help="Specifies the debugger to use (default: pycharm)."
+    )
+    debug_group.add_argument(
+        "--debug-port",
+        type=int,
+        default=DEFAULT_DEBUG_PORT,
+        help=f"Port for the debugger to connect to (default: {DEFAULT_DEBUG_PORT})."
     )
 
     # --- Run specific arguments ---
@@ -106,19 +123,12 @@ def parse_arguments():
 
     # Determine actual mode and case
     potential_mode = args.mode_or_case
+    valid_modes = ["run", "visualize", "debug"]
 
     if potential_mode is None:
         args.mode = "run"
-        if args.case is None:
-            args.case = DEFAULT_RUN_CASE
-    elif potential_mode.lower() == "run":
-        args.mode = "run"
-        if args.case is None:
-            args.case = DEFAULT_RUN_CASE
-    elif potential_mode.lower() == "visualize":
-        args.mode = "visualize"
-        if args.case is None:
-            parser.error("For visualize mode, --case must be specified.")
+    elif potential_mode.lower() in valid_modes:
+        args.mode = potential_mode.lower()
     elif potential_mode in CASE_CHOICES:
         args.mode = "run"
         if args.case is not None and args.case != potential_mode:
@@ -128,16 +138,47 @@ def parse_arguments():
         args.case = potential_mode
     else:
         parser.error(
-            f"Unrecognized command or case: '{potential_mode}'. Valid modes are 'run', 'visualize'."
+            f"Unrecognized command or case: '{potential_mode}'. Valid modes are 'run', 'visualize', 'debug'."
         )
+    #
+    # if potential_mode is None:
+    #     args.mode = "run"
+    #     if args.case is None:
+    #         args.case = DEFAULT_RUN_CASE
+    # elif potential_mode.lower() == "run":
+    #     args.mode = "run"
+    #     if args.case is None:
+    #         args.case = DEFAULT_RUN_CASE
+    # elif potential_mode.lower() == "visualize":
+    #     args.mode = "visualize"
+    #     if args.case is None and args.file is None:
+    #         parser.error("For visualize mode, --case or --file must be specified.")
+    # elif potential_mode in CASE_CHOICES:
+    #     args.mode = "run"
+    #     if args.case is not None and args.case != potential_mode:
+    #         parser.error(
+    #             f"Conflicting case names specified: '{potential_mode}' and '--case {args.case}'."
+    #         )
+    #     args.case = potential_mode
+    # else:
+    #     parser.error(
+    #         f"Unrecognized command or case: '{potential_mode}'. Valid modes are 'run', 'visualize' and 'debug'."
+    #     )
 
-    if args.mode == "run" and args.case is None:
+
+    # If a case was not provided as a positional argument, and --case is not set, default it for run/debug modes.
+    if args.mode in ["run", "debug"] and args.case is None:
         args.case = DEFAULT_RUN_CASE
+        if args.mode == "debug":
+             logging.info(f"Debug mode: --case not specified, defaulting to '{DEFAULT_RUN_CASE}'.")
+
+    if args.mode == "debug" and args.case is None:
+        parser.error("--case is required for debug mode.")
 
     # Validation for visualize mode
     if args.mode == "visualize":
-        if args.case is None:
-            parser.error("--case is required for visualize mode.")
+        if args.case is None and args.file is None:
+            parser.error("--case or --file is required for visualize mode.")
         # Ensure --ny is not used for 1D cases, --nz for 1D/2D if we want strictness (can be handled in main.py too)
         # For now, parser allows them, main.py logic might ignore irrelevant ones.
 

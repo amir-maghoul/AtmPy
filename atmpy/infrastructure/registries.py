@@ -29,6 +29,8 @@ SLOPE_LIMITERS = {
     SlopeLimiters.SUPERBEE: superbee,
     SlopeLimiters.MC_LIMITER: mc_limiter,
     SlopeLimiters.AVERAGE: average,
+    SlopeLimiters.OSPRE: ospre,
+    SlopeLimiters.KOREN: koren,
 }
 
 RIEMANN_SOLVERS = {

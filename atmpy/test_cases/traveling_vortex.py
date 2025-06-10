@@ -22,7 +22,7 @@ from atmpy.infrastructure.enums import (
     BoundarySide,
     AdvectionRoutines,
     RiemannSolvers,
-    FluxReconstructions
+    FluxReconstructions, LinearSolvers, Preconditioners
 )
 from atmpy.infrastructure.enums import (
     VariableIndices as VI,
@@ -71,7 +71,7 @@ class TravelingVortex(BaseTestCase):
         self.v0: float = 1.0  # Background velocity V
         self.w0: float = 0.0  # Background velocity W
         self.p0: float = 1.0  # Background pressure (dimensionless)
-        self.rho0: float = 1.0  # Background density (dimensionless)
+        self.rho0: float = 1  # Background density (dimensionless)
         self.rotdir: float = 1.0  # Rotation direction
         self.alpha: float = -1.0  # Vortex strength parameter 1
         self.alpha_const: float = 3.0  # Vortex strength parameter 2
@@ -142,6 +142,7 @@ class TravelingVortex(BaseTestCase):
         #################################### Grid Configuration ########################################################
         nx = 8
         ny = 10
+        # nx = ny = 64
 
         grid_updates = {
             "ndim": 2,
@@ -173,29 +174,20 @@ class TravelingVortex(BaseTestCase):
 
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
-            "CFL": 0.45,
-            "dtfixed": 0.0005,
-            "dtfixed0": None,
+            "CFL": 0.8,
+            "dtfixed": 0.01,
+            "dtfixed0": 0.01,
             "tout": np.array([10.0]),
             "stepmax": 101,
             "use_acoustic_cfl": True,  # If True adds max_sound_speed to the speed, therefore smaller dt in dynamic
         }
         self.set_temporal(temporal_updates)
 
-        ################################### Physics Settings ###########################################################
-        physics_updates = {
-            "wind_speed": [self.u0, self.v0, self.w0],
-            "gravity_strength": (0.0, 0.0, 0.0),  # Zero gravity case
-            "coriolis_strength": (0.0, 0.0, 0.0),
-            "stratification": traveling_vortex_stratification,  # Isothermal background
-        }
-        self.set_physics(physics_updates)
-
         #################################### Model Regimes #############################################################
         regime_updates = {
             "is_nongeostrophic": 1,
             "is_nonhydrostatic": 1,
-            "is_compressible": 1,
+            "is_compressible": 0,
         }
         self.set_model_regimes(regime_updates)  # This also updates Msq
 
@@ -206,9 +198,21 @@ class TravelingVortex(BaseTestCase):
             "reconstruction": FluxReconstructions.MODIFIED_MUSCL,
             "first_order_advection_routine": AdvectionRoutines.FIRST_ORDER_RK,
             "second_order_advection_routine": AdvectionRoutines.STRANG_SPLIT,
+            "linear_solver": LinearSolvers.GMRES,
+            "preconditioner": Preconditioners.DIAGONAL,
             "initial_projection": True,
         }
         self.set_numerics(numerics_updates)
+
+
+        ################################### Physics Settings ###########################################################
+        physics_updates = {
+            "wind_speed": [self.u0, self.v0, self.w0],
+            "gravity_strength": (0.0, 0.0, 0.0),  # Zero gravity case
+            "coriolis_strength": (0.0, 0.0, 0.0),
+            "stratification": traveling_vortex_stratification,  # Isothermal background
+        }
+        self.set_physics(physics_updates)
 
         #################################### Outputs ###################################################################
         output_updates = {
@@ -349,16 +353,20 @@ class TravelingVortex(BaseTestCase):
 
         rhoY0_cells = mpv.hydrostate.cell_vars[..., HI.RHOY0]
         # Calculate rhoY (Potential Temperature * Density)
-        # if self.config.model_regimes.is_compressible:
-        if True:
+
+        if self.config.model_regimes.is_compressible:
             p_total = self.p0 + dp2c  # Add perturbation to base pressure
             # Ensure pressure is positive before taking power
             p_total_safe = np.maximum(p_total, 1e-9)
             variables.cell_vars[inner_slice + (VI.RHOY,)] = p_total_safe**thermo.gamminv
         else:
-            variables.cell_vars[inner_slice + (VI.RHOY,)] = (
-                rho_total * rhoY0_cells[inner_slice[1]]
+            # variables.cell_vars[inner_slice + (VI.RHOY,)] = (
+            #     rho_total * rhoY0_cells[inner_slice[1]]
+            # )
+            variables.cell_vars[..., VI.RHOY] = (
+                rhoY0_cells
             )
+
 
         # Calculate rhoX (Tracers) - Set to zero if not used
         if VI.RHOX < variables.num_vars_cell:
@@ -428,7 +436,6 @@ class TravelingVortex(BaseTestCase):
             * np.divide(p2_nodes_unscaled, rhoY0_cells[ngy : -ngy + 1])  # Divide by 1.0
         )
         # mpv.p2_nodes[...] = 0.0
-        # mpv.p2_nodes /= 2
 
         # x = mpv.hydrostate.node_vars[..., HI.P0] / self.config.model_regimes.Msq
         # mpv.p2_nodes = np.repeat(x.reshape(1, -1), self.config.spatial_grid.grid.nshape[0], axis=0)

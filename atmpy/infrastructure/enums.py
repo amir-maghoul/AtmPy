@@ -47,6 +47,8 @@ class SlopeLimiters(Enum):
     SUPERBEE = "superbee"
     MC_LIMITER = "mc_limiter"
     AVERAGE = "average"
+    OSPRE = "ospre"
+    KOREN = "koren"
 
 
 class RiemannSolvers(Enum):
