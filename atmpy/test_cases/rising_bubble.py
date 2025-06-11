@@ -60,11 +60,15 @@ class RisingBubble(BaseTestCase):
         """Configure the SimulationConfig for the Rising Bubble case."""
         print("Setting up Rising Bubble configuration...")
 
+        nx = 10
+        ny = 10
+        # nx = 120
+        # ny = 80
         # Grid Configuration
         grid_updates = {
             "ndim": 2,
-            "nx": 120,
-            "ny": 60,
+            "nx": nx,
+            "ny": ny,
             "nz": 0,
             "xmin": -1.0,
             "xmax": 1.0,
@@ -74,6 +78,20 @@ class RisingBubble(BaseTestCase):
             "ngy": 2,
         }
         self.set_grid_configuration(grid_updates)
+
+        # Global Constants
+        constants_updates = {
+            "grav": 10,
+            "omega": 0.0,
+            "R_gas": 287.4,
+            "gamma": 1.4,
+            "p_ref": 8.61 * 1e4,
+            "T_ref": 300.0,
+            "h_ref": 10_000.0,
+            "t_ref": 1000.0,
+            "Nsq_ref": 1.3e-4,
+        }
+        self.set_global_constants(constants_updates)
 
         # Boundary Conditions
         self.set_boundary_condition(
@@ -85,39 +103,25 @@ class RisingBubble(BaseTestCase):
         # UPDATED Y-direction BCs
         self.set_boundary_condition(
             BoundarySide.BOTTOM,
-            BdryType.WALL,
+            BdryType.REFLECTIVE_GRAVITY,
             mpv_type=BdryType.WALL,  # MPV often uses WALL for REFLECTIVE_GRAVITY
         )
         self.set_boundary_condition(
             BoundarySide.TOP,
-            BdryType.WALL,
+            BdryType.REFLECTIVE_GRAVITY,
             mpv_type=BdryType.WALL,  # MPV often uses WALL for REFLECTIVE_GRAVITY
         )
 
         # Temporal Setting
         temporal_updates = {
             "CFL": 0.5,
-            "dtfixed": 0.001,
-            "dtfixed0": 0.001,
+            "dtfixed": 0.01,
+            "dtfixed0": 0.01,
             "tout": np.arange(0.1, 0.71, 0.1),
             "stepmax": 10000,
             "use_acoustic_cfl": True,
         }
         self.set_temporal(temporal_updates)
-
-        # Global Constants
-        constants_updates = {
-            "grav": 9.81,
-            "omega": 0.0,
-            "R_gas": 287.4,
-            "gamma": 1.4,
-            "p_ref": 101325,
-            "T_ref": 300.0,
-            "h_ref": 10_000.0,
-            "t_ref": 1000.0,
-            "Nsq_ref": 1.3e-4,
-        }
-        self.set_global_constants(constants_updates)
 
         # Physics Settings
         physics_updates = {
@@ -139,7 +143,7 @@ class RisingBubble(BaseTestCase):
 
         # Numerics
         numerics_updates = {
-            "limiter": LimiterType.VAN_LEER,  # UPDATED Limiter
+            "limiter": LimiterType.AVERAGE,  # UPDATED Limiter
             "riemann_solver": RiemannSolvers.MODIFIED_HLL,
             "reconstruction": FluxReconstructions.MODIFIED_MUSCL,
             "first_order_advection_routine": AdvectionRoutines.FIRST_ORDER_RK,
@@ -239,7 +243,8 @@ class RisingBubble(BaseTestCase):
         inshape = self.config.spatial_grid.grid.nshape
         rhoY_n = np.repeat(rhoY0_n.reshape(1, -1), inshape[0], axis=0)
         p_n = np.repeat(p0_n.reshape(1, -1), inshape[0], axis=0)
-        mpv.p2_nodes[...] = (p_n / rhoY_n) / Msq
-        # mpv.p2_nodes[...] = mpv.hydrostate.node_vars[..., HI.P2_0]
+        # mpv.p2_nodes[...] = (p_n / rhoY_n) / Msq
+        mpv.p2_nodes[...] = mpv.hydrostate.node_vars[..., HI.P2_0]
+        mpv.p2_nodes[...] = 0.0
         print("Full domain solution initialization complete for Rising Bubble.")
         print("Ghost cells will be overwritten by BoundaryManager.")

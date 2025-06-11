@@ -158,6 +158,19 @@ class TravelingVortex(BaseTestCase):
         }
         self.set_grid_configuration(grid_updates)
 
+        #################################### Global Constants ##########################################################
+
+        constants_updates = {
+            "gamma": 1.4,
+            "R_gas": 287.4,
+            "p_ref": 1.0e5,
+            "T_ref": 300.0,
+            "h_ref": 10_000.0,
+            "t_ref": 100.0,
+            "grav": 9.81,
+        }
+        self.set_global_constants(constants_updates)
+
         #################################### Boundary Conditions #######################################################
         self.set_boundary_condition(
             BoundarySide.LEFT, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
@@ -198,7 +211,7 @@ class TravelingVortex(BaseTestCase):
             "reconstruction": FluxReconstructions.MODIFIED_MUSCL,
             "first_order_advection_routine": AdvectionRoutines.FIRST_ORDER_RK,
             "second_order_advection_routine": AdvectionRoutines.STRANG_SPLIT,
-            "linear_solver": LinearSolvers.GMRES,
+            "linear_solver": LinearSolvers.BICGSTAB,
             "preconditioner": Preconditioners.DIAGONAL,
             "initial_projection": True,
         }
@@ -231,19 +244,7 @@ class TravelingVortex(BaseTestCase):
         }
         self.set_diagnostics(diag_updates)
 
-        #################################### Global Constants ##########################################################
-
-        constants_updates = {
-            "gamma": 1.4,
-            "R_gas": 287.4,
-            "p_ref": 1.0e5,
-            "T_ref": 300.0,
-            "h_ref": 10_000.0,
-            "t_ref": 100.0,
-            "grav": 0.0,
-        }
-        self.set_global_constants(constants_updates)
-
+        ################################################################################################################
         # Final check/update of Msq after constants are set
         self._update_Msq()
         # Final check/update of output suffix

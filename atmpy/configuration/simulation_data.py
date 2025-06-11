@@ -206,10 +206,11 @@ class Physics:
         """Recalculates gravity and coriolis based on current config."""
         g = constants.grav * constants.h_ref / (constants.R_gas * constants.T_ref)
         ndim = grid_cfg.ndim
+        non_zero = np.nonzero(self.gravity_strength)[0]
+        if non_zero:
+            self.gravity_strength = list(self.gravity_strength)
+            self.gravity_strength[non_zero[0]] = g
         self.gravity = Gravity(self.gravity_strength, ndim)
-        self.gravity.strength = g
-        self.gravity.vector[self.gravity.axis] = g
-        self.gravity_strength = self.gravity.vector
         self.coriolis = CoriolisOperator(self.coriolis_strength, self.gravity)
         print("Physics derived fields updated.")
 
