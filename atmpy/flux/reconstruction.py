@@ -73,11 +73,13 @@ def modified_muscl(
     amplitudes = calculate_amplitudes(slopes, speed, lmbda, left=True)
     lefts = np.zeros_like(primitives)
     lefts[..., 1:] = primitives[..., 1:] + amplitudes
+    lefts[..., PVI.Y] = 1.0 / (1.0 / primitives[..., PVI.Y] + amplitudes[..., PVI.Y - 1])
 
     # right amplitudes and slope
     amplitudes = calculate_amplitudes(slopes, speed, lmbda, left=False)
     rights = np.zeros_like(primitives)
     rights[..., 1:] = primitives[..., 1:] + amplitudes
+    rights[..., PVI.Y] = 1.0 / (1.0 / primitives[..., PVI.Y] + amplitudes[..., PVI.Y - 1])
     return lefts, rights
 
 

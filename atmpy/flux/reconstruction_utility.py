@@ -40,6 +40,7 @@ def calculate_variable_differences(
 
     # Apply np.diff in the direction which results in one less element
     diffs[left_idx] = np.diff(primitives[..., 1:], axis=direction)
+    diffs[left_idx + (PVI.Y - 1,)] = 1.0 / primitives[right_idx + (PVI.Y,)] - 1.0 / primitives[left_idx + (PVI.Y,)]
 
     return diffs
 
