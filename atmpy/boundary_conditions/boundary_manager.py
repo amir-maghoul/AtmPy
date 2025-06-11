@@ -328,7 +328,9 @@ def boundary_manager_2d_updated():
     # Variable setup (same as before)
     variables = Variables(grid, 6, 1)
     variables.cell_vars.fill(1.0)  # Fill with baseline
-    variables.cell_vars[grid.get_inner_slice() + (VI.RHO,)] = 5.0  # Inner rho = 5
+    variables.cell_vars[grid.get_inner_slice() + (VI.RHO,)] =  np.arange(30).reshape(
+        (nx, ny)
+    )   # Inner rho = 5
     mpv = MPV(grid, num_vars=6, direction="y")  # Create MPV object
     mpv.p2_cells.fill(100.0)  # Example p2 values
     mpv.p2_cells[grid.get_inner_slice()] = np.arange(30).reshape(
@@ -343,8 +345,8 @@ def boundary_manager_2d_updated():
     # Bottom: Reflective Gravity for main vars, WALL for MPV vars
     bc_bottom = BCInstantiationOptions(
         side=BdrySide.BOTTOM,
-        type=BdryType.REFLECTIVE_GRAVITY,
-        mpv_boundary_type=BdryType.WALL,
+        type=BdryType.PERIODIC,
+        mpv_boundary_type=BdryType.PERIODIC,
         direction="y",
         grid=grid,
         stratification=stratification,
@@ -353,8 +355,8 @@ def boundary_manager_2d_updated():
     # Top: Reflective Gravity for main vars, WALL for MPV vars
     bc_top = BCInstantiationOptions(
         side=BdrySide.TOP,
-        type=BdryType.REFLECTIVE_GRAVITY,
-        mpv_boundary_type=BdryType.WALL,
+        type=BdryType.PERIODIC,
+        mpv_boundary_type=BdryType.PERIODIC,
         direction="y",
         grid=grid,
         stratification=stratification,
@@ -363,7 +365,7 @@ def boundary_manager_2d_updated():
     # Left: Periodic for main vars, Periodic for MPV vars (MPV type could be None to default)
     bc_left = BCInstantiationOptions(
         side=BdrySide.LEFT,
-        type=BdryType.WALL,
+        type=BdryType.PERIODIC,
         mpv_boundary_type=BdryType.PERIODIC,
         direction="x",
         grid=grid,
@@ -371,8 +373,8 @@ def boundary_manager_2d_updated():
     # Right: Periodic for main vars, Periodic for MPV vars
     bc_right = BCInstantiationOptions(
         side=BdrySide.RIGHT,
-        type=BdryType.WALL,
-        # mpv_boundary_type=BdryType.PERIODIC,
+        type=BdryType.PERIODIC,
+        mpv_boundary_type=BdryType.PERIODIC,
         direction="x",
         grid=grid,
     )
@@ -396,6 +398,7 @@ def boundary_manager_2d_updated():
     manager.apply_pressure_boundary_on_all_sides(mpv.p2_cells)
 
     print("\n--- State After BC Application ---")
+    print(variables.cell_vars[..., VI.RHO])
     print(
         "Rho (Reflective Gravity applied on Y boundaries):\n",
         variables.cell_vars[..., VI.RHO],
