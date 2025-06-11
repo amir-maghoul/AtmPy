@@ -4,8 +4,11 @@ from abc import ABC, abstractmethod
 import numpy as np
 from typing import List, Tuple, TypeVar, Callable, TYPE_CHECKING
 
+from atmpy.boundary_conditions.bc_extra_operations import ExtraBCOperation
+
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
+    from atmpy.boundary_conditions.boundary_manager import BoundaryManager
 
 from atmpy.pressure_solver.operators_numba_kernels import (
     _gradient_1d_numba,
@@ -20,8 +23,10 @@ from atmpy.pressure_solver.operators_numba_kernels import (
 class AbstractDiscreteOperator(ABC):
     """Abstract class for discrete operators."""
 
-    def __init__(self, grid: "Grid"):
+    def __init__(self, grid: "Grid", boundary_manager: "BoundaryManager", boundary_operations: List[ExtraBCOperation] = None):
         self.grid = grid
+        self.boundary_manager = boundary_manager
+        self.boundary_operations = boundary_operations
 
     @abstractmethod
     def gradient(self, p: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -52,8 +57,8 @@ TDiscreteOperator = TypeVar("TDiscreteOperator", bound=AbstractDiscreteOperator)
 
 
 class ClassicalDiscreteOperator(AbstractDiscreteOperator):
-    def __init__(self, grid: "Grid"):
-        super().__init__(grid)
+    def __init__(self, grid: "Grid", boundary_manager: "BoundaryManager" = None):
+        super().__init__(grid, boundary_manager)
         self._gradient_kernel: Callable
         self._gradient_kernel_args: Tuple
 
@@ -186,6 +191,11 @@ class ClassicalDiscreteOperator(AbstractDiscreteOperator):
             The divergence evaluated at the nodes.
             Shape: (nx-1, [ny-1], [nz-1])
         """
+        if self.boundary_manager:
+            for boundary_operation in self.boundary_operations:
+                self.boundary_manager.apply_extra_all_sides(
+                    vector, boundary_operation
+                )
         div_result = self._divergence_kernel(vector, *self._divergence_kernel_args)
 
         return div_result
