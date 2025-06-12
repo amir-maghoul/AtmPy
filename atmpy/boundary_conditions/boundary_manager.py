@@ -65,6 +65,24 @@ class BoundaryManager:
                 f"{side} is not a valid side for the direction {direction}"
             )
 
+    def _validate_periodic_boundary(self, side: BdrySide):
+        condition = self.boundary_conditions[side]
+        is_periodic = False
+        if condition.type == BdryType.PERIODIC:
+            is_periodic = True
+            opposite = side.opposite
+            if opposite not in self.boundary_conditions:
+                raise ValueError(
+                    f"No boundary condition configured for side: {opposite}"
+                )
+            else:
+                opposite_condition = self.boundary_conditions[opposite]
+                if opposite_condition.type != BdryType.PERIODIC:
+                    raise ValueError(
+                        f"For this application of BC, the opposite side of a periodic BC must be periodic BC: {opposite}"
+                    )
+        return is_periodic
+
     def apply_boundary_on_one_side(
         self,
         cells: "np.ndarray",
@@ -153,15 +171,17 @@ class BoundaryManager:
         self,
         mpv_vars: "np.ndarray",  # Assuming mpv vars are passed directly (e.g., mpv.p2_cells)
         side: BdrySide,
-        context: Optional[
-            "BCApplicationContext"
-        ] = None,  # Context for this specific application
     ):
         """Apply the MPV-specific boundary condition on a single side."""
         logging.debug(f"Apply boundary conditions *MPV variables* on side: {side}")
         if side not in self.mpv_boundary_conditions:  # Check MPV dict
             raise ValueError(f"No MPV boundary condition configured for side: {side}")
         condition = self.mpv_boundary_conditions[side]
+        if condition.type == BdryType.PERIODIC:
+            raise ValueError(
+                "For pressure variables, one sided periodic BC is not allowed."
+            )
+        context = BCApplicationContext(is_nodal=True)
         if context is None:
             context = BCApplicationContext()
         condition.apply_single_variable(mpv_vars, context)
@@ -170,37 +190,38 @@ class BoundaryManager:
         self,
         mpv_vars: "np.ndarray",
         direction: str,
-        contexts: List[Optional["BCApplicationContext"]] = [None, None],
     ):
         """Apply the MPV-specific boundary conditions on a single direction."""
         sides: Tuple[BdrySide, BdrySide] = side_direction_mapping(direction)
         logging.debug(f"Apply boundary conditions *MPV variables* on sides: {sides}")
+        contexts = [BCApplicationContext(is_nodal=True)] * 2
         for side, context in zip(sides, contexts):
             if side in self.mpv_boundary_conditions:
+                is_periodic = self._validate_periodic_boundary(side)
                 condition = self.mpv_boundary_conditions[side]
                 if context is None:
                     context = BCApplicationContext()
                 condition.apply_single_variable(mpv_vars, context)
+                if is_periodic:
+                    break
 
     def apply_pressure_boundary_on_all_sides(
         self,
         mpv_vars: "np.ndarray",
-        contexts: Optional[List["BCApplicationContext"]] = None,
     ):
         """Apply the MPV-specific boundary conditions on all sides."""
         logging.debug(
             "Applying full MPV boundary conditions on *pressure variables*..."
         )
         num_bcs = len(self.mpv_boundary_conditions)
-        if contexts is None:
-            contexts = [BCApplicationContext() for _ in range(num_bcs)]
-        elif len(contexts) != num_bcs:
-            raise ValueError(
-                "Number of contexts must match number of MPV boundary conditions"
-            )
-
+        contexts = [BCApplicationContext(is_nodal=True)] * num_bcs
         i = 0
+        is_periodic = False
         for side, condition in self.mpv_boundary_conditions.items():
+            if is_periodic:
+                is_periodic = False
+                continue
+            is_periodic = self._validate_periodic_boundary(side)
             condition.apply_single_variable(mpv_vars, contexts[i])
             i += 1
 
@@ -230,9 +251,6 @@ class BoundaryManager:
         condition = target_dict[side]
         # Assuming operation list contains only one relevant operation for the side
         if operations:
-            # Check if the operation type matches the condition type?
-            # The ExtraBCOperation base class already has target_type/target_side
-            # Let's assume the caller provides the correct operation.
             condition.apply_extra(variable, operations[0])  # Pass the operation object
 
     def apply_extra_all_sides(
@@ -328,9 +346,9 @@ def boundary_manager_2d_updated():
     # Variable setup (same as before)
     variables = Variables(grid, 6, 1)
     variables.cell_vars.fill(1.0)  # Fill with baseline
-    variables.cell_vars[grid.get_inner_slice() + (VI.RHO,)] =  np.arange(30).reshape(
+    variables.cell_vars[grid.get_inner_slice() + (VI.RHO,)] = np.arange(30).reshape(
         (nx, ny)
-    )   # Inner rho = 5
+    )  # Inner rho = 5
     mpv = MPV(grid, num_vars=6, direction="y")  # Create MPV object
     mpv.p2_cells.fill(100.0)  # Example p2 values
     mpv.p2_cells[grid.get_inner_slice()] = np.arange(30).reshape(
@@ -395,40 +413,14 @@ def boundary_manager_2d_updated():
     manager.apply_boundary_on_all_sides(variables.cell_vars)
     # Assuming MPV p2_cells are handled like single vars, use apply_mpv_...
     mpv.state(gravity, 0.115)
-    manager.apply_pressure_boundary_on_all_sides(mpv.p2_cells)
+    from atmpy.infrastructure.enums import HydrostateIndices as HI
 
-    print("\n--- State After BC Application ---")
-    print(variables.cell_vars[..., VI.RHO])
-    print(
-        "Rho (Reflective Gravity applied on Y boundaries):\n",
-        variables.cell_vars[..., VI.RHO],
-    )
-    print("P2 Cells (WALL applied on Y boundaries, PERIODIC on X):\n", mpv.p2_cells)
-
-    boundary_operation = [
-        WallAdjustment(target_side=BdrySide.LEFT, target_type=BdryType.WALL, factor=100)
-    ]
-    manager.apply_extra_all_sides(
-        variables.cell_vars[..., VI.RHO], boundary_operation, target_mpv=False
-    )
-    print(
-        " RHO (EXTRA applied on Y boundaries, PERIODIC on X):\n",
-        variables.cell_vars[..., VI.RHO],
-    )
-
-    boundary_operation = [
-        WallFluxCorrection(
-            target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0
-        )
-    ]
-    manager.apply_extra_all_sides(
-        variables.cell_vars, boundary_operation, target_mpv=False
-    )
-
-    print(
-        " RHOU (EXTRA applied on Y boundaries, PERIODIC on X):\n",
-        variables.cell_vars[..., VI.RHOU],
-    )
+    mpv.p2_nodes[...] = mpv.hydrostate.node_vars[..., HI.P2_0]
+    arra = np.arange(np.prod(grid.nshape)).reshape(grid.nshape)
+    mpv.p2_nodes = arra
+    print(mpv.p2_nodes)
+    manager.apply_pressure_boundary_on_all_sides(mpv.p2_nodes)
+    print(mpv.p2_nodes)
 
 
 if __name__ == "__main__":

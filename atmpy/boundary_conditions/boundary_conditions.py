@@ -155,6 +155,7 @@ class BaseBoundaryCondition(ABC):
         pad_slice[self.direction] = slc
         return tuple(pad_slice)
 
+
 class PeriodicBoundary(BaseBoundaryCondition):
     """Implements the periodic boundary condition. See the parent class for the documentation of the shared attributes.
 
@@ -191,32 +192,102 @@ class PeriodicBoundary(BaseBoundaryCondition):
     def apply_single_variable(
         self, variable: np.ndarray, context: "BCApplicationContext"
     ):
-        """Apply the periodic boundary condition on the pressure variable."""
-        inner_padded_slice = self.inner_and_padded_slices()
+        """Apply the periodic boundary condition on a single variable.
 
-        variable[inner_padded_slice[:-1]] = np.pad(
-            variable[self.inner_slice[:-1]],
-            self.pad_width[:-1],
-            mode="wrap",
+        The behavior depends on whether the variable is cell-centered or nodal,
+        as determined by the `context.is_nodal` flag.
+        """
+        # For non-nodal (cell-centered) variables, the wrap logic is sufficient.
+        if not context.is_nodal:
+            inner_padded_slice = self.inner_and_padded_slices()
+            variable[inner_padded_slice[:-1]] = np.pad(
+                variable[self.inner_slice[:-1]],
+                self.pad_width[:-1],
+                mode="wrap",
+            )
+            return
+        inner_slice = self.inner_slice[:-1]
+        pad_width = self.bisided_pad_width()
+        mode = self._periodic_nodal_overwrite
+        variable[...] = np.pad(
+            variable[inner_slice],
+            pad_width,
+            mode=mode,
         )
 
     def apply_extra(self, variable: np.ndarray, operation: "ExtraBCOperation") -> None:
         pass
 
     @property
-    def inner_slice(self) -> Tuple[slice, ...]:
+    def inner_slice(self, full=True) -> Tuple[slice, ...]:
         """Create the directional inner slice for a single direction."""
-        directional_inner_slice = [slice(None)] * (self.ndim + 1)
+        directional_inner_slice = [slice(None)] * (self.ndim + int(full))
         directional_inner_slice[self.direction] = self.grid.inner_slice[self.direction]
         return tuple(directional_inner_slice)
 
-    def inner_and_padded_slices(self) -> Tuple[slice, ...]:
+    def inner_and_padded_slices(self, full=True, nodal=False) -> Tuple[slice, ...]:
         """Returns the slice of the padded part."""
-        side = self._find_side_axis()
-        slc = slice(0, -self.ng[side]) if side == 0 else slice(self.ng[side], None)
-        pad_slice = [slice(None)] * (self.ndim + 1)
+        side = self.side_axis
+        slc = (
+            slice(0, -self.ng[side] - int(nodal))
+            if side == 0
+            else slice(self.ng[side] + int(nodal), None)
+        )
+        pad_slice = [slice(None)] * (self.ndim + int(full))
         pad_slice[self.direction] = slc
         return tuple(pad_slice)
+
+    def bisided_pad_width(self):
+        # create the pad width
+        pad_width = [(0, 0)] * (self.ndim)
+        pad_width[self.direction] = self.ng
+        return pad_width
+
+    def _periodic_nodal_overwrite(
+        self, vector: np.ndarray, pad_width: tuple, iaxis: int, kwargs: dict
+    ) -> np.ndarray:
+        """
+        Custom padding function for nodal variables with periodic boundaries.
+
+        This function implements a non-standard periodic wrap that also overwrites
+        the first and last nodes of the *internal* data block. It is designed
+        to be used with `np.pad`.
+
+        - The left ghost cells AND the first internal node are filled with values from the end of the internal domain.
+        - The right ghost cells AND the last internal node are filled with values from the start of the internal domain.
+
+        Parameters
+        ----------
+        vector : np.ndarray
+            A 1D array slice of the data, already padded with zeros.
+        pad_width : tuple
+            A 2-tuple (left_pad, right_pad) for the current axis.
+        iaxis : int
+            The axis currently being padded.
+        kwargs : dict
+            Any keyword arguments (unused here).
+
+        Returns
+        -------
+        np.ndarray
+            The modified vector with ghost cells and boundary internal cells filled.
+        """
+        if all(pad_width) > 0:
+            left_pad, right_pad = pad_width
+
+            # --- 1. Define the source data for each side ---
+            right_source_slice = slice(left_pad, left_pad + left_pad + 1)
+            right_values = vector[right_source_slice].copy()
+
+            # The source for the left-side fill is the last `left_pad + 1` elements of the internal data.
+            left_source_slice = slice(-right_pad - right_pad - 1, -right_pad)
+            left_values = vector[left_source_slice]
+
+            # --- 2. Assign the calculated values to the destination ---
+            vector[: left_pad + 1] = left_values
+            vector[-right_pad - 1 :] = right_values
+
+        return vector
 
 
 class ReflectiveGravityBoundary(BaseBoundaryCondition):
