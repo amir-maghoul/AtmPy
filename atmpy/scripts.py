@@ -7,8 +7,7 @@ DEFAULT_PROFILE_STEPS = 20
 DEFAULT_VIS_VAR = "rho"
 DEFAULT_RUN_CASE = "TravelingVortex"
 CASE_CHOICES = ["TravelingVortex", "RisingBubble", "SineWaveAdvection1D"]
-DEFAULT_DEBUG_PORT = 5678 # Default port for PyCharm debugger
-
+DEFAULT_DEBUG_PORT = 5678  # Default port for PyCharm debugger
 
 
 def parse_arguments():
@@ -34,13 +33,13 @@ def parse_arguments():
         type=str,
         choices=["pycharm"],
         default="pycharm",
-        help="Specifies the debugger to use (default: pycharm)."
+        help="Specifies the debugger to use (default: pycharm).",
     )
     debug_group.add_argument(
         "--debug-port",
         type=int,
         default=DEFAULT_DEBUG_PORT,
-        help=f"Port for the debugger to connect to (default: {DEFAULT_DEBUG_PORT})."
+        help=f"Port for the debugger to connect to (default: {DEFAULT_DEBUG_PORT}).",
     )
 
     # --- Run specific arguments ---
@@ -165,12 +164,13 @@ def parse_arguments():
     #         f"Unrecognized command or case: '{potential_mode}'. Valid modes are 'run', 'visualize' and 'debug'."
     #     )
 
-
     # If a case was not provided as a positional argument, and --case is not set, default it for run/debug modes.
     if args.mode in ["run", "debug"] and args.case is None:
         args.case = DEFAULT_RUN_CASE
         if args.mode == "debug":
-             logging.info(f"Debug mode: --case not specified, defaulting to '{DEFAULT_RUN_CASE}'.")
+            logging.info(
+                f"Debug mode: --case not specified, defaulting to '{DEFAULT_RUN_CASE}'."
+            )
 
     if args.mode == "debug" and args.case is None:
         parser.error("--case is required for debug mode.")
