@@ -167,13 +167,13 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         logging.debug(f"Predictor (step {global_time_step_num}): Starting")
 
         half_dt = 0.5 * dt
-        # self.variables.cell_vars[...] = initial_vars_arr_for_coeffs
+        self.variables.cell_vars[...] = initial_vars_arr_for_coeffs
 
         # Current state (Sol^n, p^n) is in self.variables, self.mpv ###
         ################################ 1. Apply BCs to current state (t^n) ###########################################
         self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.p2_nodes, self._nodal_bc_contexts
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(
+            self.mpv.p2_nodes
         )
 
         ######################## 2. Compute advective mass fluxes (P v)^n based on state at t^n (Sol^n) ################
@@ -213,10 +213,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             f"Predictor (step {global_time_step_num}): After backward_update_explicit on Sol*"
         )
 
+        predictor_coeff_vars = None
         if not self.is_compressible:
-            predictor_coeff_vars = np.copy(predictor_end_vars)
-        else:
-            predictor_coeff_vars = self.variables.cell_vars
+            predictor_coeff_vars = np.copy(initial_vars_arr_for_coeffs)
 
         # Solve for Exner pressure
         self.backward_update_implicit(half_dt, initial_vars=predictor_coeff_vars)
@@ -247,14 +246,15 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ############################ 1. Reset state variables to t^n ###################################################
         self.variables.cell_vars[...] = initial_vars_arr
-        self.mpv.p2_nodes[...] = initial_p2_nodes_arr
+        if self.is_compressible:
+            self.mpv.p2_nodes[...] = self.mpv.p2_nodes0
         logging.debug(f"Corrector (step {global_time_step_num}): State reset to t^n")
 
         ############################ 2. Apply BCs to state at t^n ######################################################
-        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.p2_nodes, self._nodal_bc_contexts
-        )
+        # self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
+        # self.boundary_manager.apply_boundary_on_single_var_all_sides(
+        #     self.mpv.p2_nodes, self._nodal_bc_contexts
+        # )
 
         ########################## 3. Explicit Euler for non-advective terms ###########################################
         ################################### (Eq. 17a of BK19) ##########################################################
@@ -291,19 +291,17 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
         # Operator coefficients (PΘ) for implicit solve use current state (Sol**)
-        self.backward_update_implicit(
-            half_dt, initial_vars=self.variables.cell_vars.copy()
-        )  # Pass a copy if it's modified
+        self.backward_update_implicit(half_dt)
         # self.variables is now Sol^{n+1}, self.mpv.p2_nodes is p^{n+1}
         logging.debug(
             f"Corrector (step {global_time_step_num}): After backward_update_implicit (Sol** -> Sol^(n+1))"
         )
 
         ######################### 6. Final Boundary Conditions #########################################################
-        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.p2_nodes, self._nodal_bc_contexts
-        )
+        # self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
+        # self.boundary_manager.apply_boundary_on_single_var_all_sides(
+        #     self.mpv.p2_nodes, self._nodal_bc_contexts
+        # )
         logging.debug(f"--- Corrector (step {global_time_step_num}): Finished ---")
 
     def forward_update(self, dt: float) -> None:
@@ -317,14 +315,13 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Calculate the buoyancy PX'
         dbuoy = cellvars[..., VI.RHOY] * cellvars[..., VI.RHOX] / cellvars[..., VI.RHO]
         ###################### Update variables
+        self._forward_pressure_update(cellvars, dt, p2n)
         self._forward_momenta_update(cellvars, dt, p2n, dbuoy, g)
         self._forward_buoyancy_update(cellvars, dt)
-        self._forward_pressure_update(cellvars, dt, p2n)
-
         ####################### Update boundary values
         # Update the boundary nodes for pressure variable
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.p2_nodes, self._nodal_bc_contexts
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(
+            self.mpv.p2_nodes
         )
 
         # Update all other variables on the boundary.
@@ -402,10 +399,11 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ################################ 2. Apply boundary conditions on pi' ###########################################
         # Update the boundary nodes for pressure variable
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.p2_nodes, self._nodal_bc_contexts
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(
+            self.mpv.p2_nodes
         )
 
+        cellvars = self.variables.cell_vars
         ################################ 3. "Pre-Correction" using Current Pressure p^k ################################
         # This method will put M_inv⋅(dt*CΘ*∇p₂)/Θ in the momenta container, where M is extended coriolis inverse.
         # In a couple of steps the divergence will be applied on [Pu, Pv, Pw], using these values.
@@ -424,22 +422,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
 
         ############################# 5. Compute RHS (Divergence of Pre-Corrected Momenta) #############################
-        # Get the pre-corrected variables
-        cellvars = self.variables.cell_vars
 
         # Calculate pressure-weighted momenta P*v = (rhoY/rho) * rho*v
         # [Pu, Pv, Pw]
         pressure_weighted_momenta = self._calculate_enthalpy_weighted_momenta(cellvars)
-
-        ########################### Zero the momentum ghost cells to pass to divergence ################################
-        boundary_operation = [
-            WallFluxCorrection(
-                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.0
-            )
-        ]
-        self.boundary_manager.apply_extra_all_sides(
-            pressure_weighted_momenta, boundary_operation
-        )
 
         ################################################################################################################
         # Calculate divergence on one element inner nodes [shape: (nx-1, ny-1, nz-1)]
@@ -454,7 +440,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.mpv.wcenter *= self.is_compressible
 
         ############################ 6. Solve the elliptic helmholtz equation ##########################################
-        rtol = 1.0e-7
+        rtol = 1.0e-8
         p2_inner_flat, solver_info = self.pressure_solver.solve_helmholtz(
             rhs_flat,
             dt,
@@ -476,8 +462,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ############################ 8. Update boundary with the new values ############################################
         # Use the current existing context (is_nodal for all sides)
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            p2_full, self._nodal_bc_contexts
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(
+            p2_full
         )
 
         ############################ 9. Final Correction using Pressure Increment delta_p ##############################
@@ -499,8 +485,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
 
         # Use the current existing contexts (is_nodal for all sides)
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.p2_nodes, self._nodal_bc_contexts
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(
+            self.mpv.p2_nodes
         )
 
     def _forward_momenta_update(
@@ -604,8 +590,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
                 target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=2.0
             )
         ]
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.rhs, self._nodal_bc_contexts
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(
+            self.mpv.rhs
         )
         self.boundary_manager.apply_extra_all_sides(self.mpv.rhs, boundary_operation)
 
