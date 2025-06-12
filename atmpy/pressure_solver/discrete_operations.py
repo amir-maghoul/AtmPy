@@ -23,7 +23,12 @@ from atmpy.pressure_solver.operators_numba_kernels import (
 class AbstractDiscreteOperator(ABC):
     """Abstract class for discrete operators."""
 
-    def __init__(self, grid: "Grid", boundary_manager: "BoundaryManager", boundary_operations: List[ExtraBCOperation] = None):
+    def __init__(
+        self,
+        grid: "Grid",
+        boundary_manager: "BoundaryManager",
+        boundary_operations: List[ExtraBCOperation] = None,
+    ):
         self.grid = grid
         self.boundary_manager = boundary_manager
         self.boundary_operations = boundary_operations
@@ -193,9 +198,7 @@ class ClassicalDiscreteOperator(AbstractDiscreteOperator):
         """
         if self.boundary_manager:
             for boundary_operation in self.boundary_operations:
-                self.boundary_manager.apply_extra_all_sides(
-                    vector, boundary_operation
-                )
+                self.boundary_manager.apply_extra_all_sides(vector, boundary_operation)
         div_result = self._divergence_kernel(vector, *self._divergence_kernel_args)
 
         return div_result
