@@ -71,18 +71,27 @@ if args.mode == "debug":
             import pydevd_pycharm
 
             # NOTE: Remember to use your actual local IP if 'localhost' fails.
-            host_ip = 'localhost'
+            host_ip = "localhost"
             print("--- DEBUG MODE ---")
-            print(f"Attempting to connect to PyCharm debugger at {host_ip}:{args.debug_port}...")
+            print(
+                f"Attempting to connect to PyCharm debugger at {host_ip}:{args.debug_port}..."
+            )
             print("Start the Python Debug Server in your IDE now.")
-            pydevd_pycharm.settrace(host_ip, port=args.debug_port, stdoutToServer=True, stderrToServer=True,
-                                    suspend=True)
+            pydevd_pycharm.settrace(
+                host_ip,
+                port=args.debug_port,
+                stdoutToServer=True,
+                stderrToServer=True,
+                suspend=True,
+            )
             print("Debugger connected successfully.")
         except ImportError:
             print("ERROR: pydevd_pycharm module not found. Please install it.")
             pass
         except ConnectionRefusedError:
-            print(f"ERROR: Connection refused. Is the PyCharm Debug Server listening on port {args.debug_port}?")
+            print(
+                f"ERROR: Connection refused. Is the PyCharm Debug Server listening on port {args.debug_port}?"
+            )
             pass
         except Exception as e:
             print(f"ERROR: Could not connect to PyCharm debugger: {e}")
@@ -161,7 +170,14 @@ if args.mode in ["run", "debug"]:
     manager = BoundaryManager(bm_config)
     manager.apply_boundary_on_all_sides(variables.cell_vars)
     eos = ExnerBasedEOS()
-    flux = Flux(grid, variables, eos, config.numerics.riemann_solver, config.numerics.reconstruction, config.numerics.limiter)
+    flux = Flux(
+        grid,
+        variables,
+        eos,
+        config.numerics.riemann_solver,
+        config.numerics.reconstruction,
+        config.numerics.limiter,
+    )
     op_context = DiscreteOperatorsContext(DiscreteOperators.CLASSIC_OPERATOR, grid=grid)
     ps_context: PressureContext[ClassicalPressureSolver] = PressureContext(
         solver_type=PressureSolvers.CLASSIC_PRESSURE_SOLVER,
@@ -277,7 +293,6 @@ elif args.mode == "visualize":
         logger.info(
             f"Visualizing for effective grid: Nx={nx_to_use}, Ny={ny_to_use}, Nz={nz_to_use} (Ndim={ndim_to_use})"
         )
-
 
         # --- Generate output filename for VISUALIZATION using the utility ---
         try:
