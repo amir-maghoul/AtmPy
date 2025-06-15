@@ -113,11 +113,16 @@ class BaseBoundaryCondition(ABC):
     def pad_width(self):
         """Create the pad width for a single direction. The "ng" attribute contains a
         list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
-        Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
+        Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. To
         avoid padding the boundary in all direction with the same number of ghost cells, we need to create a
         pad width tuple containing zero tuples in the undesired directions, i.e.  for x direction padding
         [(ngx, ngx), (0, 0), (0, 0)]. For wall boundary, this is reduced to one-sided padding: for example for x direction
-        and the left side: [(ngx, 0), (0, 0), (0, 0)]"""
+        and the left side: [(ngx, 0), (0, 0), (0, 0)].
+
+        Notes
+        -----
+        There is an extra zero (0,0) tuple in the pad width. This corresponds to the last axis where the difference variables
+        are stacked and the BC is not defined on that axis. """
 
         side: int = self.side_axis
         # create (ng, 0) or (0, ng)
@@ -219,9 +224,9 @@ class PeriodicBoundary(BaseBoundaryCondition):
         pass
 
     @property
-    def inner_slice(self, full=True) -> Tuple[slice, ...]:
+    def inner_slice(self) -> Tuple[slice, ...]:
         """Create the directional inner slice for a single direction."""
-        directional_inner_slice = [slice(None)] * (self.ndim + int(full))
+        directional_inner_slice = [slice(None)] * (self.ndim + 1)
         directional_inner_slice[self.direction] = self.grid.inner_slice[self.direction]
         return tuple(directional_inner_slice)
 
@@ -281,7 +286,7 @@ class PeriodicBoundary(BaseBoundaryCondition):
 
             # The source for the left-side fill is the last `left_pad + 1` elements of the internal data.
             left_source_slice = slice(-right_pad - right_pad - 1, -right_pad)
-            left_values = vector[left_source_slice]
+            left_values = vector[left_source_slice].copy()
 
             # --- 2. Assign the calculated values to the destination ---
             vector[: left_pad + 1] = left_values

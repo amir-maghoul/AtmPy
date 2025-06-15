@@ -360,7 +360,23 @@ def boundary_manager_2d_updated():
     th = Thermodynamics()
     gravity = (0.0, 1.0, 0.0)
 
-    # Bottom: Reflective Gravity for main vars, WALL for MPV vars
+    # Left: Periodic for main vars, Periodic for MPV vars (MPV type could be None to default)
+    bc_left = BCInstantiationOptions(
+        side=BdrySide.LEFT,
+        type=BdryType.PERIODIC,
+        mpv_boundary_type=BdryType.PERIODIC,
+        direction="x",
+        grid=grid,
+    )
+    # Right: Periodic for main vars, Periodic for MPV vars
+    bc_right = BCInstantiationOptions(
+        side=BdrySide.RIGHT,
+        type=BdryType.PERIODIC,
+        mpv_boundary_type=BdryType.PERIODIC,
+        direction="x",
+        grid=grid,
+    )
+
     bc_bottom = BCInstantiationOptions(
         side=BdrySide.BOTTOM,
         type=BdryType.PERIODIC,
@@ -380,24 +396,8 @@ def boundary_manager_2d_updated():
         stratification=stratification,
         gravity=gravity,
     )
-    # Left: Periodic for main vars, Periodic for MPV vars (MPV type could be None to default)
-    bc_left = BCInstantiationOptions(
-        side=BdrySide.LEFT,
-        type=BdryType.PERIODIC,
-        mpv_boundary_type=BdryType.PERIODIC,
-        direction="x",
-        grid=grid,
-    )
-    # Right: Periodic for main vars, Periodic for MPV vars
-    bc_right = BCInstantiationOptions(
-        side=BdrySide.RIGHT,
-        type=BdryType.PERIODIC,
-        mpv_boundary_type=BdryType.PERIODIC,
-        direction="x",
-        grid=grid,
-    )
 
-    options = [bc_bottom, bc_top, bc_left, bc_right]
+    options = [bc_left, bc_right, bc_bottom, bc_top,]
     print(bc_right.mpv_boundary_type)
     bc_config = BoundaryConditionsConfiguration(options)
 
