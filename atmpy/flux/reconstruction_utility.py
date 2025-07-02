@@ -33,14 +33,17 @@ def calculate_variable_differences(
     """
 
     direction = direction_axis(direction_str)
-    diffs = np.zeros_like(primitives[..., 1:])  # The final difference array]
+    diffs = np.zeros_like(primitives[..., 1:])  # The final difference array
 
     # Set the difference slice (one fewer element than the original array) in the corresponding direction
     left_idx, right_idx, _ = directional_indices(ndim, direction_str, full=False)
 
     # Apply np.diff in the direction which results in one less element
     diffs[left_idx] = np.diff(primitives[..., 1:], axis=direction)
-    diffs[left_idx + (PVI.Y - 1,)] = 1.0 / primitives[right_idx + (PVI.Y,)] - 1.0 / primitives[left_idx + (PVI.Y,)]
+    # Since rho is not included in diffs, the index of each variable should be minus one.
+    diffs[left_idx + (PVI.Y - 1,)] = (
+        1.0 / primitives[right_idx + (PVI.Y,)] - 1.0 / primitives[left_idx + (PVI.Y,)]
+    )
 
     return diffs
 

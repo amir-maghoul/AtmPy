@@ -34,12 +34,12 @@ def create_averaging_kernels(dimension: int) -> List[np.ndarray]:
         For 3D: [kx, ky, kz]
     """
     if dimension == 1:
-        kx = np.array([1.0, 1.0], dtype=np.float32)
+        kx = np.array([1.0, 1.0], dtype=np.float64)
         kx /= kx.sum()
         return [kx]
 
     elif dimension == 2:
-        base_kernel = np.array([[0.5, 1.0, 0.5], [0.5, 1.0, 0.5]], dtype=np.float32)
+        base_kernel = np.array([[0.5, 1.0, 0.5], [0.5, 1.0, 0.5]], dtype=np.float64)
         base_kernel /= base_kernel.sum()
 
         kx = base_kernel
@@ -47,7 +47,7 @@ def create_averaging_kernels(dimension: int) -> List[np.ndarray]:
         return [kx, ky]
 
     elif dimension == 3:
-        base_2d = np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]], dtype=np.float32)
+        base_2d = np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]], dtype=np.float64)
         base_2d /= base_2d.sum()
 
         # kernel_x (shape: 2 x 3 x 3)
