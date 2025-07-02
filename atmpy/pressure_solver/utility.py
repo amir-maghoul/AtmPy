@@ -22,6 +22,6 @@ def laplacian_inner_slice(ng_all: List[Tuple[int, int]]):
 
 def single_element_slice(ndim: int, axis: int, element: int):
     """Calculate the slice for a single element in the given direction."""
-    slices = [slice(None)]*ndim
+    slices = [slice(None)] * ndim
     slices[axis] = element
     return tuple(slices)

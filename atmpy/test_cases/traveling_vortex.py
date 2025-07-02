@@ -98,95 +98,94 @@ class TravelingVortex(BaseTestCase):
         ####################### Polynomial coefficients for pressure perturbation ######################################
 
         self.coe_correct = np.zeros((25,))
-        self.coe_correct[0] = 1.0 / 12.0;
-        self.coe_correct[1] = -  12.0 / 13.0;
-        self.coe_correct[2] = 9.0 / 2.0;
-        self.coe_correct[3] = - 184.0 / 15.0;
-        self.coe_correct[4] = 609.0 / 32.0;
-        self.coe_correct[5] = - 222.0 / 17.0;
-        self.coe_correct[6] = -  38.0 / 9.0;
-        self.coe_correct[7] = 54.0 / 19.0;
-        self.coe_correct[8] = 783.0 / 20.0;
-        self.coe_correct[9] = - 558.0 / 7.0;
-        self.coe_correct[10] = 1053.0 / 22.0;
-        self.coe_correct[11] = 1014.0 / 23.0;
-        self.coe_correct[12] = -1473.0 / 16.0;
-        self.coe_correct[13] = 204.0 / 5.0;
-        self.coe_correct[14] = 510.0 / 13.0;
-        self.coe_correct[15] = -1564.0 / 27.0;
-        self.coe_correct[16] = 153.0 / 8.0;
-        self.coe_correct[17] = 450.0 / 29.0;
-        self.coe_correct[18] = - 269.0 / 15.0;
-        self.coe_correct[19] = 174.0 / 31.0;
-        self.coe_correct[20] = 57.0 / 32.0;
-        self.coe_correct[21] = -  74.0 / 33.0;
-        self.coe_correct[22] = 15.0 / 17.0;
-        self.coe_correct[23] = -   6.0 / 35.0;
-        self.coe_correct[24] = 1.0 / 72.0;
+        self.coe_correct[0] = 1.0 / 12.0
+        self.coe_correct[1] = -12.0 / 13.0
+        self.coe_correct[2] = 9.0 / 2.0
+        self.coe_correct[3] = -184.0 / 15.0
+        self.coe_correct[4] = 609.0 / 32.0
+        self.coe_correct[5] = -222.0 / 17.0
+        self.coe_correct[6] = -38.0 / 9.0
+        self.coe_correct[7] = 54.0 / 19.0
+        self.coe_correct[8] = 783.0 / 20.0
+        self.coe_correct[9] = -558.0 / 7.0
+        self.coe_correct[10] = 1053.0 / 22.0
+        self.coe_correct[11] = 1014.0 / 23.0
+        self.coe_correct[12] = -1473.0 / 16.0
+        self.coe_correct[13] = 204.0 / 5.0
+        self.coe_correct[14] = 510.0 / 13.0
+        self.coe_correct[15] = -1564.0 / 27.0
+        self.coe_correct[16] = 153.0 / 8.0
+        self.coe_correct[17] = 450.0 / 29.0
+        self.coe_correct[18] = -269.0 / 15.0
+        self.coe_correct[19] = 174.0 / 31.0
+        self.coe_correct[20] = 57.0 / 32.0
+        self.coe_correct[21] = -74.0 / 33.0
+        self.coe_correct[22] = 15.0 / 17.0
+        self.coe_correct[23] = -6.0 / 35.0
+        self.coe_correct[24] = 1.0 / 72.0
 
         self.const_coe_correct = np.zeros((13,))
-        self.const_coe_correct[0] = 1.0 / 12.0;
-        self.const_coe_correct[1] = -12.0 / 13.0;
-        self.const_coe_correct[2] = 33.0 / 7.0;
-        self.const_coe_correct[3] = -44.0 / 3.0;
-        self.const_coe_correct[4] = 495.0 / 16.0;
-        self.const_coe_correct[5] = -792.0 / 17.0;
-        self.const_coe_correct[6] = 154.0 / 3.0;
-        self.const_coe_correct[7] = -792.0 / 19.0;
-        self.const_coe_correct[8] = 99.0 / 4.0;
-        self.const_coe_correct[9] = -220.0 / 21.0;
-        self.const_coe_correct[10] = 3.0;
-        self.const_coe_correct[11] = -12.0 / 23.0;
-        self.const_coe_correct[12] = 1.0 / 24.0;
+        self.const_coe_correct[0] = 1.0 / 12.0
+        self.const_coe_correct[1] = -12.0 / 13.0
+        self.const_coe_correct[2] = 33.0 / 7.0
+        self.const_coe_correct[3] = -44.0 / 3.0
+        self.const_coe_correct[4] = 495.0 / 16.0
+        self.const_coe_correct[5] = -792.0 / 17.0
+        self.const_coe_correct[6] = 154.0 / 3.0
+        self.const_coe_correct[7] = -792.0 / 19.0
+        self.const_coe_correct[8] = 99.0 / 4.0
+        self.const_coe_correct[9] = -220.0 / 21.0
+        self.const_coe_correct[10] = 3.0
+        self.const_coe_correct[11] = -12.0 / 23.0
+        self.const_coe_correct[12] = 1.0 / 24.0
 
         self.coe_cor_correct = np.zeros((19,))
-        self.coe_cor_correct[0] = 1.0 / 7.0;
-        self.coe_cor_correct[1] = -3.0 / 4.0;
-        self.coe_cor_correct[2] = 4.0 / 3.0;
-        self.coe_cor_correct[3] = -1.0 / 5.0;
-        self.coe_cor_correct[4] = -45.0 / 22.0;
-        self.coe_cor_correct[5] = 3.0 / 4.0;
-        self.coe_cor_correct[6] = 9.0 / 2.0;
-        self.coe_cor_correct[7] = -36.0 / 7.0;
-        self.coe_cor_correct[8] = -11.0 / 5.0;
-        self.coe_cor_correct[9] = 55.0 / 8.0;
-        self.coe_cor_correct[10] = -33.0 / 17.0;
-        self.coe_cor_correct[11] = -4.0;
-        self.coe_cor_correct[12] = 58.0 / 19.0;
-        self.coe_cor_correct[13] = 3.0 / 5.0;
-        self.coe_cor_correct[14] = -10.0 / 7.0;
-        self.coe_cor_correct[15] = 4.0 / 11.0;
-        self.coe_cor_correct[16] = 9.0 / 46.0;
-        self.coe_cor_correct[17] = -1.0 / 8.0;
-        self.coe_cor_correct[18] = 1.0 / 50.0;
+        self.coe_cor_correct[0] = 1.0 / 7.0
+        self.coe_cor_correct[1] = -3.0 / 4.0
+        self.coe_cor_correct[2] = 4.0 / 3.0
+        self.coe_cor_correct[3] = -1.0 / 5.0
+        self.coe_cor_correct[4] = -45.0 / 22.0
+        self.coe_cor_correct[5] = 3.0 / 4.0
+        self.coe_cor_correct[6] = 9.0 / 2.0
+        self.coe_cor_correct[7] = -36.0 / 7.0
+        self.coe_cor_correct[8] = -11.0 / 5.0
+        self.coe_cor_correct[9] = 55.0 / 8.0
+        self.coe_cor_correct[10] = -33.0 / 17.0
+        self.coe_cor_correct[11] = -4.0
+        self.coe_cor_correct[12] = 58.0 / 19.0
+        self.coe_cor_correct[13] = 3.0 / 5.0
+        self.coe_cor_correct[14] = -10.0 / 7.0
+        self.coe_cor_correct[15] = 4.0 / 11.0
+        self.coe_cor_correct[16] = 9.0 / 46.0
+        self.coe_cor_correct[17] = -1.0 / 8.0
+        self.coe_cor_correct[18] = 1.0 / 50.0
 
         self.coe_d_correct = np.zeros((25,))
-        self.coe_d_correct[0] = 1.0 / 12.0;
-        self.coe_d_correct[1] = -  12.0 / 13.0;
-        self.coe_d_correct[2] = 30.0 / 7.0;
-        self.coe_d_correct[3] = - 148.0 / 15.0;
-        self.coe_d_correct[4] = 57.0 / 8.0;
-        self.coe_d_correct[5] = 348.0 / 17.0;
-        self.coe_d_correct[6] = - 538.0 / 9.0;
-        self.coe_d_correct[7] = 900.0 / 19.0;
-        self.coe_d_correct[8] = 1071.0 / 20.0;
-        self.coe_d_correct[9] = -3128.0 / 21.0;
-        self.coe_d_correct[10] = 1020.0 / 11.0;
-        self.coe_d_correct[11] = 2040.0 / 23.0;
-        self.coe_d_correct[12] = -1105.0 / 6.0;
-        self.coe_d_correct[13] = 408.0 / 5.0;
-        self.coe_d_correct[14] = 1020.0 / 13.0;
-        self.coe_d_correct[15] = -3128.0 / 27.0;
-        self.coe_d_correct[16] = 153.0 / 4.0;
-        self.coe_d_correct[17] = 900.0 / 29.0;
-        self.coe_d_correct[18] = - 538.0 / 15.0;
-        self.coe_d_correct[19] = 348.0 / 31.0;
-        self.coe_d_correct[20] = 57.0 / 16.0;
-        self.coe_d_correct[21] = - 148.0 / 33.0;
-        self.coe_d_correct[22] = 30.0 / 17.0;
-        self.coe_d_correct[23] = -  12.0 / 35.0;
-        self.coe_d_correct[24] = 1.0 / 36.0;
-
+        self.coe_d_correct[0] = 1.0 / 12.0
+        self.coe_d_correct[1] = -12.0 / 13.0
+        self.coe_d_correct[2] = 30.0 / 7.0
+        self.coe_d_correct[3] = -148.0 / 15.0
+        self.coe_d_correct[4] = 57.0 / 8.0
+        self.coe_d_correct[5] = 348.0 / 17.0
+        self.coe_d_correct[6] = -538.0 / 9.0
+        self.coe_d_correct[7] = 900.0 / 19.0
+        self.coe_d_correct[8] = 1071.0 / 20.0
+        self.coe_d_correct[9] = -3128.0 / 21.0
+        self.coe_d_correct[10] = 1020.0 / 11.0
+        self.coe_d_correct[11] = 2040.0 / 23.0
+        self.coe_d_correct[12] = -1105.0 / 6.0
+        self.coe_d_correct[13] = 408.0 / 5.0
+        self.coe_d_correct[14] = 1020.0 / 13.0
+        self.coe_d_correct[15] = -3128.0 / 27.0
+        self.coe_d_correct[16] = 153.0 / 4.0
+        self.coe_d_correct[17] = 900.0 / 29.0
+        self.coe_d_correct[18] = -538.0 / 15.0
+        self.coe_d_correct[19] = 348.0 / 31.0
+        self.coe_d_correct[20] = 57.0 / 16.0
+        self.coe_d_correct[21] = -148.0 / 33.0
+        self.coe_d_correct[22] = 30.0 / 17.0
+        self.coe_d_correct[23] = -12.0 / 35.0
+        self.coe_d_correct[24] = 1.0 / 36.0
 
         self.coe_incorrect = np.array(
             [
@@ -444,18 +443,34 @@ class TravelingVortex(BaseTestCase):
         dp2c = np.zeros_like(r_cell)
         if Msq > 1e-10:  # Only calculate if compressible and vortex has strength
             for ip, c in enumerate(self.coe):
-                term = self.fac**2 * c * (r_over_R0_cell ** (12 + ip) - 1.0) * self.rotdir**2
+                term = (
+                    self.fac**2
+                    * c
+                    * (r_over_R0_cell ** (12 + ip) - 1.0)
+                    * self.rotdir**2
+                )
                 dp2c[mask_rho] += term[mask_rho]
 
             if not self.correct_distribution:
                 dp2c_const = np.zeros_like(r_cell)
                 for ip, c in enumerate(self.const_coe):
-                    term = self.fac**2 * c * (r_over_R0_cell ** (12 + ip) - 1.0) * self.rotdir**2
+                    term = (
+                        self.fac**2
+                        * c
+                        * (r_over_R0_cell ** (12 + ip) - 1.0)
+                        * self.rotdir**2
+                    )
                     dp2c_const[mask_rho] += term[mask_rho]
             else:
                 dp2c_const = np.zeros_like(r_cell)
                 for ip, c in enumerate(self.coe_cor):
-                    term = self.fac * coriolis * c * (r_over_R0_cell ** (7 + ip) - 1.0) * self.R0 #self.rotdir**2
+                    term = (
+                        self.fac
+                        * coriolis
+                        * c
+                        * (r_over_R0_cell ** (7 + ip) - 1.0)
+                        * self.R0
+                    )  # self.rotdir**2
                     dp2c_const[mask_rho] += term[mask_rho]
 
             dp2c = self.alpha * dp2c + self.alpha_const * dp2c_const
@@ -474,7 +489,7 @@ class TravelingVortex(BaseTestCase):
         # Calculate rhoY (Potential Temperature * Density)
 
         if self.config.model_regimes.is_compressible:
-        # if True:
+            # if True:
             p_total = self.p0 + Msq * dp2c  # Add perturbation to base pressure
             # Ensure pressure is positive before taking power
             p_total_safe = np.maximum(p_total, 1e-9)
@@ -532,17 +547,30 @@ class TravelingVortex(BaseTestCase):
 
         p2_nodes_unscaled = np.zeros_like(r_node)
         for ip, c in enumerate(self.coe):
-            term = self.fac**2 * c * (r_over_R0_node ** (12 + ip) - 1.0) * self.rotdir**2
+            term = (
+                self.fac**2 * c * (r_over_R0_node ** (12 + ip) - 1.0) * self.rotdir**2
+            )
             p2_nodes_unscaled[mask_node] += term[mask_node]
 
         p2n_const_unscaled = np.zeros_like(r_node)
         if not self.correct_distribution:
             for ip, c in enumerate(self.const_coe):
-                term = self.fac**2 * c * (r_over_R0_node ** (12 + ip) - 1.0) * (self.rotdir ** 2)
+                term = (
+                    self.fac**2
+                    * c
+                    * (r_over_R0_node ** (12 + ip) - 1.0)
+                    * (self.rotdir**2)
+                )
                 p2n_const_unscaled[mask_node] += term[mask_node]
         else:
             for ip, c in enumerate(self.coe_cor):
-                term = self.fac * coriolis * c * (r_over_R0_node ** (7 + ip) - 1.0) * self.R0
+                term = (
+                    self.fac
+                    * coriolis
+                    * c
+                    * (r_over_R0_node ** (7 + ip) - 1.0)
+                    * self.R0
+                )
                 p2n_const_unscaled[mask_node] += term[mask_node]
 
         p2_nodes_unscaled = (
@@ -552,10 +580,9 @@ class TravelingVortex(BaseTestCase):
         ngy = self.config.spatial_grid.grid.ng[1][
             0
         ]  # get number of ghost cells in y direction.
-        mpv.p2_nodes[inner_slice] = (
-            thermo.Gamma
-            * np.divide(p2_nodes_unscaled, rhoY0_cells[ngy : -ngy + 1])  # Divide by 1.0
-        )
+        mpv.p2_nodes[inner_slice] = thermo.Gamma * np.divide(
+            p2_nodes_unscaled, rhoY0_cells[ngy : -ngy + 1]
+        )  # Divide by 1.0
         # if self.correct_distribution:
         #     mpv.p2_nodes[...] *= Msq
 

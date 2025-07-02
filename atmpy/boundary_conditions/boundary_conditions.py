@@ -122,7 +122,7 @@ class BaseBoundaryCondition(ABC):
         Notes
         -----
         There is an extra zero (0,0) tuple in the pad width. This corresponds to the last axis where the difference variables
-        are stacked and the BC is not defined on that axis. """
+        are stacked and the BC is not defined on that axis."""
 
         side: int = self.side_axis
         # create (ng, 0) or (0, ng)

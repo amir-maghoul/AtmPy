@@ -397,7 +397,12 @@ def boundary_manager_2d_updated():
         gravity=gravity,
     )
 
-    options = [bc_left, bc_right, bc_bottom, bc_top,]
+    options = [
+        bc_left,
+        bc_right,
+        bc_bottom,
+        bc_top,
+    ]
     print(bc_right.mpv_boundary_type)
     bc_config = BoundaryConditionsConfiguration(options)
 

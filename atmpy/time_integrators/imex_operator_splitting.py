@@ -172,9 +172,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Current state (Sol^n, p^n) is in self.variables, self.mpv ###
         ################################ 1. Apply BCs to current state (t^n) ###########################################
         self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-        self.boundary_manager.apply_pressure_boundary_on_all_sides(
-            self.mpv.p2_nodes
-        )
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.p2_nodes)
 
         ######################## 2. Compute advective mass fluxes (P v)^n based on state at t^n (Sol^n) ################
         # This updates self.flux[direction][..., VI.RHOY]
@@ -227,10 +225,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ############################ 5. Apply Final Boundary Conditions ###############################################
         self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-        self.boundary_manager.apply_pressure_boundary_on_all_sides(
-            self.mpv.p2_nodes
-        )
-
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.p2_nodes)
 
         ######################### 6. Compute predicted advective mass fluxes (Pv)^{n+1/2} ##############################
         # self.variables.cell_vars is now Sol^{n+1/2}
@@ -302,9 +297,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ######################### 6. Final Boundary Conditions #########################################################
         self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-        self.boundary_manager.apply_pressure_boundary_on_all_sides(
-            self.mpv.p2_nodes
-        )
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.p2_nodes)
         logging.debug(f"--- Corrector (step {global_time_step_num}): Finished ---")
 
     def forward_update(self, dt: float) -> None:
@@ -323,9 +316,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self._forward_buoyancy_update(cellvars, dt)
         ####################### Update boundary values
         # Update the boundary nodes for pressure variable
-        self.boundary_manager.apply_pressure_boundary_on_all_sides(
-            self.mpv.p2_nodes
-        )
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.p2_nodes)
 
         # Update all other variables on the boundary.
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
@@ -402,9 +393,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ################################ 2. Apply boundary conditions on pi' ###########################################
         # Update the boundary nodes for pressure variable
-        self.boundary_manager.apply_pressure_boundary_on_all_sides(
-            self.mpv.p2_nodes
-        )
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.p2_nodes)
 
         cellvars = self.variables.cell_vars
         ################################ 3. "Pre-Correction" using Current Pressure p^k ################################
@@ -464,9 +453,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ############################ 8. Update boundary with the new values ############################################
         # Use the current existing context (is_nodal for all sides)
-        self.boundary_manager.apply_pressure_boundary_on_all_sides(
-            p2_full
-        )
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(p2_full)
 
         ############################ 9. Final Correction using Pressure Increment delta_p ##############################
         # Apply the update using the *solved increment*.
@@ -584,9 +571,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
                 target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=2.0
             )
         ]
-        self.boundary_manager.apply_pressure_boundary_on_all_sides(
-            self.mpv.rhs
-        )
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.rhs)
         self.boundary_manager.apply_extra_all_sides(self.mpv.rhs, boundary_operation)
 
         ############################## Divide the divergence by dP/dpi #################################################
