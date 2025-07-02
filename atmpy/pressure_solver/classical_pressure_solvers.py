@@ -3,6 +3,7 @@
 import numpy as np
 import scipy as sp
 from typing import TYPE_CHECKING, Union, Tuple, Optional, Callable, Dict
+from atmpy.variables.utility import cell_averaging, cells_to_nodes_averaging
 
 from atmpy.boundary_conditions.contexts import BCApplicationContext
 from atmpy.infrastructure.enums import (
@@ -94,6 +95,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         )
 
         self._update_discrete_operators()
+        self.p_buffer = np.zeros(self.grid.nshape, dtype=np.float64)
 
     def _get_preconditioner_compute_components(self):
         """Get the precondtioning compute function. The sole raison d'être of this method is to avoid circular import
@@ -409,14 +411,14 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         def _matvec(p_flat):
             ############## Pad p_flat to the full nodal shape expected by helmholtz_operator ###########################
             inner_slice = self.grid.get_inner_slice()
-            p_full = np.zeros(self.grid.nshape, dtype=p_flat.dtype)
-            p_full[inner_slice] = p_flat.reshape(inshape)
+            self.p_buffer.fill(0.0)
+            self.p_buffer[inner_slice] = p_flat.reshape(inshape)
 
-            self.boundary_manager.apply_pressure_boundary_on_all_sides(p_full)
+            self.boundary_manager.apply_pressure_boundary_on_all_sides(self.p_buffer)
 
             # Apply the physics-based Helmholtz operator
             result = self.helmholtz_operator(
-                p_full, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
+                self.p_buffer, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
             )  # Shape is (nx-1, ny-1, nz-1)
             return result.flatten()
 
@@ -553,13 +555,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         P = cellvars[..., VI.RHOY]
 
         # Averaging over the nodes and fill the mpv container (Eq. 29 BK19)
-        kernel = np.ones([2] * self.ndim)
-        dPdpi = (
-            coeff
-            * sp.signal.fftconvolve(P**exponent, kernel, mode="valid")
-            / kernel.sum()
-        )
+        dPdpi = coeff * cells_to_nodes_averaging(P**exponent)
 
+        # Apply wall correction
         boundary_operation = [
             WallAdjustment(
                 target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5

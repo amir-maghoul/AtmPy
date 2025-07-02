@@ -211,14 +211,7 @@ class PeriodicBoundary(BaseBoundaryCondition):
                 mode="wrap",
             )
             return
-        inner_slice = self.inner_slice[:-1]
-        pad_width = self.bisided_pad_width()
-        mode = self._periodic_nodal_overwrite
-        variable[...] = np.pad(
-            variable[inner_slice],
-            pad_width,
-            mode=mode,
-        )
+        self.periodic_nodal_condition(variable)
 
     def apply_extra(self, variable: np.ndarray, operation: "ExtraBCOperation") -> None:
         pass
@@ -248,9 +241,7 @@ class PeriodicBoundary(BaseBoundaryCondition):
         pad_width[self.direction] = self.ng
         return pad_width
 
-    def _periodic_nodal_overwrite(
-        self, vector: np.ndarray, pad_width: tuple, iaxis: int, kwargs: dict
-    ) -> np.ndarray:
+    def periodic_nodal_condition(self, variable):
         """
         Custom padding function for nodal variables with periodic boundaries.
 
@@ -265,34 +256,37 @@ class PeriodicBoundary(BaseBoundaryCondition):
         ----------
         vector : np.ndarray
             A 1D array slice of the data, already padded with zeros.
-        pad_width : tuple
-            A 2-tuple (left_pad, right_pad) for the current axis.
-        iaxis : int
-            The axis currently being padded.
-        kwargs : dict
-            Any keyword arguments (unused here).
 
         Returns
         -------
         np.ndarray
             The modified vector with ghost cells and boundary internal cells filled.
         """
-        if all(pad_width) > 0:
-            left_pad, right_pad = pad_width
+        ng_l, ng_r = self.ng
+        d = self.direction
 
-            # --- 1. Define the source data for each side ---
-            right_source_slice = slice(left_pad, left_pad + left_pad + 1)
-            right_values = vector[right_source_slice].copy()
+        # 1. Define the SOURCE data regions from the interior of the domain.
+        #    The source for the left-side fill is the last `ng_l + 1` elements of the internal data.
+        left_fill_source_slice = [slice(None)] * variable.ndim
+        left_fill_source_slice[d] = slice(-ng_r - (ng_l + 1), -ng_r)
 
-            # The source for the left-side fill is the last `left_pad + 1` elements of the internal data.
-            left_source_slice = slice(-right_pad - right_pad - 1, -right_pad)
-            left_values = vector[left_source_slice].copy()
+        #    The source for the right-side fill is the first `ng_r + 1` elements of the internal data.
+        right_fill_source_slice = [slice(None)] * variable.ndim
+        right_fill_source_slice[d] = slice(ng_l, ng_l + (ng_r + 1))
 
-            # --- 2. Assign the calculated values to the destination ---
-            vector[: left_pad + 1] = left_values
-            vector[-right_pad - 1 :] = right_values
+        # 2. Define the DESTINATION regions. These include the ghost cells AND the
+        #    first/last interior node, matching the original function's behavior.
+        #    Destination for the left fill (ghosts + first interior node)
+        left_dest_slice = [slice(None)] * variable.ndim
+        left_dest_slice[d] = slice(0, ng_l + 1)
 
-        return vector
+        #    Destination for the right fill (ghosts + last interior node)
+        right_dest_slice = [slice(None)] * variable.ndim
+        right_dest_slice[d] = slice(-ng_r - 1, None)
+
+        # 3. Perform the block memory copies. This is extremely fast.
+        variable[tuple(left_dest_slice)] = variable[tuple(left_fill_source_slice)]
+        variable[tuple(right_dest_slice)] = variable[tuple(right_fill_source_slice)]
 
 
 class ReflectiveGravityBoundary(BaseBoundaryCondition):

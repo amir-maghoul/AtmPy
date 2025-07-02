@@ -2,6 +2,7 @@ import numpy as np
 from typing import List, Tuple, TYPE_CHECKING
 
 from atmpy.flux.utility import create_averaging_kernels
+from atmpy.variables.utility import cell_averaging
 
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
@@ -187,7 +188,7 @@ class Flux:
 
         return fluxes
 
-    def compute_averaging_fluxes(self, mode: str = "valid") -> None:
+    def compute_averaging_fluxes(self) -> None:
         """
         Compute the physical flux in x, y, and z directions. The physical flux in the BK19 algorithm is
         calculated starting with averaging of the Pu variable from cell to nodes and then averaging nodes to get
@@ -217,8 +218,8 @@ class Flux:
             unphysical_fluxes.values(), self.kernels, directions
         ):
             inner_index = one_element_inner_slice(self.ndim, full=False)
-            self.flux[direction][inner_index + (VI.RHOY,)] = sp.signal.fftconvolve(
-                flux, kernel, mode=mode
+            self.flux[direction][inner_index + (VI.RHOY,)] = cell_averaging(
+                flux, kernel
             )
 
     def apply_reconstruction(
@@ -352,7 +353,6 @@ def main():
     lefts_idx, rights_idx, directional_inner_idx = directional_indices(2, direction)
 
     cell_vars = variables.cell_vars
-    iflux = flux.iflux
 
     left, right = modified_muscl(
         variables, flux.flux, eos, flux.limiter, 0.5, direction
@@ -363,9 +363,22 @@ def main():
     flux.apply_riemann_solver(1, direction)
     print(flux.flux[direction][..., VI.RHOU])
     print(flux.variables.cell_vars[..., VI.RHOU])
-    u = variables.cell_vars[..., VI.RHOW]
+    u = variables.cell_vars[..., VI.RHOU]
 
     print(int(2) + True)
+    kernel = flux.kernels[0]
+    print(kernel)
+
+    kernel = np.ones([2] * 2)
+
+    kernel3d = create_averaging_kernels(1)[0]
+    v = np.random.randint(10, size=(5))
+    print(u)
+    res1 = sp.signal.fftconvolve(u, kernel, mode="valid") / kernel.sum()
+    print(res1)
+
+    res2 = cell_averaging(u, kernel) / kernel.sum()
+    print(res2)
 
 
 if __name__ == "__main__":

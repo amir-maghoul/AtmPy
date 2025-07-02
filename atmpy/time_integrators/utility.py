@@ -3,6 +3,7 @@
 import numpy as np
 import scipy as sp
 from atmpy.physics.thermodynamics import Thermodynamics
+from atmpy.variables.utility import cells_to_nodes_averaging, cell_averaging
 
 
 def calculate_dpi_dp(P: np.ndarray, Msq: float) -> float:
@@ -24,10 +25,7 @@ def calculate_dpi_dp(P: np.ndarray, Msq: float) -> float:
     """
     th: Thermodynamics = Thermodynamics()
     ndim: int = P.ndim
+    coeff = th.gm1 / Msq
     dpi_temp: np.ndarray = P ** (th.gamma - 2.0)
-    averaging_kernel: np.ndarray = np.ones([2] * ndim)
-    return (
-        (th.gm1 / Msq)
-        * sp.signal.fftconvolve(dpi_temp, averaging_kernel, mode="valid")
-        / averaging_kernel.sum()
-    )
+    dpidP = coeff * cells_to_nodes_averaging(dpi_temp)
+    return dpidP
