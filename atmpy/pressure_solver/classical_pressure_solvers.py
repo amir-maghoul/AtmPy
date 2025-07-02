@@ -3,7 +3,7 @@
 import numpy as np
 import scipy as sp
 from typing import TYPE_CHECKING, Union, Tuple, Optional, Callable, Dict
-from atmpy.variables.utility import cell_averaging
+from atmpy.variables.utility import cell_averaging, cells_to_nodes_averaging
 
 from atmpy.boundary_conditions.contexts import BCApplicationContext
 from atmpy.infrastructure.enums import (
@@ -555,12 +555,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         P = cellvars[..., VI.RHOY]
 
         # Averaging over the nodes and fill the mpv container (Eq. 29 BK19)
-        kernel = np.ones([2] * self.ndim)
-        dPdpi = (
-            coeff
-            * cell_averaging(P**exponent, kernel)
-        )
+        dPdpi = coeff * cells_to_nodes_averaging(P**exponent)
 
+        # Apply wall correction
         boundary_operation = [
             WallAdjustment(
                 target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
