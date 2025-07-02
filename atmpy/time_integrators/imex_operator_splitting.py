@@ -225,7 +225,14 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             f"Predictor (step {global_time_step_num}): After backward_update_implicit (Sol* -> Sol^(n+1/2))"
         )
 
-        ######################### 5. Compute predicted advective mass fluxes (Pv)^{n+1/2} ##############################
+        ############################ 5. Apply Final Boundary Conditions ###############################################
+        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(
+            self.mpv.p2_nodes
+        )
+
+
+        ######################### 6. Compute predicted advective mass fluxes (Pv)^{n+1/2} ##############################
         # self.variables.cell_vars is now Sol^{n+1/2}
         self.flux.compute_averaging_fluxes()  # Uses self.variables (Sol^{n+1/2})
         # This updates self.flux[... ,VI.RHOY] to represent (Pv)^{n+1/2} for the corrector
@@ -250,11 +257,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.mpv.p2_nodes[...] = self.mpv.p2_nodes0
         logging.debug(f"Corrector (step {global_time_step_num}): State reset to t^n")
 
-        ############################ 2. Apply BCs to state at t^n ######################################################
-        # self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-        # self.boundary_manager.apply_boundary_on_single_var_all_sides(
-        #     self.mpv.p2_nodes, self._nodal_bc_contexts
-        # )
+        ############################ 2. Apply BCs to state at t^n (if necessary) #######################################
 
         ########################## 3. Explicit Euler for non-advective terms ###########################################
         ################################### (Eq. 17a of BK19) ##########################################################
@@ -298,10 +301,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
         ######################### 6. Final Boundary Conditions #########################################################
-        # self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-        # self.boundary_manager.apply_boundary_on_single_var_all_sides(
-        #     self.mpv.p2_nodes, self._nodal_bc_contexts
-        # )
+        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(
+            self.mpv.p2_nodes
+        )
         logging.debug(f"--- Corrector (step {global_time_step_num}): Finished ---")
 
     def forward_update(self, dt: float) -> None:
@@ -418,8 +421,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
         ############################# 4. Apply BCs to Pre-Corrected State ##############################################
-        # TODO: Check if necessary
-        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
+        # # TODO: Check if necessary
+        # self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
 
         ############################# 5. Compute RHS (Divergence of Pre-Corrected Momenta) #############################
 
@@ -436,7 +439,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Final RHS for A * delta_p = rhs
         rhs_flat = divergence_inner[laplacian_inner_node_slice].flatten()
 
-        # Adjust the coefficients of the pressure gradient term for the solver as a result of compressibility regime
+        # Adjust the coefficients of the pressure gradient term for the solver as a result of compressibility
         self.mpv.wcenter *= self.is_compressible
 
         ############################ 6. Solve the elliptic helmholtz equation ##########################################
@@ -448,7 +451,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.is_nonhydrostatic,
             self.is_compressible,
             rtol=rtol,
-            # Add tol/max_iter if needed, e.g., tol=1e-7
         )
 
         ############################ 7. Prepare p2 for Correction Step #################################################
@@ -480,14 +482,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ############################ 10. Update The Main Exner Pressure ################################################
         self.mpv.p2_nodes += p2_full
-
-        ############################ 11. Apply Final Boundary Conditions ###############################################
-        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-
-        # Use the current existing contexts (is_nodal for all sides)
-        self.boundary_manager.apply_pressure_boundary_on_all_sides(
-            self.mpv.p2_nodes
-        )
 
     def _forward_momenta_update(
         self,
