@@ -14,6 +14,7 @@ from atmpy.flux.reconstruction_utility import (
 )
 from atmpy.infrastructure.enums import (
     VariableIndices as VI,
+    PrimitiveVariableIndices as PVI,
 )
 
 
@@ -56,14 +57,12 @@ def modified_muscl(
     inner_idx = one_element_inner_slice(ndim, full=False)
 
     # Unphysical Pressure
-    P = flux[direction][..., VI.RHOY]
+    Pu = flux[direction][inner_idx + (VI.RHOY,)]
 
     # Compute flow speed
     speed = np.zeros_like(cell_vars[..., VI.RHOY])
     speed[inner_idx] = (
-        0.5
-        * (P[inner_idx][lefts_idx] + P[inner_idx][rights_idx])
-        / cell_vars[..., VI.RHOY][inner_idx]
+        0.5 * (Pu[lefts_idx] + Pu[rights_idx]) / cell_vars[inner_idx + (VI.RHOY,)]
     )  # This is basically ((Pu)[i-1/2] + (Pu)[i+1/2])/(P[i]/2)
 
     # Compute variable differences (for slope) and slope at interfaces
@@ -72,11 +71,21 @@ def modified_muscl(
 
     # left amplitudes and slope
     amplitudes = calculate_amplitudes(slopes, speed, lmbda, left=True)
-    lefts = primitives + amplitudes
+    lefts = np.zeros_like(primitives)
+    lefts[..., 1:] = primitives[..., 1:] + amplitudes
+    # Amplidutes have one less element (no rho). Therefore each index should be minus one like PVI.Y - 1
+    lefts[..., PVI.Y] = 1.0 / (
+        1.0 / primitives[..., PVI.Y] + amplitudes[..., PVI.Y - 1]
+    )
 
     # right amplitudes and slope
     amplitudes = calculate_amplitudes(slopes, speed, lmbda, left=False)
-    rights = primitives + amplitudes
+    rights = np.zeros_like(primitives)
+    rights[..., 1:] = primitives[..., 1:] + amplitudes
+    # Amplidutes have one less element (no rho). Therefore each index should be minus one like PVI.Y - 1
+    rights[..., PVI.Y] = 1.0 / (
+        1.0 / primitives[..., PVI.Y] + amplitudes[..., PVI.Y - 1]
+    )
     return lefts, rights
 
 

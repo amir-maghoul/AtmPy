@@ -4,6 +4,7 @@ from dataclasses import (
 )  # Not used here, but good practice if other fields were added
 from typing import TYPE_CHECKING
 
+from atmpy.infrastructure.utility import directional_indices
 from atmpy.test_cases.base_test_case import BaseTestCase
 from atmpy.configuration.simulation_configuration import SimulationConfig
 from atmpy.infrastructure.enums import (
@@ -13,6 +14,8 @@ from atmpy.infrastructure.enums import (
     SlopeLimiters as LimiterType,
     VariableIndices as VI,
     HydrostateIndices as HI,
+    FluxReconstructions,
+    RiemannSolvers,
 )
 from atmpy.physics.thermodynamics import Thermodynamics
 
@@ -30,8 +33,20 @@ class RisingBubble(BaseTestCase):
     and then relies on boundary conditions to correct ghost cells.
     """
 
-    def __init__(self):
-        super().__init__(name="RisingBubble", config=SimulationConfig())
+    def __init__(self, config_override: SimulationConfig = None):
+        # Initialize with a default SimulationConfig, which will be modified in setup
+        _effective_config: SimulationConfig
+        run_setup_method = False
+
+        if config_override is not None:
+            _effective_config = config_override
+        else:
+            # No override, create a default config. BaseTestCase will get this,
+            # and then setup() will populate it.
+            _effective_config = SimulationConfig()
+            run_setup_method = True
+
+        super().__init__(name="TravelingVortex", config=_effective_config)
 
         # Case-specific parameters
         self.del_theta_k: float = 2.0  # Initial potential temperature perturbation [K]
@@ -45,11 +60,15 @@ class RisingBubble(BaseTestCase):
         """Configure the SimulationConfig for the Rising Bubble case."""
         print("Setting up Rising Bubble configuration...")
 
+        nx = 10
+        ny = 10
+        # nx = 120
+        # ny = 80
         # Grid Configuration
         grid_updates = {
             "ndim": 2,
-            "nx": 160,
-            "ny": 80,
+            "nx": nx,
+            "ny": ny,
             "nz": 0,
             "xmin": -1.0,
             "xmax": 1.0,
@@ -59,6 +78,20 @@ class RisingBubble(BaseTestCase):
             "ngy": 2,
         }
         self.set_grid_configuration(grid_updates)
+
+        # Global Constants
+        constants_updates = {
+            "grav": 10,
+            "omega": 0.0,
+            "R_gas": 287.4,
+            "gamma": 1.4,
+            "p_ref": 8.61 * 1e4,
+            "T_ref": 300.0,
+            "h_ref": 10_000.0,
+            "t_ref": 1000.0,
+            "Nsq_ref": 1.3e-4,
+        }
+        self.set_global_constants(constants_updates)
 
         # Boundary Conditions
         self.set_boundary_condition(
@@ -82,26 +115,13 @@ class RisingBubble(BaseTestCase):
         # Temporal Setting
         temporal_updates = {
             "CFL": 0.5,
-            "dtfixed": 0.002,
-            "dtfixed0": 0.002,
+            "dtfixed": 0.01,
+            "dtfixed0": 0.01,
             "tout": np.arange(0.1, 0.71, 0.1),
             "stepmax": 10000,
+            "use_acoustic_cfl": True,
         }
         self.set_temporal(temporal_updates)
-
-        # Global Constants
-        constants_updates = {
-            "grav": 10.0,
-            "omega": 0.0,
-            "R_gas": 287.4,
-            "gamma": 1.4,
-            "p_ref": 8.61e4,
-            "T_ref": 300.0,
-            "h_ref": 10000.0,
-            "t_ref": 1000.0,
-            "Nsq_ref": 1.3e-4,
-        }
-        self.set_global_constants(constants_updates)
 
         # Physics Settings
         physics_updates = {
@@ -117,15 +137,17 @@ class RisingBubble(BaseTestCase):
             "is_ArakawaKonor": 0,
             "is_nongeostrophic": 1,
             "is_nonhydrostatic": 1,
-            "is_compressible": 1,  # Effectively sets the d(rhoY)/dt term in pressure solver to zero
-            # Set to 1 if you want the fully compressible solver pressure term
+            "is_compressible": 1,
         }
         self.set_model_regimes(regime_updates)
 
         # Numerics
         numerics_updates = {
-            "limiter_scalars": LimiterType.VAN_LEER,  # UPDATED Limiter
-            "advection_routine": AdvectionRoutines.STRANG_SPLIT,
+            "limiter": LimiterType.AVERAGE,  # UPDATED Limiter
+            "riemann_solver": RiemannSolvers.MODIFIED_HLL,
+            "reconstruction": FluxReconstructions.MODIFIED_MUSCL,
+            "first_order_advection_routine": AdvectionRoutines.FIRST_ORDER_RK,
+            "second_order_advection_routine": AdvectionRoutines.STRANG_SPLIT,
             "tol": 1.0e-8,
             "max_iterations": 6000,
             "initial_projection": False,
@@ -167,7 +189,7 @@ class RisingBubble(BaseTestCase):
         thermo = Thermodynamics()
         thermo.update(self.config.global_constants.gamma)
         Msq = self.config.model_regimes.Msq
-        T_ref_const = self.config.global_constants.T_ref
+        THETA_0 = 300
 
         self.config.update_all_derived_fields()
 
@@ -188,65 +210,41 @@ class RisingBubble(BaseTestCase):
             )
 
         # Calculate Radial Distance for Perturbation (on full grid)
-        r_dist_full = (
+        r = (
             np.sqrt((XC_full - self.xc_bubble) ** 2 + (YC_full - self.yc_bubble) ** 2)
             / self.r0_bubble
         )
 
-        # Potential Temperature Perturbation (non-dimensional, on full grid)
-        theta_perturbation_nd_full = (self.del_theta_k / T_ref_const) * (
-            np.cos(0.5 * np.pi * r_dist_full) ** 2
-        )
-        theta_perturbation_nd_full[r_dist_full > 1.0] = 0.0
+        p0 = mpv.hydrostate.cell_vars[..., HI.P0]
+        rhoY0 = mpv.hydrostate.cell_vars[..., HI.RHOY0]
 
-        # Background Potential Temperature (Theta_bg_nd, non-dimensional, on full grid)
-        Theta_bg_nd_full = self.config.physics.stratification(YC_full)
+        perturbation = (self.del_theta_k / THETA_0) * np.cos(0.5 * np.pi * r) ** 2
+        perturbation[np.where(r > 1.0)] = 0.0
 
-        # Total Potential Temperature (Theta_total_nd, on full grid)
-        Theta_total_nd_full = Theta_bg_nd_full + theta_perturbation_nd_full
+        icshape = self.config.spatial_grid.grid.cshape
+        rhoY = np.repeat(rhoY0.reshape(1, -1), icshape[0], axis=0)
+        rho = rhoY / (np.ones_like(perturbation) + perturbation)
 
-        # Get 1D Hydrostatic rhoY0 profile (non-dimensional) for the FULL 1D grid
-        # mpv.hydrostate.cell_vars is 1D and already includes ghost cells
-        rhoY0_hydro_1d_full_nd = mpv.hydrostate.cell_vars[..., HI.RHOY0]
+        slices = [slice(None)] * 2
+        x_inner_slice = slices
+        x_inner_slice[0] = slice(2, -2)
+        x_inner_slice = tuple(x_inner_slice)
+        y_inner_slice = slices
+        y_inner_slice[1] = slice(2, -2)
 
-        # Expand/broadcast rhoY0 to 2D full grid: (nx_total, ny_total)
-        # rhoY0_hydro_1d_full_nd has shape (ny_total,). XC_full, YC_full have shape (nx_total, ny_total).
-        rhoY0_hydro_expanded_nd_full = rhoY0_hydro_1d_full_nd[
-            np.newaxis, :
-        ]  # Shape (1, ny_total)
-        # This will broadcast to (nx_total, ny_total) when used with Theta_total_nd_full
+        variables.cell_vars[..., VI.RHO] = rho
+        variables.cell_vars[..., VI.RHOU] = 0
+        variables.cell_vars[..., VI.RHOV] = 0
+        variables.cell_vars[..., VI.RHOW] = 0
+        variables.cell_vars[..., VI.RHOY] = rhoY
 
-        # --- Set State Variables (FULL Domain, including ghosts) ---
-
-        # Density (rho_total_nd): rho_total = rhoY0_hydro / Theta_total
-        rho_total_nd_full = rhoY0_hydro_expanded_nd_full / Theta_total_nd_full
-        variables.cell_vars[..., VI.RHO] = rho_total_nd_full
-
-        # Momenta (non-dimensional)
-        u0_nd, v0_nd, w0_nd = self.config.physics.wind_speed
-        variables.cell_vars[..., VI.RHOU] = rho_total_nd_full * u0_nd
-        variables.cell_vars[..., VI.RHOV] = rho_total_nd_full * v0_nd
-
-        if VI.RHOW < variables.num_vars_cell:
-            if grid_obj.ndim == 3:
-                variables.cell_vars[..., VI.RHOW] = rho_total_nd_full * w0_nd
-            else:
-                variables.cell_vars[..., VI.RHOW] = 0.0
-
-        # RhoY (non-dimensional): rhoY_total = rho_total * Theta_total = rhoY0_hydro
-        variables.cell_vars[..., VI.RHOY] = np.broadcast_to(
-            rhoY0_hydro_expanded_nd_full, rho_total_nd_full.shape
-        )
-
-        # RhoX (Tracers, non-dimensional) - Set to zero
-        if VI.RHOX < variables.num_vars_cell:
-            variables.cell_vars[..., VI.RHOX] = 0.0
-
-        # Initialize Pressure Perturbation (p2_nodes, non-dimensional, FULL domain)
-        # For a bubble initially in hydrostatic balance, dynamic pressure perturbation is zero.
+        p0_n = mpv.hydrostate.node_vars[..., HI.P0]
+        rhoY0_n = mpv.hydrostate.node_vars[..., HI.RHOY0]
+        inshape = self.config.spatial_grid.grid.nshape
+        rhoY_n = np.repeat(rhoY0_n.reshape(1, -1), inshape[0], axis=0)
+        p_n = np.repeat(p0_n.reshape(1, -1), inshape[0], axis=0)
+        # mpv.p2_nodes[...] = (p_n / rhoY_n) / Msq
+        mpv.p2_nodes[...] = mpv.hydrostate.node_vars[..., HI.P2_0]
         mpv.p2_nodes[...] = 0.0
-        mpv.dp2_nodes[...] = 0.0
-        mpv.p2_cells[...] = 0.0
-
         print("Full domain solution initialization complete for Rising Bubble.")
         print("Ghost cells will be overwritten by BoundaryManager.")

@@ -25,8 +25,12 @@ if TYPE_CHECKING:
         ReflectiveGravityBCInstantiationOptions as RFBCInstantiationOptions,
     )
     from atmpy.boundary_conditions.bc_extra_operations import ExtraBCOperation
+    from atmpy.variables.multiple_pressure_variables import MPV
 
-from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
+from atmpy.boundary_conditions.bc_extra_operations import (
+    WallAdjustment,
+    WallFluxCorrection,
+)
 from atmpy.infrastructure.utility import (
     direction_axis,
     momentum_index,
@@ -36,6 +40,7 @@ from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
     BoundarySide,
     VariableIndices as VI,
+    HydrostateIndices as HI,
 )
 from atmpy.physics.gravity import Gravity
 
@@ -108,11 +113,16 @@ class BaseBoundaryCondition(ABC):
     def pad_width(self):
         """Create the pad width for a single direction. The "ng" attribute contains a
         list of size 3 of the tuples containing the number of ghost cells in each side of each direction.
-        Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. In order to
+        Assuming we are working in 3D,"ng"= [(ngx, ngx), (ngy, ngy), (ngz, ngz)]. To
         avoid padding the boundary in all direction with the same number of ghost cells, we need to create a
         pad width tuple containing zero tuples in the undesired directions, i.e.  for x direction padding
         [(ngx, ngx), (0, 0), (0, 0)]. For wall boundary, this is reduced to one-sided padding: for example for x direction
-        and the left side: [(ngx, 0), (0, 0), (0, 0)]"""
+        and the left side: [(ngx, 0), (0, 0), (0, 0)].
+
+        Notes
+        -----
+        There is an extra zero (0,0) tuple in the pad width. This corresponds to the last axis where the difference variables
+        are stacked and the BC is not defined on that axis."""
 
         side: int = self.side_axis
         # create (ng, 0) or (0, ng)
@@ -130,6 +140,25 @@ class BaseBoundaryCondition(ABC):
         return sides.index(
             self.side
         )  # Index of the side in the tuple. Used to index the sided number of ghost cells
+
+    def _boundary_slice(self) -> Tuple[slice, ...]:
+        """Create the slice for the nodes/cells at the boundary."""
+        idx = (
+            self.ng[self.side_axis] - 1
+            if self.side_axis == 0
+            else -self.ng[self.side_axis]
+        )
+        boundary_nodes_slice = copy.deepcopy(self.full_inner_slice)
+        boundary_nodes_slice[self.direction] = idx
+        return tuple(boundary_nodes_slice)
+
+    def padded_slices(self) -> Tuple[slice, ...]:
+        """Returns the slice of the padded part."""
+        side = self._find_side_axis()
+        slc = slice(0, self.ng[side]) if side == 0 else slice(-self.ng[side], None)
+        pad_slice = [slice(None)] * self.ndim
+        pad_slice[self.direction] = slc
+        return tuple(pad_slice)
 
 
 class PeriodicBoundary(BaseBoundaryCondition):
@@ -168,13 +197,27 @@ class PeriodicBoundary(BaseBoundaryCondition):
     def apply_single_variable(
         self, variable: np.ndarray, context: "BCApplicationContext"
     ):
-        """Apply the periodic boundary condition on the pressure variable."""
-        inner_padded_slice = self.inner_and_padded_slices()
+        """Apply the periodic boundary condition on a single variable.
 
-        variable[inner_padded_slice[:-1]] = np.pad(
-            variable[self.inner_slice[:-1]],
-            self.pad_width[:-1],
-            mode="wrap",
+        The behavior depends on whether the variable is cell-centered or nodal,
+        as determined by the `context.is_nodal` flag.
+        """
+        # For non-nodal (cell-centered) variables, the wrap logic is sufficient.
+        if not context.is_nodal:
+            inner_padded_slice = self.inner_and_padded_slices()
+            variable[inner_padded_slice[:-1]] = np.pad(
+                variable[self.inner_slice[:-1]],
+                self.pad_width[:-1],
+                mode="wrap",
+            )
+            return
+        inner_slice = self.inner_slice[:-1]
+        pad_width = self.bisided_pad_width()
+        mode = self._periodic_nodal_overwrite
+        variable[...] = np.pad(
+            variable[inner_slice],
+            pad_width,
+            mode=mode,
         )
 
     def apply_extra(self, variable: np.ndarray, operation: "ExtraBCOperation") -> None:
@@ -187,13 +230,69 @@ class PeriodicBoundary(BaseBoundaryCondition):
         directional_inner_slice[self.direction] = self.grid.inner_slice[self.direction]
         return tuple(directional_inner_slice)
 
-    def inner_and_padded_slices(self) -> Tuple[slice, ...]:
+    def inner_and_padded_slices(self, full=True, nodal=False) -> Tuple[slice, ...]:
         """Returns the slice of the padded part."""
-        side = self._find_side_axis()
-        slc = slice(0, -self.ng[side]) if side == 0 else slice(self.ng[side], None)
-        pad_slice = [slice(None)] * (self.ndim + 1)
+        side = self.side_axis
+        slc = (
+            slice(0, -self.ng[side] - int(nodal))
+            if side == 0
+            else slice(self.ng[side] + int(nodal), None)
+        )
+        pad_slice = [slice(None)] * (self.ndim + int(full))
         pad_slice[self.direction] = slc
         return tuple(pad_slice)
+
+    def bisided_pad_width(self):
+        # create the pad width
+        pad_width = [(0, 0)] * (self.ndim)
+        pad_width[self.direction] = self.ng
+        return pad_width
+
+    def _periodic_nodal_overwrite(
+        self, vector: np.ndarray, pad_width: tuple, iaxis: int, kwargs: dict
+    ) -> np.ndarray:
+        """
+        Custom padding function for nodal variables with periodic boundaries.
+
+        This function implements a non-standard periodic wrap that also overwrites
+        the first and last nodes of the *internal* data block. It is designed
+        to be used with `np.pad`.
+
+        - The left ghost cells AND the first internal node are filled with values from the end of the internal domain.
+        - The right ghost cells AND the last internal node are filled with values from the start of the internal domain.
+
+        Parameters
+        ----------
+        vector : np.ndarray
+            A 1D array slice of the data, already padded with zeros.
+        pad_width : tuple
+            A 2-tuple (left_pad, right_pad) for the current axis.
+        iaxis : int
+            The axis currently being padded.
+        kwargs : dict
+            Any keyword arguments (unused here).
+
+        Returns
+        -------
+        np.ndarray
+            The modified vector with ghost cells and boundary internal cells filled.
+        """
+        if all(pad_width) > 0:
+            left_pad, right_pad = pad_width
+
+            # --- 1. Define the source data for each side ---
+            right_source_slice = slice(left_pad, left_pad + left_pad + 1)
+            right_values = vector[right_source_slice].copy()
+
+            # The source for the left-side fill is the last `left_pad + 1` elements of the internal data.
+            left_source_slice = slice(-right_pad - right_pad - 1, -right_pad)
+            left_values = vector[left_source_slice].copy()
+
+            # --- 2. Assign the calculated values to the destination ---
+            vector[: left_pad + 1] = left_values
+            vector[-right_pad - 1 :] = right_values
+
+        return vector
 
 
 class ReflectiveGravityBoundary(BaseBoundaryCondition):
@@ -224,6 +323,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
                 "Reflective gravity is not implemented for 1 dimensional problem."
             )
         self.th: "Thermodynamics" = inst_opts.thermodynamics
+        self.mpv: "MPV" = inst_opts.mpv
         self.gravity: Gravity = Gravity(inst_opts.gravity, self.ndim)
         if self.gravity.strength == 0.0:
             raise ValueError(
@@ -284,9 +384,9 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
                     (cell_vars[nlast + (VI.RHOY,)] ** self.th.gm1) + dpi
                 ) ** self.th.gm1inv
             else:
-                raise NotImplementedError(
-                    "The incompressible boundary condition is not implemented yet."
-                )
+                rhoY = self.mpv.hydrostate.cell_vars[
+                    nimage[self.gravity.axis], HI.RHOY0
+                ]
 
             # Get the index of the velocities in cell_vars for the gravity and nongravity directions
             gravity_momentum_index = self.gravity.vertical_momentum_index  # VI.RHOV
@@ -330,10 +430,31 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
     ):
         pass
 
-    def apply_extra(
-        self, variable: np.ndarray, context: "BCApplicationContext"
-    ) -> None:
-        pass
+    def apply_extra(self, variables: np.ndarray, operation: "ExtraBCOperation") -> None:
+        """This is applied on a nodal variable. Rescale nodes at the boundary by a factor.
+
+        Parameters
+        ----------
+        variable : np.ndarray
+            The variables to apply the extra boundary condition on. The compatibility of variables with the
+            extra BC is on the user.
+        operation: ExtraBCOperation
+            The ExtraBCOperation object to be applied.
+        """
+
+        if isinstance(operation, WallAdjustment):
+            # Assumption: Variables is a single nodal variable
+            factor = operation.factor
+            boundary_nodes_slice = self._boundary_slice()
+            variables[boundary_nodes_slice] *= factor
+        elif isinstance(operation, WallFluxCorrection):
+            # Assumption: Variables is the momenta stacked on the last axis.
+            factor = operation.factor
+            pad_slice = self.padded_slices()
+            for i in range(variables.shape[-1]):
+                variables[pad_slice + (i,)] *= factor
+        else:
+            pass
 
     def _create_boundary_indices(
         self,
@@ -493,21 +614,29 @@ class Wall(BaseBoundaryCondition):
             mode=mode,
         )
 
-    def apply_extra(self, variable: np.ndarray, operation: "ExtraBCOperation") -> None:
+    def apply_extra(self, variables: np.ndarray, operation: "ExtraBCOperation") -> None:
         """This is applied on a nodal variable. Rescale nodes at the boundary by a factor.
 
         Parameters
         ----------
         variable : np.ndarray
-            The nodal variable to apply the extra boundary condition on.
+            The variables to apply the extra boundary condition on. The compatibility of variables with the
+            extra BC is on the user.
         operation: ExtraBCOperation
             The ExtraBCOperation object to be applied.
         """
 
         if isinstance(operation, WallAdjustment):
+            # Assumption: Variables is a single nodal variable
             factor = operation.factor
-            boundary_nodes_slice = self._boundary_nodes()
-            variable[boundary_nodes_slice] *= factor
+            boundary_nodes_slice = self._boundary_slice()
+            variables[boundary_nodes_slice] *= factor
+        elif isinstance(operation, WallFluxCorrection):
+            # Assumption: Variables is the momenta stacked on the last axis.
+            factor = operation.factor
+            pad_slice = self.padded_slices()
+            for i in range(variables.shape[-1]):
+                variables[pad_slice + (i,)] *= factor
         else:
             pass
 
@@ -523,27 +652,6 @@ class Wall(BaseBoundaryCondition):
         inner_slice = [slice(None)] * (self.ndim + 1)
         inner_slice[self.direction] = slc
         return tuple(inner_slice)
-
-    def _boundary_nodes(self) -> Tuple[slice, ...]:
-        """Create the slice for the nodes at the boundary. This is used to rescale those nodes."""
-        # Notice in backward indexing, the third to last element in the last inner node (boundary node).
-        # Therefore, in backward indexing -ig - 1 is the correct index of the last inner node.
-        idx = (
-            self.ng[self.side_axis]
-            if self.side_axis == 0
-            else -self.ng[self.side_axis] - 1
-        )
-        boundary_nodes_slice = copy.deepcopy(self.full_inner_slice)
-        boundary_nodes_slice[self.direction] = idx
-        return tuple(boundary_nodes_slice)
-
-    def padded_slices(self) -> Tuple[slice, ...]:
-        """Returns the slice of the padded part."""
-        side = self._find_side_axis()
-        slc = slice(0, self.ng[side]) if side == 0 else slice(-self.ng[side], None)
-        pad_slice = [slice(None)] * self.ndim
-        pad_slice[self.direction] = slc
-        return tuple(pad_slice)
 
 
 class NonReflectiveOutlet(BaseBoundaryCondition):
@@ -609,7 +717,7 @@ def example_usage():
         "is_lamb": False,
         "is_compressible": True,
     }
-    x = ReflectiveGravityBoundary(**params)
+    x = Wall(**params)
     print(variables.cell_vars[..., VI.RHO])
     x.apply(variables.cell_vars)
     print(variables.cell_vars[..., VI.RHO])

@@ -8,6 +8,10 @@ from atmpy.infrastructure.enums import (
     BoundaryConditions as BdryType,
     BoundarySide,
     AdvectionRoutines,
+    RiemannSolvers,
+    FluxReconstructions,
+    LinearSolvers,
+    Preconditioners,
 )
 from atmpy.infrastructure.enums import SlopeLimiters as LimiterType
 from atmpy.grid.utility import DimensionSpec, create_grid
@@ -109,11 +113,12 @@ class Temporal:
 
     CFL: float = 0.45
     dtfixed0: float = 0.01
-    dtfixed: float = 0.01
+    dtfixed: float = None
     acoustic_timestep: float = 0.0
     tout: np.ndarray = field(default_factory=lambda: np.array([1.0]))
     tmax: float = 0.05
     stepmax: int = 101
+    use_acoustic_cfl: bool = False
 
 
 @dataclass
@@ -138,6 +143,9 @@ class GlobalConstants:
     Cs: float = field(init=False)
 
     def __post_init__(self):
+        self.update_global_constants()
+
+    def update_global_constants(self):
         # Ensure gamma != 1 before calculating cp_gas
         if np.isclose(self.gamma, 1.0):
             raise ValueError("Gamma (ratio of specific heats) cannot be 1.")
@@ -202,9 +210,11 @@ class Physics:
         """Recalculates gravity and coriolis based on current config."""
         g = constants.grav * constants.h_ref / (constants.R_gas * constants.T_ref)
         ndim = grid_cfg.ndim
+        non_zero = np.nonzero(self.gravity_strength)[0]
+        if non_zero:
+            self.gravity_strength = list(self.gravity_strength)
+            self.gravity_strength[non_zero[0]] = g
         self.gravity = Gravity(self.gravity_strength, ndim)
-        self.gravity.strength = g
-        self.gravity_strength = self.gravity.vector
         self.coriolis = CoriolisOperator(self.coriolis_strength, self.gravity)
         print("Physics derived fields updated.")
 
@@ -214,8 +224,13 @@ class Numerics:
     """The data class for numerical information."""
 
     do_advection: bool = True
-    limiter_scalars: LimiterType = LimiterType.VAN_LEER
-    advection_routine: AdvectionRoutines = AdvectionRoutines.STRANG_SPLIT
+    limiter: LimiterType = LimiterType.VAN_LEER
+    riemann_solver: RiemannSolvers = RiemannSolvers.MODIFIED_HLL
+    reconstruction: FluxReconstructions = FluxReconstructions.MODIFIED_MUSCL
+    first_order_advection_routine: AdvectionRoutines = AdvectionRoutines.FIRST_ORDER_RK
+    second_order_advection_routine: AdvectionRoutines = AdvectionRoutines.STRANG_SPLIT
+    linear_solver: LinearSolvers = LinearSolvers.BICGSTAB
+    preconditioner: Preconditioners = Preconditioners.DIAGONAL
     tol: float = 1e-8
     max_iterations: int = 6000
     initial_projection: bool = True
@@ -229,6 +244,7 @@ class Diagnostics:
     diag: bool = True
     diag_plot_compare: bool = False
     diag_current_run: str = "atmpy_run"
+    analysis: bool = False
 
 
 @dataclass
@@ -244,6 +260,7 @@ class Outputs:
     output_filename: str = ""
     output_suffix: str = ""
     output_extension: str = ".nc"
+    output_frequency_steps: int = 100
     checkpoint_base_name: str = "_traveling_vortex_checkpoint"
     enable_checkpointing: str = True
     checkpoint_frequency_steps: int = 100

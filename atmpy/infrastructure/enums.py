@@ -6,8 +6,8 @@ class VariableIndices(IntEnum):
 
     # Indices of Conserved Quantities
     RHO = 0  # Density
-    RHOX = 1  # Perturbation of X (Chi): X'
-    RHOY = 2  # Potential Temperature
+    RHOY = 1  # Potential Temperature
+    RHOX = 2  # Perturbation of X (Chi): X'
     RHOU = 3  # Horizontal Velocity x-component
     RHOV = 4  # Horizontal Velocity y-component
     RHOW = 5  # Vertical Velocity
@@ -18,9 +18,9 @@ class PrimitiveVariableIndices(IntEnum):
     """Create constants for variable indices in the variable container (ndarray) for better readability"""
 
     # Indices of Conserved Quantities
-    P = 0  # Real Pressure
-    X = 1  # Perturbation of X (Chi): X'
-    Y = 2  # Potential Temperature
+    RHO = 0  # Density
+    Y = 1  # Potential Temperature
+    X = 2  # Perturbation of X (Chi): X'
     U = 3  # Horizontal Velocity x-component
     V = 4  # Horizontal Velocity y-component
     W = 5  # Vertical Velocity
@@ -46,6 +46,9 @@ class SlopeLimiters(Enum):
     VAN_LEER = "van_leer"
     SUPERBEE = "superbee"
     MC_LIMITER = "mc_limiter"
+    AVERAGE = "average"
+    OSPRE = "ospre"
+    KOREN = "koren"
 
 
 class RiemannSolvers(Enum):
@@ -109,6 +112,7 @@ class AdvectionRoutines(Enum):
     """Map name to function for the advection solver"""
 
     STRANG_SPLIT = "strang_split"
+    FIRST_ORDER_RK = "first_order_rk"
 
 
 class LinearSolvers(Enum):

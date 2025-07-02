@@ -70,15 +70,15 @@ def _gradient_2d_numba(
 
     for i in range(nx):
         for j in range(ny):
-            p_i_j = p[i, j]
-            p_ip1_j = p[i + 1, j]
-            p_i_jp1 = p[i, j + 1]
-            p_ip1_jp1 = p[i + 1, j + 1]
+            p00 = p[i, j]
+            p10 = p[i + 1, j]
+            p01 = p[i, j + 1]
+            p11 = p[i + 1, j + 1]
 
             # Dpx = avg gradient in x across the cell (i,j)
-            Dpx[i, j] = (p_ip1_j + p_ip1_jp1 - p_i_j - p_i_jp1) * inv_dx_half
+            Dpx[i, j] = (p10 + p11 - p00 - p01) * inv_dx_half
             # Dpy = avg gradient in y across the cell (i,j)
-            Dpy[i, j] = (p_i_jp1 + p_ip1_jp1 - p_i_j - p_ip1_j) * inv_dy_half
+            Dpy[i, j] = (p01 + p11 - p00 - p10) * inv_dy_half
 
     return Dpx, Dpy
 

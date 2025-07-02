@@ -1,0 +1,4 @@
+32:./outputs/run_nx32/_traveling_vortex_32_32.nc
+64:./outputs/run_nx64/_traveling_vortex_64_64.nc
+128:./outputs/run_nx128/_traveling_vortex_128_128.nc
+256:./outputs/run_nx256/_traveling_vortex_256_256.nc

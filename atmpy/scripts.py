@@ -1,72 +1,199 @@
 """ Module for run scripts and parser"""
 
 import argparse
+import logging
 
-DEFAULT_PROFILE_STEPS = 20  # Define a default
+DEFAULT_PROFILE_STEPS = 20
+DEFAULT_VIS_VAR = "rho"
+DEFAULT_RUN_CASE = "TravelingVortex"
+CASE_CHOICES = ["TravelingVortex", "RisingBubble", "SineWaveAdvection1D"]
+DEFAULT_DEBUG_PORT = 5678  # Default port for PyCharm debugger
 
 
 def parse_arguments():
     """Parses command-line arguments for the Atmpy simulation."""
-    parser = argparse.ArgumentParser(description="Atmpy Simulation")
+    parser = argparse.ArgumentParser(description="Atmpy Simulation Framework")
 
-    # Existing arguments
     parser.add_argument(
-        "--restart", type=str, help="Path to checkpoint file to restart from."
-    )
-    parser.add_argument(
-        "--mode",
-        type=str,
-        choices=["run", "visualize_only", "run_and_visualize"],
-        default="run_and_visualize",  # Consider changing default to 'run' if visualization is often separate
-        help="Simulation mode: 'run', 'visualize_only', or 'run_and_visualize'.",
-    )
-    parser.add_argument(
-        "--input_file",
-        type=str,
-        help="Path to NetCDF file to visualize (required if mode is 'visualize_only').",
-    )
-    parser.add_argument(
-        "--initial_value",  # Corrected typo: inital -> initial
-        type=str,
-        help="Initial value to visualize.",
+        "mode_or_case",
+        nargs="?",
+        help="Execution mode ('run', 'visualize', 'debug') or test case name (if mode is 'run' and omitted).",
     )
 
-    # New arguments for test case selection and profiling
     parser.add_argument(
         "--case",
         type=str,
-        choices=["TravelingVortex", "RisingBubble"],  # Add more cases as needed
-        default="RisingBubble",  # Or your preferred default
-        help="Test case to run.",
+        choices=CASE_CHOICES,
+        help=f"Test case to run or visualize. Defaults to '{DEFAULT_RUN_CASE}' for run mode if not specified.",
     )
-    parser.add_argument(
+
+    debug_group = parser.add_argument_group("Debug Mode Options")
+    debug_group.add_argument(
+        "--debugger",
+        type=str,
+        choices=["pycharm"],
+        default="pycharm",
+        help="Specifies the debugger to use (default: pycharm).",
+    )
+    debug_group.add_argument(
+        "--debug-port",
+        type=int,
+        default=DEFAULT_DEBUG_PORT,
+        help=f"Port for the debugger to connect to (default: {DEFAULT_DEBUG_PORT}).",
+    )
+
+    # --- Run specific arguments ---
+    run_group = parser.add_argument_group("Run Mode Options")
+    run_group.add_argument(
+        "--restart", type=str, help="Path to checkpoint file to restart from."
+    )
+    run_group.add_argument(
+        "--config-pickle-path",
+        type=str,
+        default=None,
+        help="Path to a pickled SimulationConfig object to override default test case configuration for running.",
+    )
+    run_group.add_argument(
         "--profile",
-        action="store_true",  # Makes this a flag; args.profile will be True if --profile is present
+        action="store_true",
         help="Enable profiling mode. Runs for --profile_steps, adjusts output.",
     )
-    parser.add_argument(
+    run_group.add_argument(
         "--profile_steps",
         type=int,
         default=DEFAULT_PROFILE_STEPS,
         help=f"Number of simulation steps to run when --profile is enabled (default: {DEFAULT_PROFILE_STEPS}).",
     )
 
+    # --- Visualize specific arguments ---
+    vis_group = parser.add_argument_group("Visualize Mode Options")
+    # --case is already a top-level arg, but crucial for visualize
+    vis_group.add_argument(  # Note: --case is already defined globally, this just mentally groups it for help
+        "--vis_case_info",
+        action="help",  # Does nothing, just for grouping in help message. Relies on global --case.
+        help="The --case option (defined globally) is required for visualize mode to identify the simulation.",
+    )
+    vis_group.add_argument(
+        "--nx",
+        type=int,
+        default=None,  # Default to None, meaning use case's default from config
+        help="Number of grid points in X dimension for the visualized output. (Visualize mode only)",
+    )
+    vis_group.add_argument(
+        "--ny",
+        type=int,
+        default=None,
+        help="Number of grid points in Y dimension for the visualized output. (Visualize mode only, for 2D/3D cases)",
+    )
+    vis_group.add_argument(
+        "--nz",
+        type=int,
+        default=None,
+        help="Number of grid points in Z dimension for the visualized output. (Visualize mode only, for 3D cases)",
+    )
+    vis_group.add_argument(
+        "--variable",
+        type=str,
+        default=DEFAULT_VIS_VAR,
+        help=f"Name of the variable to plot (default: {DEFAULT_VIS_VAR}). (Visualize mode only)",
+    )
+    vis_group.add_argument(
+        "--plot_type",
+        type=str,
+        choices=["static", "animate"],
+        default="static",
+        help="Type of plot: 'static' or 'animate'. (Visualize mode only)",
+    )
+    vis_group.add_argument(
+        "--steps",
+        type=int,
+        nargs="*",
+        default=[-1],
+        help="Time indices to plot. For static: one index. For animate: one or two for range. (Visualize mode only)",
+    )
+    vis_group.add_argument(
+        "--file",
+        type=str,
+        nargs="*",
+        help="The file to read visualization from",
+    )
+
     args = parser.parse_args()
 
-    # Validation
-    if args.mode == "visualize_only" and not args.input_file:
-        parser.error("--input_file is required when --mode is 'visualize_only'")
-    if args.initial_value and args.mode not in ["visualize_only", "run_and_visualize"]:
-        parser.error("--initial_value can only be passed when visualizing.")
-    if args.profile and args.mode == "visualize_only":
-        # It's not an error, but good to inform the user if they combine them.
-        # Or you could make it an error if it's truly meaningless.
-        print(
-            "Warning: --profile flag is used with --mode visualize_only. Profiling typically applies to 'run' modes."
-        )
-    if args.profile and not (args.mode == "run" or args.mode == "run_and_visualize"):
+    # Determine actual mode and case
+    potential_mode = args.mode_or_case
+    valid_modes = ["run", "visualize", "debug"]
+
+    if potential_mode is None:
+        args.mode = "run"
+    elif potential_mode.lower() in valid_modes:
+        args.mode = potential_mode.lower()
+    elif potential_mode in CASE_CHOICES:
+        args.mode = "run"
+        if args.case is not None and args.case != potential_mode:
+            parser.error(
+                f"Conflicting case names specified: '{potential_mode}' and '--case {args.case}'."
+            )
+        args.case = potential_mode
+    else:
         parser.error(
-            "--profile flag is intended for 'run' or 'run_and_visualize' modes."
+            f"Unrecognized command or case: '{potential_mode}'. Valid modes are 'run', 'visualize', 'debug'."
         )
+    #
+    # if potential_mode is None:
+    #     args.mode = "run"
+    #     if args.case is None:
+    #         args.case = DEFAULT_RUN_CASE
+    # elif potential_mode.lower() == "run":
+    #     args.mode = "run"
+    #     if args.case is None:
+    #         args.case = DEFAULT_RUN_CASE
+    # elif potential_mode.lower() == "visualize":
+    #     args.mode = "visualize"
+    #     if args.case is None and args.file is None:
+    #         parser.error("For visualize mode, --case or --file must be specified.")
+    # elif potential_mode in CASE_CHOICES:
+    #     args.mode = "run"
+    #     if args.case is not None and args.case != potential_mode:
+    #         parser.error(
+    #             f"Conflicting case names specified: '{potential_mode}' and '--case {args.case}'."
+    #         )
+    #     args.case = potential_mode
+    # else:
+    #     parser.error(
+    #         f"Unrecognized command or case: '{potential_mode}'. Valid modes are 'run', 'visualize' and 'debug'."
+    #     )
+
+    # If a case was not provided as a positional argument, and --case is not set, default it for run/debug modes.
+    if args.mode in ["run", "debug"] and args.case is None:
+        args.case = DEFAULT_RUN_CASE
+        if args.mode == "debug":
+            logging.info(
+                f"Debug mode: --case not specified, defaulting to '{DEFAULT_RUN_CASE}'."
+            )
+
+    if args.mode == "debug" and args.case is None:
+        parser.error("--case is required for debug mode.")
+
+    # Validation for visualize mode
+    if args.mode == "visualize":
+        if args.case is None and args.file is None:
+            parser.error("--case or --file is required for visualize mode.")
+        # Ensure --ny is not used for 1D cases, --nz for 1D/2D if we want strictness (can be handled in main.py too)
+        # For now, parser allows them, main.py logic might ignore irrelevant ones.
+
+        if args.plot_type == "static" and args.steps and len(args.steps) > 1:
+            logging.warning(
+                f"Static plot: Using first time index {args.steps[0]} from {args.steps}."
+            )
+            args.steps = [args.steps[0]]
+        elif args.plot_type == "animate":
+            if args.steps and len(args.steps) >= 2:
+                logging.warning(
+                    f"Animate plot: Using range {args.steps[0]}-{args.steps[-1]} from {args.steps}."
+                )
+                args.steps = [args.steps[0], args.steps[-1]]
+            elif args.steps and len(args.steps) < 2:
+                args.steps = [0, -1]
 
     return args

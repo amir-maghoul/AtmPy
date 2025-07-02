@@ -4,12 +4,16 @@ import numpy as np
 import scipy as sp
 from typing import TYPE_CHECKING, Union, Tuple, Optional, Callable, Dict
 
+from atmpy.boundary_conditions.contexts import BCApplicationContext
 from atmpy.infrastructure.enums import (
     VariableIndices as VI,
     BoundarySide as BdrySide,
     BoundaryConditions as BdryType,
 )
-from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
+from atmpy.boundary_conditions.bc_extra_operations import (
+    WallAdjustment,
+    WallFluxCorrection,
+)
 from atmpy.infrastructure.utility import (
     one_element_inner_slice,
     one_element_inner_nodal_shape,
@@ -85,6 +89,12 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         if self.precondition_type is None:
             raise ValueError("The preconditioner type must be specified")
 
+        self._nodal_bc_contexts = (
+            [BCApplicationContext(is_nodal=True)] * self.grid.ndim * 2
+        )
+
+        self._update_discrete_operators()
+
     def _get_preconditioner_compute_components(self):
         """Get the precondtioning compute function. The sole raison d'être of this method is to avoid circular import
         issues from factory."""
@@ -114,6 +124,26 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self.precon_data = self.precon_compute(
             self, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
         )
+
+    def _update_discrete_operators(self):
+        """Update the discrete operators to handle the booundary conditions for divergence and gradients"""
+        self.discrete_operator.boundary_manager = self.boundary_manager
+
+        solid_wall_operation = [
+            WallFluxCorrection(
+                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.0
+            )
+        ]
+
+        reflective_wall_operation = [
+            WallFluxCorrection(
+                target_side=BdrySide.ALL,
+                target_type=BdryType.REFLECTIVE_GRAVITY,
+                factor=0.0,
+            )
+        ]
+        boundary_operations = [solid_wall_operation, reflective_wall_operation]
+        self.discrete_operator.boundary_operations = boundary_operations
 
     def pressure_coefficients_nodes(self, cellvars: np.ndarray, dt: float):
         """Calculate the coefficients for the pressure equation. Notice the coefficients are nodal.
@@ -153,17 +183,17 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         inner_slice = one_element_inner_slice(self.ndim, full=False)
         self.mpv.wcenter[inner_slice] = dPdpi
 
-        #################### Update the boundary nodes for the dP/dpi container. ######################################
-        # Create the operation context to scale down the nodes. Notice the side is set to be BdrySide.ALL.
-        # This will apply the 'extra' method whenever the boundary is defined to be WALL.
-        boundary_operation = [
-            WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
-            )
-        ]
-        self.boundary_manager.apply_extra_all_sides(
-            self.mpv.wcenter, boundary_operation, target_mpv=False
-        )
+        # #################### Update the boundary nodes for the dP/dpi container. ######################################
+        # # Create the operation context to scale down the nodes. Notice the side is set to be BdrySide.ALL.
+        # # This will apply the 'extra' method whenever the boundary is defined to be WALL.
+        # boundary_operation = [
+        #     WallAdjustment(
+        #         target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
+        #     )
+        # ]
+        # self.boundary_manager.apply_extra_all_sides(
+        #     self.mpv.wcenter, boundary_operation, target_mpv=False
+        # )
 
     def calculate_enthalpy_weighted_pressure_gradient(
         self, p: np.ndarray, dt: float, is_nongeostrophic: bool, is_nonhydrostatic: bool
@@ -188,16 +218,12 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         Tuple[np.ndarray, np.ndarray, np.ndarray]
             Tuple of updated momenta arrays
         """
-        # Get necessary variables/coefficients
-        cellvars = self.variables.cell_vars
-
         #### Calculate the needed values for the updates in the RHS of the momenta equations (the Exner pressure #######
         #### perturbation (Pi^prime)_x, _y, _z (see RHS of momenta eq.) and the P*Theta coefficients)  ##################
         dpdx, dpdy, dpdz = self.discrete_operator.gradient(p)
-        pTheta = self._calculate_coefficient_pTheta(
-            cellvars
-        )  # Capital P. it is written small for naming in Python.
-
+        pTheta = self.mpv.wplus[
+            0
+        ]  # Capital P. it is written small for naming in Python.
         ##################### Calculate exner pressure gradient times coefficient (cell-centered) ######################
         ##################### These are the nominator terms under the divergence in the Helmholtz equation #############
         Pu = -dt * pTheta * dpdx
@@ -259,8 +285,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         ########################## Update the full variables using the intermediate variables. #########################
         # Notice the u_incr, v_incr and w_incr are update of Pu, Pv and Pw, where P = rho*Theta. In order to update the
         # main momenta variables (rhou, rhov and rhow) we need to multiply the result by 1.0/Theta = chi.
+        # The plus sign is because Pu_incr has an inherent minus sign.
         cellvars[..., VI.RHOU] += chi * Pu_incr
-        cellvars[..., VI.RHOV] += chi * Pv_incr if self.ndim > 2 else 0.0
+        cellvars[..., VI.RHOV] += chi * Pv_incr if self.ndim >= 2 else 0.0
         cellvars[..., VI.RHOW] += chi * Pw_incr if self.ndim == 3 else 0.0
         cellvars[..., VI.RHOX] += (
             -updt_chi * dt * dS * cellvars[..., self.vertical_momentum_index]
@@ -296,13 +323,13 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         The output is of shape (nnx-2, nny-2, nnz-2):
         - p is of shape (nnx, nny, nnz)
         - grad(p) is of shape (nnx-1, nny-1, nnz-1)
-        - divergence(grad(p)) is of shape (nnx-2, ny-2, nz-2)
+        - divergence(grad(p)) is of shape (nnx-2, nny-2, nnz-2)
         """
-
         ######### Calculate the needed term inside the divergence: M_inv ⋅ ( dt * (PΘ)° * ∇p )  ########################
         # The results are cell-centered
+        # WARNING: note the sign of dt.
         u, v, w = self.calculate_enthalpy_weighted_pressure_gradient(
-            p, dt, is_nongeostrophic, is_nonhydrostatic
+            p, -dt, is_nongeostrophic, is_nonhydrostatic
         )
 
         ######### Stack the values above so that they can be passed to the divergence ##################################
@@ -310,13 +337,8 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             ..., : self.ndim
         ]  # Ensure correct dims
 
-        ######### Apply divergence #####################################################################################
-        divergence = self.discrete_operator.divergence(vector_field_cell)
-
-        ######### Negate the result and flatten for future usage in scipy LinearOperator ###############################
-        laplacian = (
-            -divergence
-        )  # This is the sign between the first and second term in the Helmholtz equation
+        #################################### Apply divergence ##########################################################
+        laplacian = self.discrete_operator.divergence(vector_field_cell)
 
         return laplacian
 
@@ -329,7 +351,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         is_compressible: bool,
     ):
         """Calculate the full Helmholtz operator:
-        [α_p * (∂P/∂π)°/dt]p₂ + ∇⋅(M_inv⋅(dt*CΘ*∇p₂))
+        [α_p * (∂P/∂π)°/dt]p₂ - ∇⋅(M_inv⋅(dt*(PΘ)°*∇p₂))
 
         Parameters
         ----------
@@ -389,6 +411,8 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             inner_slice = self.grid.get_inner_slice()
             p_full = np.zeros(self.grid.nshape, dtype=p_flat.dtype)
             p_full[inner_slice] = p_flat.reshape(inshape)
+
+            self.boundary_manager.apply_pressure_boundary_on_all_sides(p_full)
 
             # Apply the physics-based Helmholtz operator
             result = self.helmholtz_operator(
@@ -466,12 +490,19 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         solution_flat, info = self.linear_solver.solve(
             A, rhs_flat, rtol=rtol, max_iter=max_iter, M=M_op
         )
+        iterations = getattr(
+            self.linear_solver, "iterations_", "N/A (solver does not store iterations)"
+        )
 
-        # Optional Logging
+        # Logging
         if info > 0:
             print(f"WARNING: Linear solver did not converge in {info} iterations.")
         elif info < 0:
             print(f"ERROR: Linear solver failed with error code {info}.")
+        else:
+            print(
+                f"Linear solver converged. Iterations: {iterations}. Exit code: {info}"
+            )
 
         return solution_flat, info
 
@@ -509,22 +540,31 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         pi = (1/Msq) * P^(gamma - 1). Therefore, dpi/dP = (gamma - 1)/Msq * P^(gamma - 2). Since we need the inverse
         (dP/dpi), every part of this will be inverted in the code.
 
-        The dt**2 in the denominator has an obvious reason: This will be part of the Helmholtz equation operator, the
+        The dt in the denominator has an obvious reason: This will be part of the Helmholtz equation operator, the
         laplacian and this term should be created as an overall operator, the dt (which basically belongs to the
-        laplacian update) should be divided before we create the operator ([C/dt]p₂ + ∇⋅(M_inv⋅(dt*CΘ*∇p₂)) = DivV).
+        laplacian update) should be divided before we create the operator ([C/dt]p₂ - ∇⋅(M_inv⋅(dt*CΘ*∇p₂)) = DivV).
         """
 
         # Calculate the coefficient and the exponent of the dP/dpi using the formula directly. (see the docstring)
-        ccenter = -self.Msq * self.th.gm1inv / (dt)
-        cexp = 2.0 - self.th.gamma
+        coeff = -self.Msq * self.th.gm1inv / (dt)
+        exponent = 2.0 - self.th.gamma
 
         # Temp variable for rhoTheta=P for readability
         P = cellvars[..., VI.RHOY]
 
-        # Averaging over the nodes and fill the mpv container
+        # Averaging over the nodes and fill the mpv container (Eq. 29 BK19)
         kernel = np.ones([2] * self.ndim)
-        return (
-            ccenter
-            * sp.signal.fftconvolve(P**cexp, kernel, mode="valid")
+        dPdpi = (
+            coeff
+            * sp.signal.fftconvolve(P**exponent, kernel, mode="valid")
             / kernel.sum()
         )
+
+        boundary_operation = [
+            WallAdjustment(
+                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
+            )
+        ]
+        self.boundary_manager.apply_extra_all_sides(dPdpi, boundary_operation)
+
+        return dPdpi

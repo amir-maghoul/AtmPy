@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from typing import List, TYPE_CHECKING, Generic, Dict, Any, Tuple
 
+from atmpy.boundary_conditions.bc_extra_operations import ExtraBCOperation
+
 if TYPE_CHECKING:
     from atmpy.infrastructure.enums import (
         PressureSolvers,
@@ -11,6 +13,8 @@ if TYPE_CHECKING:
         Preconditioners,
     )
     from atmpy.grid.kgrid import Grid
+    from atmpy.boundary_conditions.boundary_manager import BoundaryManager
+
 from atmpy.pressure_solver.abstract_pressure_solver import TPressureSolver
 from atmpy.pressure_solver.discrete_operations import TDiscreteOperator
 
@@ -28,6 +32,8 @@ class DiscreteOperatorsContext:
 
     operator_type: "DiscreteOperators"
     grid: "Grid"
+    boundary_manager: "BoundaryManager" = None
+    boundary_operations: List[ExtraBCOperation] = None
 
     def instantiate(self) -> TDiscreteOperator:
         """Instantiate a discrete operator"""

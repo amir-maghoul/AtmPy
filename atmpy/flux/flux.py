@@ -1,5 +1,6 @@
 import numpy as np
 from typing import List, Tuple, TYPE_CHECKING
+
 from atmpy.flux.utility import create_averaging_kernels
 
 if TYPE_CHECKING:
@@ -101,23 +102,21 @@ class Flux:
         self.ndim = self.grid.ndim
         self.kernels = create_averaging_kernels(self.ndim)  # [kernel_x, kernel_y, ...]
 
-        self.iflux = {"x": None, "y": None, "z": None}
-
         if self.ndim == 1:
             self.flux = {
                 "x": np.zeros(
-                    (grid.ncx_total + 1, variables.num_vars_cell), dtype=np.float32
+                    (grid.ncx_total + 1, variables.num_vars_cell), dtype=np.float64
                 )
             }
         elif self.ndim == 2:
             self.flux = {
                 "x": np.zeros(
                     (grid.ncx_total + 1, grid.ncy_total, variables.num_vars_cell),
-                    dtype=np.float32,
+                    dtype=np.float64,
                 ),
                 "y": np.zeros(
                     (grid.ncx_total, grid.ncy_total + 1, variables.num_vars_cell),
-                    dtype=np.float32,
+                    dtype=np.float64,
                 ),
             }
 
@@ -130,7 +129,7 @@ class Flux:
                         grid.ncz_total,
                         variables.num_vars_cell,
                     ),
-                    dtype=np.float32,
+                    dtype=np.float64,
                 ),
                 "y": np.zeros(
                     (
@@ -139,7 +138,7 @@ class Flux:
                         grid.ncz_total,
                         variables.num_vars_cell,
                     ),
-                    dtype=np.float32,
+                    dtype=np.float64,
                 ),
                 "z": np.zeros(
                     (
@@ -148,12 +147,9 @@ class Flux:
                         grid.ncz_total + 1,
                         variables.num_vars_cell,
                     ),
-                    dtype=np.float32,
+                    dtype=np.float64,
                 ),
             }
-
-        # Initialize iflux
-        self.compute_averaging_fluxes()
 
     def _compute_unphysical_fluxes(self) -> dict[str, np.ndarray]:
         """
@@ -220,9 +216,10 @@ class Flux:
         for flux, kernel, direction in zip(
             unphysical_fluxes.values(), self.kernels, directions
         ):
-            self.iflux[direction] = sp.signal.fftconvolve(flux, kernel, mode=mode)
             inner_index = one_element_inner_slice(self.ndim, full=False)
-            self.flux[direction][inner_index + (VI.RHOY,)] = self.iflux[direction]
+            self.flux[direction][inner_index + (VI.RHOY,)] = sp.signal.fftconvolve(
+                flux, kernel, mode=mode
+            )
 
     def apply_reconstruction(
         self, lmbda: float, direction: str
@@ -246,7 +243,7 @@ class Flux:
         )
 
         # Use reconstruction scheme (MUSCL) to create left and right primitive variables
-        lefts.primitives, rights.primitives = self.reconstruction(
+        lefts.primitives[...], rights.primitives[...] = self.reconstruction(
             self.variables, self.flux, self.eos, self.limiter, lmbda, direction
         )
 
@@ -268,12 +265,13 @@ class Flux:
         Pu = velocity * cell_vars[..., VI.RHOY]
 
         # Calculate the P = rho*Theta by averaging and advecting
-        lefts.cell_vars[lefts_idx + (VI.RHOY,)] = rights.cell_vars[
-            rights_idx + (VI.RHOY,)
-        ] = 0.5 * (
+        scale = 0.5 * (
             (cell_vars[lefts_idx + (VI.RHOY,)] + cell_vars[rights_idx + (VI.RHOY,)])
-            - lmbda * (Pu[lefts_idx] + Pu[rights_idx])
+            - 0.5 * lmbda * (Pu[rights_idx] - Pu[lefts_idx])
         )
+
+        lefts.cell_vars[lefts_idx + (VI.RHOY,)] = scale
+        rights.cell_vars[rights_idx + (VI.RHOY,)] = scale
 
         # Find the rho conservative variable from the new updated primitive variables
         left_rho = lefts.cell_vars[..., VI.RHOY] / lefts.primitives[..., PVI.Y]
@@ -295,6 +293,7 @@ class Flux:
             The direction of the flux calculation.
         """
         lefts, rights = self.apply_reconstruction(lmbda, direction)
+
         self.riemann_solver(
             lefts.primitives, rights.primitives, self.flux, direction, self.ndim
         )

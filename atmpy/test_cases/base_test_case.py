@@ -89,6 +89,7 @@ class BaseTestCase(ABC):
                 setattr(physics_config, key, value)
             else:
                 print(f"Warning: Physics setting '{key}' not found in config.")
+        self.config.update_all_derived_fields()
 
     def set_model_regimes(self, model_regime_updates: dict):
         """Update the model regime configuration."""
@@ -137,9 +138,7 @@ class BaseTestCase(ABC):
         regime = self.config.model_regimes
         if const.R_gas > 0 and const.T_ref > 0:
             denominator = const.R_gas * const.T_ref
-            regime.Msq = (
-                (const.u_ref * const.u_ref) / denominator * regime.is_compressible
-            )
+            regime.Msq = (const.u_ref * const.u_ref) / denominator
         else:
             regime.Msq = 0.0  # Avoid division by zero
             print("Warning: Cannot calculate Msq due to invalid R_gas or T_ref.")

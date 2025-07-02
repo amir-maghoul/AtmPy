@@ -2,6 +2,7 @@
 The code is the modified version of what appears in PyBella project.
 """
 
+import scipy as sp
 import numpy as np
 from typing import List, Union, TYPE_CHECKING
 
@@ -50,9 +51,9 @@ class MPV:
         self.p2_nodes0: np.ndarray = np.zeros(grid.nshape)
         self.dp2_nodes: np.ndarray = np.zeros(grid.nshape)
 
-        self.u: np.ndarray = np.zeros(grid.cshape)
-        self.v: np.ndarray = np.zeros(grid.cshape)
-        self.w: np.ndarray = np.zeros(grid.cshape)
+        self.Pu: np.ndarray = np.zeros(grid.cshape)
+        self.Pv: np.ndarray = np.zeros(grid.cshape)
+        self.Pw: np.ndarray = np.zeros(grid.cshape)
 
         # Containers for the pressure equation
         self.rhs: np.ndarray = np.zeros(
@@ -72,7 +73,8 @@ class MPV:
 
     def _create_1D_grid_in_direction(self):
         """Reduce the dimension of the Grid object and create a new one in the given direction"""
-
+        if self.grid.ndim == 1:
+            return self.grid
         start: float = getattr(self.grid, self.direction_str + "_start")
         end: float = getattr(self.grid, self.direction_str + "_end")
         ncells: int = getattr(self.grid, "n" + self.direction_str)
@@ -98,12 +100,16 @@ class MPV:
         equal to the number of cells plus one. The derivative reduces this shape in the direction of gravity to equal to
         the number of cells. After that the resulting 1D array gets tiled to be of the same shape as the grid.cshape.
         """
+
         dr: float = self.grid.dxyz[self.direction]
 
         # Since variables in self.hydrostate are 1D, it suffices to calculate the convolution in their only direction
         # and then divide the result be the correct dx, dy or dz to get the derivative.
         S0: np.ndarray = self.hydrostate.node_vars[..., HI.S0]
         dS: np.ndarray = np.diff(S0) / dr
+
+        if self.grid.ndim == 1:
+            return dS
 
         # Expand and repeat along even axes so that the result matches the cell array shape.
         tile_shape: list = self._get_tile_shape()
@@ -114,6 +120,9 @@ class MPV:
         """Get method to get the S0c attribute. The S0 variable is assumed to be defined on the cells."""
         S0c: np.ndarray = self.hydrostate.cell_vars[..., HI.S0]
 
+        if self.grid.ndim == 1:
+            return S0c
+
         # Expand and repeat along even axes so that the result matches the cell array shape.
         tile_shape: list = self._get_tile_shape()
         S0c = np.tile(S0c, tile_shape)
@@ -123,6 +132,9 @@ class MPV:
         tile_shape = list(self.grid.cshape)
         tile_shape[self.direction] = 1
         return tile_shape
+
+    def set_rhs_to_zero(self):
+        self.rhs[...] = 0.0
 
     def state(self, gravity_strength: Union[np.ndarray, list, tuple], Msq: float):
         """Computes the initial values for the multiple pressure variables
@@ -165,6 +177,12 @@ class MPV:
             pi_cm: np.ndarray = np.exp(-(cells - 0.5 * dr) / Hex)
             pi_c: np.ndarray = np.exp(-(cells) / Hex)
 
+            # Y_c: np.ndarray = -Gamma * g * dr / (pi_cp - pi_cm)
+            # P_c: np.ndarray = (1.0 / Y_c)**thermo.gm1inv
+            # p_c: np.ndarray = pi_c**thermo.Gammainv
+            # rho_c: np.ndarray = P_c / Y_c
+            #
+            # self.hydrostate.cell_vars[..., HI.P2_0] = 1.0 / Y_c / Msq
             Y_c: np.ndarray = -Gamma * g * dr / (pi_cp - pi_cm)
             P_c: np.ndarray = pi_c**thermo.gm1inv
             p_c: np.ndarray = pi_c**thermo.Gammainv
@@ -178,100 +196,6 @@ class MPV:
             self.hydrostate.cell_vars[..., HI.S0] = 1.0 / Y_c
 
         else:
-            # In absence of gravity, we set every pressure to 1.
+            # In the absence of gravity, we set every pressure to 1.
             self.hydrostate.cell_vars[...] = 1.0
             self.hydrostate.node_vars[...] = 1.0
-
-
-def simple_test():
-    from atmpy.variables.utility import compute_stratification
-    from atmpy.grid.kgrid import Grid
-
-    R_gas = 287.4
-    R_vap = 461.0
-    Q_vap = 2.53e06
-    gamma = 1.4
-
-    h_ref = 10000.0
-    t_ref = 100.0
-    T_ref = 300.00
-    p_ref = 1e5
-    u_ref = h_ref / t_ref
-    scale_factor = 20.0
-    delth = 0.01 / T_ref
-    xc = 0.0
-    gravity = [0, 1.0, 0.0]
-    Nsq_ref = 1.0e-4
-
-    Msq = u_ref * u_ref / (R_gas * T_ref)
-    a = scale_factor * 5.0e3 / h_ref
-    axis = 1
-
-    xmin = -15.0 * scale_factor
-    xmax = 15.0 * scale_factor
-    ymin = 0.0
-    ymax = 1.0
-    zmin = -1.0
-    zmax = 1.0
-
-    def stratification(y):
-        Nsq = Nsq_ref * t_ref * t_ref
-        g = gravity[1] / Msq
-
-        return np.exp(Nsq * y / g)
-
-    def molly(x):
-        del0 = 0.25
-        L = xmax - xmin
-        xi_l = np.minimum(1.0, (x - xmin) / (del0 * L))
-        xi_r = np.minimum(1.0, (xmax - x) / (del0 * L))
-        return 0.5 * np.minimum(1.0 - np.cos(np.pi * xi_l), 1.0 - np.cos(np.pi * xi_r))
-
-    dims = [DimensionSpec(301 + 1, xmin, xmax, 2), DimensionSpec(10 + 1, ymin, ymax, 2)]
-    grid = create_grid(dims)
-
-    x = grid.x_cells.reshape(-1, 1)
-    y = grid.y_cells.reshape(1, -1)
-
-    xn = grid.x_nodes[:-1].reshape(-1, 1)
-    yn = grid.y_nodes[:-1].reshape(1, -1)
-
-    Y = stratification(y) + delth * molly(x) * np.sin(np.pi * y) / (
-        1.0 + (x - xc) ** 2 / (a**2)
-    )
-
-    Yn = stratification(yn) + delth * molly(xn) * np.sin(np.pi * yn) / (
-        1.0 + (xn - xc) ** 2 / (a**2)
-    )
-
-    mpv = MPV(grid)
-    mpv.state(gravity, Msq)
-    hydrostatics = Variables(grid, num_vars_cell=7, num_vars_node=7)
-    hydrostatics2 = Variables(grid, num_vars_cell=7, num_vars_node=7)
-    # compute_stratification(hydrostatics, Y, Yn, grid, axis, gravity, Msq)
-    print(hydrostatics.cell_vars[4, :, HI.P0])
-
-    # End of compute_stratification method
-
-
-if __name__ == "__main__":
-    # simple_test()
-    dt = 0.1
-
-    nx = 1
-    ngx = 2
-    nnx = nx + 2 * ngx
-    ny = 2
-    ngy = 2
-    nny = ny + 2 * ngy
-
-    dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
-    grid = create_grid(dim)
-    # rng = np.random.default_rng()
-    # arr = np.arange(nnx * nny)
-    # rng.shuffle(arr)
-
-    mvp = MPV(grid)
-
-    mvp.state([0, 1, 0], 1.0)
-    print(mvp.hydrostate.cell_vars[..., HI.RHO0].reshape((1, -1)))

@@ -51,7 +51,8 @@ class TimeIntegratorContext(Generic[TTimeIntegrator]):
     variables: "Variables"
     flux: "Flux"
     boundary_manager: "BoundaryManager"
-    advection_routine: "AdvectionRoutines"
+    first_order_advection_routine: "AdvectionRoutines"
+    second_order_advection_routine: "AdvectionRoutines"
     dt: float
     extra_dependencies: Dict[str, Any] = field(default_factory=dict)
 
@@ -65,7 +66,8 @@ class TimeIntegratorContext(Generic[TTimeIntegrator]):
             "variables": self.variables,
             "flux": self.flux,
             "boundary_manager": self.boundary_manager,
-            "advection_routine": self.advection_routine,
+            "first_order_advection_routine": self.first_order_advection_routine,
+            "second_order_advection_routine": self.second_order_advection_routine,
             "dt": self.dt,
         }
         dependencies.update(self.extra_dependencies)

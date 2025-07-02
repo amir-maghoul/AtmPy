@@ -3,6 +3,7 @@
 import numpy as np
 from typing import TYPE_CHECKING
 from atmpy.infrastructure.enums import VariableIndices as VI
+import logging
 
 if TYPE_CHECKING:
     from atmpy.variables.variables import Variables
@@ -51,18 +52,19 @@ def calculate_dynamic_dt(
     inner_slice = grid.get_inner_slice()
 
     # --- Calculate local sound speed (c) ---
-    # This depends heavily on your EOS and variable definitions.
-    # Assuming ExnerBasedEOS and rhoY stores rho * Theta_nd (non-dim potential temp)
-    # P_exner_nd ~ rhoY (if scaled appropriately in your system)
-    # c_physical = sqrt(gamma * R_gas * T_physical)
-    # c_nondim = c_physical / u_ref
-    # T_physical = (rhoY / rho) * T_ref (if rhoY/rho is Theta_nd)
-
     rho_inner = variables.cell_vars[inner_slice + (VI.RHO,)]
     rhoY_inner = variables.cell_vars[inner_slice + (VI.RHOY,)]
 
     # Avoid division by zero if rho is zero anywhere (e.g., uninitialized ghosts)
     valid_rho_mask = rho_inner > MACHINE_EPSILON
+
+    Y_prim_inner = np.zeros_like(rho_inner)
+    Y_prim_inner[valid_rho_mask] = (
+        rhoY_inner[valid_rho_mask] / rho_inner[valid_rho_mask]
+    )
+
+    # Physical Temperature: T_phys = Theta_nd * T_ref
+    T_physical_inner = Y_prim_inner * config.global_constants.T_ref
 
     # Calculate primitive potential temperature (Theta_nd)
     # This assumes Y_prim is Theta_nd = Theta_physical / T_ref
@@ -141,7 +143,7 @@ def calculate_dynamic_dt(
     # --- Calculate CFL based on acoustic or advective speeds ---
     # config.temporal might need a new flag like 'use_acoustic_cfl'
     use_acoustic_cfl = getattr(
-        config.temporal, "use_acoustic_cfl", True
+        config.temporal, "use_acoustic_cfl", False
     )  # Default to True
 
     if use_acoustic_cfl:
@@ -167,24 +169,7 @@ def calculate_dynamic_dt(
         dt_z = cfl_number * grid.dxyz[2] / max_char_speed_z
 
     dt_cfl = min(dt_x, dt_y, dt_z)
-
-    # --- Blend with fixed dt if configured ---
-    # Simplified: primarily use CFL, but allow fixed dt from config to also cap it.
-    # The PyBella ramp-up logic for dtfixed0 to dtfixed is specific;
-    # a more common approach is just `min(dt_cfl, config.temporal.dtfixed)`
-    # if dt_fixed is an *upper bound*. If dt_fixed is *the* dt unless CFL is smaller,
-    # then dt_cfl is the primary driver.
-    # Let's assume we want the smaller of CFL-derived dt and a user-specified fixed dt.
-
-    # If config.temporal.dtfixed is meant to be THE timestep unless CFL demands smaller:
-    # dt = min(dt_cfl, config.temporal.dtfixed)
-    # If dt_cfl is always the primary driver, and dtfixed is only for startup or as a cap:
     dt = dt_cfl  # Default to CFL driven
-
-    if config.temporal.dtfixed > 0:
-        dt = min(dt_cfl, config.temporal.dtfixed)
-    else:
-        dt = dt_cfl
 
     # --- Adjust dt to hit next_output_time precisely ---
     time_to_next_output = next_output_time - current_sim_time

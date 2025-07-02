@@ -3,15 +3,22 @@
 from __future__ import annotations
 
 import logging
+import numpy as np
+
+np.seterr(all="raise")
 from typing import TYPE_CHECKING, Union, List, Any, Callable
 
-
-from atmpy.boundary_conditions.bc_extra_operations import WallAdjustment
+from atmpy.boundary_conditions.bc_extra_operations import (
+    WallAdjustment,
+    WallFluxCorrection,
+)
 from atmpy.boundary_conditions.contexts import BCApplicationContext
 from atmpy.infrastructure.utility import (
     directional_indices,
     one_element_inner_slice,
     one_element_inner_nodal_shape,
+    dimension_directions,
+    momentum_index,
 )
 from atmpy.pressure_solver.discrete_operations import AbstractDiscreteOperator
 from atmpy.infrastructure.enums import VariableIndices as VI, Preconditioners
@@ -49,7 +56,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         flux: "Flux",
         boundary_manager: "BoundaryManager",
         pressure_solver: "TPressureSolver",
-        advection_routine: AdvectionRoutines,
+        first_order_advection_routine: AdvectionRoutines,
+        second_order_advection_routine: AdvectionRoutines,
         wind_speed: List[float],
         is_nongeostrophic: bool,
         is_nonhydrostatic: bool,
@@ -75,7 +83,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.pressure_solver.discrete_operator
         )
         self.advection_routine: Callable
-        self._get_advection_routine(advection_routine)
+        self._get_advection_routine(
+            first_order_advection_routine, second_order_advection_routine
+        )
         self.th: "Thermodynamics" = self.pressure_solver.th
         self.dt: float = dt
         self.Msq: float = self.pressure_solver.Msq
@@ -94,144 +104,201 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
     def _get_advection_routine(
-        self, advection_routine_name: "AdvectionRoutines"
+        self,
+        first_order_advection_routine_name: "AdvectionRoutines",
+        second_order_advection_routine_name: "AdvectionRoutines",
     ) -> None:
         """Get the advection routine. The sole raison d'être of this method is to avoid circular import
         issues from factory."""
         from atmpy.infrastructure.factory import get_advection_routines
 
-        self.advection_routine = get_advection_routines(advection_routine_name)
+        self.first_order_advection_routine = get_advection_routines(
+            first_order_advection_routine_name
+        )
+        self.second_order_advection_routine = get_advection_routines(
+            second_order_advection_routine_name
+        )
 
-    def step(self) -> None:
+    def _get_dimensional_sweep_order(self, global_time_step_num: int) -> List[str]:
+        """Determines the order of dimensional sweeps based on the global time step."""
+        base_directions = dimension_directions(self.grid.ndim)
+        if self.grid.ndim == 1:
+            return base_directions
+        if global_time_step_num % 2 == 0:
+            return base_directions
+        else:
+            return base_directions[::-1]
+
+    def step(self, *args, **kwargs) -> None:  # Added global_time_step_num
         """
         Performs a single time step using the semi-implicit predictor-corrector
         method based on Benacchio & Klein (2019).
         """
-        logging.info(f"--- Starting time step with dt = {self.dt} ---")
+        global_time_step_num = kwargs.pop("global_step")
+
+        logging.info(
+            f"--- Starting time step {global_time_step_num} with dt = {self.dt} ---"
+        )
 
         # --- Save Initial State (t^n) ---
-        initial_vars = np.copy(self.variables.cell_vars)
-        initial_p2 = np.copy(self.mpv.p2_nodes)
-        # It might be necessary to save self.flux too if advection modifies it undesirably
-        # initial_flux_iflux = {k: np.copy(v) for k, v in self.flux.iflux.items() if v is not None}
+        initial_vars_arr = np.copy(self.variables.cell_vars)
+        initial_p2_nodes_arr = np.copy(self.mpv.p2_nodes)
 
-        ####################### Predictor Stage (Calculates fluxes at t^{n+1/2}) #######################################
-        # This modifies self.variables, self.mpv, and self.flux
-        self._predictor_step(self.dt, self.advection_routine)
+        ######################### Predictor Stage: Compute advective fluxes (Pv)^{n+1/2} ###############################
+        # Sol^n and p^n are currently in self.variables and self.mpv
+        self._predictor_step(self.dt, initial_vars_arr, global_time_step_num)
+        # After this, self.flux contains (Pv)^{n+1/2}
+        # self.variables contains Sol^{n+1/2} and self.mpv.p2_nodes contains p^{n+1/2} (these are intermediate)
 
-        ####################### Corrector Stage (Advances state from t^n to t^{n+1}) ###################################
-        # This resets self.variables/mpv internally and uses the predicted fluxes from self.flux
-        self._corrector_step(self.dt, self.advection_routine, initial_vars, initial_p2)
+        ######################### Corrector Stage: Advance state from t^n to t^{n+1} ###################################
+        self._corrector_step(
+            self.dt, initial_vars_arr, initial_p2_nodes_arr, global_time_step_num
+        )
+        # After this, self.variables contains Sol^{n+1} and self.mpv.p2_nodes contains p^{n+1}
 
-        logging.info(f"--- Finished time step ---")
+        logging.info(f"--- Finished time step {global_time_step_num} ---")
 
-    def _predictor_step(self, dt: float, advection_func: Callable) -> None:
-        """
-        Performs the predictor stage of the time step (Eq. 14-15 in BK19).
-        Calculates the state at t + dt/2 to compute advective fluxes for the main step.
-        Modifies self.variables, self.mpv, and self.flux in-place.
-        """
-        logging.debug("--- Starting Predictor Step ---")
+    def _predictor_step(
+        self,
+        dt: float,
+        initial_vars_arr_for_coeffs: np.ndarray,
+        global_time_step_num: int,
+    ) -> None:
+        logging.debug(f"Predictor (step {global_time_step_num}): Starting")
+
         half_dt = 0.5 * dt
+        self.variables.cell_vars[...] = initial_vars_arr_for_coeffs
 
-        ############################## 1. Apply BCs to current state ###################################################
+        # Current state (Sol^n, p^n) is in self.variables, self.mpv ###
+        ################################ 1. Apply BCs to current state (t^n) ###########################################
         self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.p2_nodes, self._nodal_bc_contexts
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.p2_nodes)
+
+        ######################## 2. Compute advective mass fluxes (P v)^n based on state at t^n (Sol^n) ################
+        # This updates self.flux[direction][..., VI.RHOY]
+        self.flux.compute_averaging_fluxes()  # Uses self.variables (which is Sol^n)
+        logging.debug(
+            f"Predictor (step {global_time_step_num}): Averaging fluxes computed from Sol^n"
         )
 
-        ###################### 2. Compute advective fluxes based on state at t^n #######################################
-        # Note: compute_averaging_fluxes computes Pu, Pv, Pw.
-        # The Riemann solver part happens within advection_func.
-        self.flux.compute_averaging_fluxes()
-
-        ################### 3. Advect state by dt/2 using fluxes at t^n (Eq. 14a, but integrated) ######################
-        # Result is Sol*
-        advection_func(
+        #################### 3.a Advect state by dt/2 using first-order splitting -> Sol* ###############################
+        ##################################### (Eq. 14a of BK19) ########################################################
+        # self.variables.cell_vars (Sol^n) becomes Sol#
+        # # Advective mass fluxes in self.flux are based on Sol^n
+        sweep_order = self._get_dimensional_sweep_order(global_time_step_num)
+        self.first_order_advection_routine(
             self.grid,
-            self.variables,
+            self.variables,  # Input: Sol^n, Output: Sol#
             self.flux,
             half_dt,
+            sweep_order=sweep_order,
             boundary_manager=self.boundary_manager,
         )
-        logging.debug("Predictor: After advection")
+        logging.debug(
+            f"Predictor (step {global_time_step_num}): After first-order advection (Sol^n -> Sol#)"
+        )
 
-        ################### 4. Save current pressure p^n before non-advective updates ##################################
-        # (Needed if compressibility logic requires p2_nodes0 later, but BK19 C code resets p2_nodes later)
-        # p2_nodes_n = np.copy(self.mpv.p2_nodes) # Let's assume implicit step correctly uses current p2
+        #################################### 3.b Save the value of pressure after advection ############################
+        self.mpv.p2_nodes0[...] = self.mpv.p2_nodes
+        # Save Sol# and return
+        predictor_end_vars = np.copy(self.variables.cell_vars)
 
-        ################### 5. Non-Advective Implicit Euler Substep for dt/2 (Eq. 15) ##################################
-        # Result is Sol^{n+1/2} and p2^{n+1/2}
-        self.backward_update_explicit(half_dt)
-        logging.debug("Predictor: After backward_update_explicit")
-        # Note: backward_update_implicit uses the state modified by backward_update_explicit
-        self.backward_update_implicit(half_dt)
-        logging.debug("Predictor: After backward_update_implicit")
+        ###################### 4. Non-Advective Implicit Euler Substep for dt/2 ########################################
+        #################################### (Eq. 15 of BK19) ##########################################################
+        # Applied to Sol# to get Sol^{n+1/2} and p^{n+1/2}
+        self.backward_update_explicit(half_dt)  # Operates on self.variables (Sol#)
+        logging.debug(
+            f"Predictor (step {global_time_step_num}): After backward_update_explicit on Sol*"
+        )
 
-        ################### 6. Compute predicted advective fluxes (Pu, Pv, Pw) at t^{n+1/2} ############################
-        # These will be used by the corrector stage's advection step.
-        # This updates self.flux.iflux and potentially parts of self.flux.flux
-        self.flux.compute_averaging_fluxes()
-        logging.debug("--- Finished Predictor Step (Predicted Fluxes Updated) ---")
+        predictor_coeff_vars = None
+        if not self.is_compressible:
+            predictor_coeff_vars = np.copy(initial_vars_arr_for_coeffs)
+
+        # Solve for Exner pressure
+        self.backward_update_implicit(half_dt, initial_vars=predictor_coeff_vars)
+
+        # self.variables is now Sol^{n+1/2}, self.mpv.p2_nodes is p^{n+1/2}
+        logging.debug(
+            f"Predictor (step {global_time_step_num}): After backward_update_implicit (Sol* -> Sol^(n+1/2))"
+        )
+
+        ############################ 5. Apply Final Boundary Conditions ###############################################
+        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.p2_nodes)
+
+        ######################### 6. Compute predicted advective mass fluxes (Pv)^{n+1/2} ##############################
+        # self.variables.cell_vars is now Sol^{n+1/2}
+        self.flux.compute_averaging_fluxes()  # Uses self.variables (Sol^{n+1/2})
+        # This updates self.flux[... ,VI.RHOY] to represent (Pv)^{n+1/2} for the corrector
+        logging.debug(
+            f"Predictor (step {global_time_step_num}): Averaging fluxes (Pv)^(n+1/2) computed from Sol^(n+1/2)"
+        )
+        logging.debug(f"--- Predictor (step {global_time_step_num}): Finished ---")
 
     def _corrector_step(
         self,
         dt: float,
-        advection_func: Callable,
-        initial_vars: np.ndarray,
-        initial_p2: np.ndarray,
+        initial_vars_arr: np.ndarray,
+        initial_p2_nodes_arr: np.ndarray,
+        global_time_step_num: int,
     ) -> None:
-        """
-        Performs the corrector stage of the time step (Eq. 17 in BK19).
-        Advances the state from t^n to t^{n+1} using predicted advective fluxes.
-        """
-        logging.debug("--- Starting Corrector Step ---")
+        logging.debug(f"Corrector (step {global_time_step_num}): Starting")
         half_dt = 0.5 * dt
 
-        ######################### 1. Reset state variables to t^n ######################################################
-        self.variables.cell_vars[...] = initial_vars
-        self.mpv.p2_nodes[...] = initial_p2
-        logging.debug("Corrector: State reset to t^n")
+        ############################ 1. Reset state variables to t^n ###################################################
+        self.variables.cell_vars[...] = initial_vars_arr
+        if self.is_compressible:
+            self.mpv.p2_nodes[...] = self.mpv.p2_nodes0
+        logging.debug(f"Corrector (step {global_time_step_num}): State reset to t^n")
 
-        ######################### 2. Apply BCs to state at t^n #########################################################
-        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.p2_nodes, self._nodal_bc_contexts
+        ############################ 2. Apply BCs to state at t^n (if necessary) #######################################
+
+        ########################## 3. Explicit Euler for non-advective terms ###########################################
+        ################################### (Eq. 17a of BK19) ##########################################################
+        # Based on state t^n (Sol^n). Result is Sol*
+        self.forward_update(half_dt)  # Operates on self.variables (Sol^n -> Sol*)
+        # self.mpv.p2_nodes is still p^n
+        logging.debug(
+            f"Corrector (step {global_time_step_num}): After forward_update (Sol^n -> Sol*)"
         )
 
-        ######################### 3. Explicit Predictor (Fast Modes, Eq. 17a) ##########################################
-        # Applies explicit Euler step for non-advective terms based on state n
-        # Result is Sol*
-        self.forward_update(half_dt)
-        logging.debug("Corrector: After forward_update (Eq. 17a)")
-
-        ######################### 4. Advection (Full Step, Eq. 17b) ####################################################
-        # Uses the predicted fluxes computed at the end of _predictor_step
-        # (These are stored in self.flux)
-        # Result is Sol**
-        advection_func(
+        ######################### 4. Advection using Strang Splitting ##################################################
+        ################################# (Full Step, Eq.17b of BK19) ##################################################
+        # Uses the advective mass fluxes in self.flux[..., RHOY] (which are (Pv)^{n+1/2})
+        # self.variables.cell_vars (Sol*) becomes Sol**
+        sweep_order = self._get_dimensional_sweep_order(global_time_step_num)
+        self.second_order_advection_routine(
             self.grid,
-            self.variables,
-            self.flux,
-            dt,
+            self.variables,  # Input: Sol*, Output: Sol**
+            self.flux,  # Contains (Pv)^{n+1/2}
+            dt,  # Full dt for this advection operation
+            sweep_order=sweep_order,
             boundary_manager=self.boundary_manager,
         )
-        logging.debug("Corrector: After full advection (Eq. 17b)")
-
-        ######################### 5. Implicit Corrector (Fast Modes, Eq. 17c) ##########################################
-        # Applies implicit Euler substep for dt/2 to the advected state Sol**
-        # Result is Sol^{n+1} and p2^{n+1}
-        self.backward_update_explicit(half_dt)
-        logging.debug("Corrector: After backward_update_explicit (part of Eq. 17c)")
-        self.backward_update_implicit(half_dt)  # Uses state from previous step
-        logging.debug("Corrector: After backward_update_implicit (part of Eq. 17c)")
-
-        ######################## 6. Final Boundary Conditions ##########################################################
-        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.p2_nodes, self._nodal_bc_contexts
+        logging.debug(
+            f"Corrector (step {global_time_step_num}): After Strang-split advection (Sol* -> Sol**)"
         )
-        logging.debug("--- Finished Corrector Step ---")
+
+        ################################ 5. Implicit Euler substep for dt/2 ############################################
+        ########################################### (Eq. 17c of BK19) ##################################################
+        # Applied to Sol** to get Sol^{n+1}
+        self.backward_update_explicit(half_dt)  # Operates on self.variables (Sol**)
+        logging.debug(
+            f"Corrector (step {global_time_step_num}): After backward_update_explicit on Sol**"
+        )
+
+        # Operator coefficients (PΘ) for implicit solve use current state (Sol**)
+        self.backward_update_implicit(half_dt)
+        # self.variables is now Sol^{n+1}, self.mpv.p2_nodes is p^{n+1}
+        logging.debug(
+            f"Corrector (step {global_time_step_num}): After backward_update_implicit (Sol** -> Sol^(n+1))"
+        )
+
+        ######################### 6. Final Boundary Conditions #########################################################
+        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.p2_nodes)
+        logging.debug(f"--- Corrector (step {global_time_step_num}): Finished ---")
 
     def forward_update(self, dt: float) -> None:
         """Integrates the problem on time step using the explicit euler in the NON-ADVECTIVE stage. This means
@@ -243,17 +310,13 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # Calculate the buoyancy PX'
         dbuoy = cellvars[..., VI.RHOY] * cellvars[..., VI.RHOX] / cellvars[..., VI.RHO]
-
         ###################### Update variables
+        self._forward_pressure_update(cellvars, dt, p2n)
         self._forward_momenta_update(cellvars, dt, p2n, dbuoy, g)
         self._forward_buoyancy_update(cellvars, dt)
-        self._forward_pressure_update(cellvars, dt, p2n)
-
         ####################### Update boundary values
         # Update the boundary nodes for pressure variable
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.p2_nodes, self._nodal_bc_contexts
-        )
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.p2_nodes)
 
         # Update all other variables on the boundary.
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
@@ -330,10 +393,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ################################ 2. Apply boundary conditions on pi' ###########################################
         # Update the boundary nodes for pressure variable
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.p2_nodes, self._nodal_bc_contexts
-        )
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.p2_nodes)
 
+        cellvars = self.variables.cell_vars
         ################################ 3. "Pre-Correction" using Current Pressure p^k ################################
         # This method will put M_inv⋅(dt*CΘ*∇p₂)/Θ in the momenta container, where M is extended coriolis inverse.
         # In a couple of steps the divergence will be applied on [Pu, Pv, Pw], using these values.
@@ -348,37 +410,36 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
         ############################# 4. Apply BCs to Pre-Corrected State ##############################################
-        # TODO: Check if necessary
-        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
+        # # TODO: Check if necessary
+        # self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
 
         ############################# 5. Compute RHS (Divergence of Pre-Corrected Momenta) #############################
-        # Get the pre-corrected variables
-        cellvars = self.variables.cell_vars
 
         # Calculate pressure-weighted momenta P*v = (rhoY/rho) * rho*v
         # [Pu, Pv, Pw]
         pressure_weighted_momenta = self._calculate_enthalpy_weighted_momenta(cellvars)
 
+        ################################################################################################################
         # Calculate divergence on one element inner nodes [shape: (nx-1, ny-1, nz-1)]
         # Since the current momenta contain the pressure gradient update, this divergence
         # is basically ∇⋅(M_inv⋅(dt*(PΘ)*∇p₂)) where M is extended coriolis inverse
         divergence_inner = self.discrete_operator.divergence(pressure_weighted_momenta)
-
         laplacian_inner_node_slice = laplacian_inner_slice(self.grid.ng)
         # Final RHS for A * delta_p = rhs
         rhs_flat = divergence_inner[laplacian_inner_node_slice].flatten()
 
-        # Adjust the coefficients of the pressure gradient term for the solver as a result of compressibility regime
+        # Adjust the coefficients of the pressure gradient term for the solver as a result of compressibility
         self.mpv.wcenter *= self.is_compressible
 
         ############################ 6. Solve the elliptic helmholtz equation ##########################################
+        rtol = 1.0e-8
         p2_inner_flat, solver_info = self.pressure_solver.solve_helmholtz(
             rhs_flat,
             dt,
             self.is_nongeostrophic,
             self.is_nonhydrostatic,
             self.is_compressible,
-            # Add tol/max_iter if needed, e.g., tol=1e-7
+            rtol=rtol,
         )
 
         ############################ 7. Prepare p2 for Correction Step #################################################
@@ -392,9 +453,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ############################ 8. Update boundary with the new values ############################################
         # Use the current existing context (is_nodal for all sides)
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            p2_full, self._nodal_bc_contexts
-        )
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(p2_full)
 
         ############################ 9. Final Correction using Pressure Increment delta_p ##############################
         # Apply the update using the *solved increment*.
@@ -410,14 +469,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ############################ 10. Update The Main Exner Pressure ################################################
         self.mpv.p2_nodes += p2_full
-
-        ############################ 11. Apply Final Boundary Conditions ###############################################
-        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
-
-        # Use the current existing contexts (is_nodal for all sides)
-        self.boundary_manager.apply_boundary_on_single_var_all_sides(
-            self.mpv.p2_nodes, self._nodal_bc_contexts
-        )
 
     def _forward_momenta_update(
         self,
@@ -441,7 +492,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             The gravity strength
         """
         coriolis = self.coriolis.strength
-        adjusted_momenta = self.variables.adjust_background_wind(self.wind_speed, -1.0)
+        adjusted_momenta = self.variables.adjust_background_wind(
+            self.wind_speed, -1.0, in_place=True
+        )
 
         # pressure gradient factor: (P/Gamma)
         rhoYovG = self.pressure_solver._calculate_P_over_Gamma(cellvars)
@@ -474,28 +527,43 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # Updates: The momentum in the direction of gravity
         # Find vertical vs horizontal velocities:
-        cellvars[..., self.pressure_solver.vertical_momentum_index] -= dt * (
-            (g / self.Msq) * dbuoy * self.is_nonhydrostatic
-        )
+        if (
+            self.grid.ndim >= 2
+            and self.pressure_solver.vertical_momentum_index < cellvars.shape[-1]
+        ):
+            cellvars[..., self.pressure_solver.vertical_momentum_index] -= dt * (
+                (g / self.Msq) * dbuoy * self.is_nonhydrostatic
+            )
 
     def _forward_pressure_update(
         self, cellvars: np.ndarray, dt: float, p2n: np.ndarray
     ):
         """Update the Exner pressure."""
 
-        # Compute the weighting factor Y = (rhoY / rho) = Theta
-        Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
-
+        ################################################################################################################
         # Compute the divergence of the pressure-weighted momenta: (Pu)_x + (Pv)_y + (Pw)_z where
-        # P = rho*Y = rho*Theta
+        # # P = rho*Y = rho*Theta
         pressure_weighted_momenta = self._calculate_enthalpy_weighted_momenta(
             self.variables.cell_vars
         )
+        ################################################################################################################
+        # Zero out the container and the ghost cells of momenta
+        self.mpv.set_rhs_to_zero()
+        # boundary_operation = [
+        #     WallAdjustment(
+        #         target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.0
+        #     )
+        # ]
+        # self.boundary_manager.apply_extra_all_sides(pressure_weighted_momenta, boundary_operation)
+
+        ################################################################################################################
+        # Divergence
         inner_slice = one_element_inner_slice(self.grid.ndim, full=False)
         self.mpv.rhs[inner_slice] = self.discrete_operator.divergence(
             pressure_weighted_momenta,
         )
 
+        ################################################################################################################
         # Adjust wall boundary nodes (scale). Notice the side is set to be BdrySide.ALL.
         # This will apply the 'extra' method whenever the boundary is defined to be WALL.
         boundary_operation = [
@@ -503,17 +571,16 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
                 target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=2.0
             )
         ]
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.rhs)
         self.boundary_manager.apply_extra_all_sides(self.mpv.rhs, boundary_operation)
 
+        ############################## Divide the divergence by dP/dpi #################################################
         # Calculate the derivative of the Exner pressure with respect to P
         dpidP = calculate_dpi_dp(cellvars[..., VI.RHOY], self.Msq)
 
-        # Create node-to-cell index (slice(1, -1) in all directions)
-        inner_idx = one_element_inner_slice(self.grid.ndim, full=False)
-
         # Create a nodal variable to store the intermediate updates
         dp2n = np.zeros_like(p2n)
-        dp2n[inner_idx] -= dt * dpidP * self.mpv.rhs[inner_slice]
+        dp2n[inner_slice] -= dt * dpidP * self.mpv.rhs[inner_slice]
         self.mpv.p2_nodes[...] += self.is_compressible * dp2n
 
     def _forward_buoyancy_update(self, cellvars: np.ndarray, dt: float):
@@ -533,7 +600,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Intermediate variable for current Chi
         currentX = cellvars[..., VI.RHO] * (
             (cellvars[..., VI.RHO] / cellvars[..., VI.RHOY]) - S0c
-        )
+        )  # Calculate the perturbation of Chi, then multiply with density rho
 
         ###############################################################################################################
         # Update the variable

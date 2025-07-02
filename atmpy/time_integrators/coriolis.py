@@ -73,9 +73,9 @@ class CoriolisOperator:
 
     def apply_inverse(
         self,
-        u: np.ndarray,
-        v: np.ndarray,
-        w: np.ndarray,
+        U: np.ndarray,
+        V: np.ndarray,
+        W: np.ndarray,
         variables: "Variables",
         mpv: "MPV",
         is_nongeostrophic: bool,
@@ -103,33 +103,6 @@ class CoriolisOperator:
         dt : float
             The time step.
         """
-        if self.strength is None or np.all(self.strength == 0):
-            pass
-        else:
-            self._apply_inverse(
-                u,
-                v,
-                w,
-                variables,
-                mpv,
-                is_nongeostrophic,
-                is_nonhydrostatic,
-                Msq,
-                dt,
-            )
-
-    def _apply_inverse(
-        self,
-        U: np.ndarray,
-        V: np.ndarray,
-        W: np.ndarray,
-        variables: "Variables",
-        mpv: "MPV",
-        is_nongeostrophic: bool,
-        is_nonhydrostatic: bool,
-        Msq: float,
-        dt: float,
-    ) -> None:
 
         # Prepare scalar values
         nonhydro = is_nonhydrostatic

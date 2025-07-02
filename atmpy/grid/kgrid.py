@@ -291,6 +291,17 @@ class Grid:
                 "Cannot have mixed of None and not None values for parameters of the ndim."
             )
 
+    def get_total_number_of_cells(self, axis):
+        """Get method for total number of cells"""
+        if axis == 0:
+            return self.ncx_total
+        elif axis == 1:
+            return self.ncy_total
+        elif axis == 2:
+            return self.ncz_total
+        else:
+            raise ValueError("Invalid value for 'axis'.")
+
     def get_cell_coordinates(self, axis):
         """Get method for cell coordinate values in each direction"""
         if axis == 0:
