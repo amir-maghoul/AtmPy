@@ -40,3 +40,42 @@ def cell_averaging(data: np.ndarray, kernel: np.ndarray):
 
     # Crop the full convolution to the 'valid' region
     return full_conv[tuple(slices)] / kernel.sum()
+
+
+def cells_to_nodes_averaging(cell_data: np.ndarray) -> np.ndarray:
+    """
+    Averages cell-centered variable to the nodes at their corners.
+
+    The result is an array with the shape of the inner nodes.
+
+    Parameters
+    ----------
+    cell_data : np.ndarray
+        The array of cell-centered data.
+
+    Returns
+    -------
+    np.ndarray
+        The node-centered data, with a shape corresponding to the inner nodes
+        of the grid (e.g., (nx, ny) -> (nx-1, ny-1)).
+    """
+    ndim = cell_data.ndim
+    if ndim > 3:  # Assuming the last axis is for variables
+        ndim -= 1
+
+    if ndim == 1:
+        return 0.5 * (cell_data[:-1] + cell_data[1:])
+    elif ndim == 2:
+        return 0.25 * (
+                cell_data[:-1, :-1] + cell_data[1:, :-1] +
+                cell_data[:-1, 1:] + cell_data[1:, 1:]
+        )
+    elif ndim == 3:
+        return 0.125 * (
+                cell_data[:-1, :-1, :-1] + cell_data[1:, :-1, :-1] +
+                cell_data[:-1, 1:, :-1] + cell_data[1:, 1:, :-1] +
+                cell_data[:-1, :-1, 1:] + cell_data[1:, :-1, 1:] +
+                cell_data[:-1, 1:, 1:] + cell_data[1:, 1:, 1:]
+        )
+    else:
+        raise ValueError("Unsupported dimensionality for cell-to-node averaging.")
