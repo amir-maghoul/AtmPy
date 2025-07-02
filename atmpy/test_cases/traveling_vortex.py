@@ -22,7 +22,9 @@ from atmpy.infrastructure.enums import (
     BoundarySide,
     AdvectionRoutines,
     RiemannSolvers,
-    FluxReconstructions, LinearSolvers, Preconditioners
+    FluxReconstructions,
+    LinearSolvers,
+    Preconditioners,
 )
 from atmpy.infrastructure.enums import (
     VariableIndices as VI,
@@ -67,15 +69,25 @@ class TravelingVortex(BaseTestCase):
         super().__init__(name="TravelingVortex", config=_effective_config)
 
         ############################### Vortex Specific Parameters #####################################################
+        self.correct_distribution = True
+
         self.u0: float = 1.0  # Background velocity U
         self.v0: float = 1.0  # Background velocity V
         self.w0: float = 0.0  # Background velocity W
         self.p0: float = 1.0  # Background pressure (dimensionless)
-        self.rho0: float = 1  # Background density (dimensionless)
+
+        if self.correct_distribution:
+            self.rho0: float = 0.5  # Background density (dimensionless)
+            self.del_rho: float = 0.5  # Density deficit at center
+            self.alpha = 1
+            self.alpha_const = 1
+        else:
+            self.rho0: float = 1  # Background density (dimensionless)
+            self.del_rho: float = -0.5  # Density deficit at center
+            self.alpha: float = -1  # 0.5  # Vortex strength parameter 1
+            self.alpha_const: float = 3  # 0.5  # Vortex strength parameter 2
+
         self.rotdir: float = 1.0  # Rotation direction
-        self.alpha: float = -1.0  # Vortex strength parameter 1
-        self.alpha_const: float = 3.0  # Vortex strength parameter 2
-        self.del_rho: float = -0.5  # Density deficit at center
         self.R0: float = 0.4  # Vortex radius scale
         self.fac: float = (
             1.0 * 1024.0
@@ -84,7 +96,99 @@ class TravelingVortex(BaseTestCase):
         self.yc: float = 0.0  # Vortex center y
 
         ####################### Polynomial coefficients for pressure perturbation ######################################
-        self.coe = np.array(
+
+        self.coe_correct = np.zeros((25,))
+        self.coe_correct[0] = 1.0 / 12.0;
+        self.coe_correct[1] = -  12.0 / 13.0;
+        self.coe_correct[2] = 9.0 / 2.0;
+        self.coe_correct[3] = - 184.0 / 15.0;
+        self.coe_correct[4] = 609.0 / 32.0;
+        self.coe_correct[5] = - 222.0 / 17.0;
+        self.coe_correct[6] = -  38.0 / 9.0;
+        self.coe_correct[7] = 54.0 / 19.0;
+        self.coe_correct[8] = 783.0 / 20.0;
+        self.coe_correct[9] = - 558.0 / 7.0;
+        self.coe_correct[10] = 1053.0 / 22.0;
+        self.coe_correct[11] = 1014.0 / 23.0;
+        self.coe_correct[12] = -1473.0 / 16.0;
+        self.coe_correct[13] = 204.0 / 5.0;
+        self.coe_correct[14] = 510.0 / 13.0;
+        self.coe_correct[15] = -1564.0 / 27.0;
+        self.coe_correct[16] = 153.0 / 8.0;
+        self.coe_correct[17] = 450.0 / 29.0;
+        self.coe_correct[18] = - 269.0 / 15.0;
+        self.coe_correct[19] = 174.0 / 31.0;
+        self.coe_correct[20] = 57.0 / 32.0;
+        self.coe_correct[21] = -  74.0 / 33.0;
+        self.coe_correct[22] = 15.0 / 17.0;
+        self.coe_correct[23] = -   6.0 / 35.0;
+        self.coe_correct[24] = 1.0 / 72.0;
+
+        self.const_coe_correct = np.zeros((13,))
+        self.const_coe_correct[0] = 1.0 / 12.0;
+        self.const_coe_correct[1] = -12.0 / 13.0;
+        self.const_coe_correct[2] = 33.0 / 7.0;
+        self.const_coe_correct[3] = -44.0 / 3.0;
+        self.const_coe_correct[4] = 495.0 / 16.0;
+        self.const_coe_correct[5] = -792.0 / 17.0;
+        self.const_coe_correct[6] = 154.0 / 3.0;
+        self.const_coe_correct[7] = -792.0 / 19.0;
+        self.const_coe_correct[8] = 99.0 / 4.0;
+        self.const_coe_correct[9] = -220.0 / 21.0;
+        self.const_coe_correct[10] = 3.0;
+        self.const_coe_correct[11] = -12.0 / 23.0;
+        self.const_coe_correct[12] = 1.0 / 24.0;
+
+        self.coe_cor_correct = np.zeros((19,))
+        self.coe_cor_correct[0] = 1.0 / 7.0;
+        self.coe_cor_correct[1] = -3.0 / 4.0;
+        self.coe_cor_correct[2] = 4.0 / 3.0;
+        self.coe_cor_correct[3] = -1.0 / 5.0;
+        self.coe_cor_correct[4] = -45.0 / 22.0;
+        self.coe_cor_correct[5] = 3.0 / 4.0;
+        self.coe_cor_correct[6] = 9.0 / 2.0;
+        self.coe_cor_correct[7] = -36.0 / 7.0;
+        self.coe_cor_correct[8] = -11.0 / 5.0;
+        self.coe_cor_correct[9] = 55.0 / 8.0;
+        self.coe_cor_correct[10] = -33.0 / 17.0;
+        self.coe_cor_correct[11] = -4.0;
+        self.coe_cor_correct[12] = 58.0 / 19.0;
+        self.coe_cor_correct[13] = 3.0 / 5.0;
+        self.coe_cor_correct[14] = -10.0 / 7.0;
+        self.coe_cor_correct[15] = 4.0 / 11.0;
+        self.coe_cor_correct[16] = 9.0 / 46.0;
+        self.coe_cor_correct[17] = -1.0 / 8.0;
+        self.coe_cor_correct[18] = 1.0 / 50.0;
+
+        self.coe_d_correct = np.zeros((25,))
+        self.coe_d_correct[0] = 1.0 / 12.0;
+        self.coe_d_correct[1] = -  12.0 / 13.0;
+        self.coe_d_correct[2] = 30.0 / 7.0;
+        self.coe_d_correct[3] = - 148.0 / 15.0;
+        self.coe_d_correct[4] = 57.0 / 8.0;
+        self.coe_d_correct[5] = 348.0 / 17.0;
+        self.coe_d_correct[6] = - 538.0 / 9.0;
+        self.coe_d_correct[7] = 900.0 / 19.0;
+        self.coe_d_correct[8] = 1071.0 / 20.0;
+        self.coe_d_correct[9] = -3128.0 / 21.0;
+        self.coe_d_correct[10] = 1020.0 / 11.0;
+        self.coe_d_correct[11] = 2040.0 / 23.0;
+        self.coe_d_correct[12] = -1105.0 / 6.0;
+        self.coe_d_correct[13] = 408.0 / 5.0;
+        self.coe_d_correct[14] = 1020.0 / 13.0;
+        self.coe_d_correct[15] = -3128.0 / 27.0;
+        self.coe_d_correct[16] = 153.0 / 4.0;
+        self.coe_d_correct[17] = 900.0 / 29.0;
+        self.coe_d_correct[18] = - 538.0 / 15.0;
+        self.coe_d_correct[19] = 348.0 / 31.0;
+        self.coe_d_correct[20] = 57.0 / 16.0;
+        self.coe_d_correct[21] = - 148.0 / 33.0;
+        self.coe_d_correct[22] = 30.0 / 17.0;
+        self.coe_d_correct[23] = -  12.0 / 35.0;
+        self.coe_d_correct[24] = 1.0 / 36.0;
+
+
+        self.coe_incorrect = np.array(
             [
                 1.0 / 24.0,
                 -6.0 / 13.0,
@@ -113,7 +217,7 @@ class TravelingVortex(BaseTestCase):
                 1.0 / 72.0,
             ]
         )
-        self.const_coe = np.array(
+        self.const_coe_incorrect = np.array(
             [
                 1.0 / 24,
                 -6.0 / 13,
@@ -131,6 +235,15 @@ class TravelingVortex(BaseTestCase):
             ]
         )
 
+        if self.correct_distribution:
+            self.coe = self.coe_correct
+            self.const_coe = self.const_coe_correct
+            self.coe_d = self.coe_d_correct
+            self.coe_cor = self.coe_cor_correct
+        else:
+            self.coe = self.const_coe_incorrect
+            self.const_coe = self.const_coe_incorrect
+
         ###########################3 Call setup to configure the simulation ############################################
         if run_setup_method:
             self.setup()
@@ -141,8 +254,8 @@ class TravelingVortex(BaseTestCase):
 
         #################################### Grid Configuration ########################################################
         nx = 8
-        ny = 10
-        # nx = ny = 64
+        ny = 8
+        nx = ny = 64
 
         grid_updates = {
             "ndim": 2,
@@ -187,9 +300,9 @@ class TravelingVortex(BaseTestCase):
 
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
-            "CFL": 0.8,
-            "dtfixed": 0.01,
-            "dtfixed0": 0.01,
+            "CFL": 0.45,
+            "dtfixed": 0.001,
+            "dtfixed0": None,
             "tout": np.array([10.0]),
             "stepmax": 101,
             "use_acoustic_cfl": True,  # If True adds max_sound_speed to the speed, therefore smaller dt in dynamic
@@ -200,7 +313,7 @@ class TravelingVortex(BaseTestCase):
         regime_updates = {
             "is_nongeostrophic": 1,
             "is_nonhydrostatic": 1,
-            "is_compressible": 0,
+            "is_compressible": 1,
         }
         self.set_model_regimes(regime_updates)  # This also updates Msq
 
@@ -216,7 +329,6 @@ class TravelingVortex(BaseTestCase):
             "initial_projection": True,
         }
         self.set_numerics(numerics_updates)
-
 
         ################################### Physics Settings ###########################################################
         physics_updates = {
@@ -263,6 +375,8 @@ class TravelingVortex(BaseTestCase):
         thermo = Thermodynamics()
         thermo.update(self.config.global_constants.gamma)
         Msq = self.config.model_regimes.Msq
+        coriolis = self.config.physics.coriolis_strength[2]
+        # coriolis = self.fac
 
         # Get slices for inner domain (excluding ghost cells)
         inner_slice = grid.get_inner_slice()
@@ -330,17 +444,21 @@ class TravelingVortex(BaseTestCase):
         dp2c = np.zeros_like(r_cell)
         if Msq > 1e-10:  # Only calculate if compressible and vortex has strength
             for ip, c in enumerate(self.coe):
-                term = c * (r_over_R0_cell ** (12 + ip) - 1.0) * self.rotdir**2
+                term = self.fac**2 * c * (r_over_R0_cell ** (12 + ip) - 1.0) * self.rotdir**2
                 dp2c[mask_rho] += term[mask_rho]
 
-            dp2c_const = np.zeros_like(r_cell)
-            for ip, c in enumerate(self.const_coe):
-                term = c * (r_over_R0_cell ** (12 + ip) - 1.0) * self.rotdir**2
-                dp2c_const[mask_rho] += term[mask_rho]
+            if not self.correct_distribution:
+                dp2c_const = np.zeros_like(r_cell)
+                for ip, c in enumerate(self.const_coe):
+                    term = self.fac**2 * c * (r_over_R0_cell ** (12 + ip) - 1.0) * self.rotdir**2
+                    dp2c_const[mask_rho] += term[mask_rho]
+            else:
+                dp2c_const = np.zeros_like(r_cell)
+                for ip, c in enumerate(self.coe_cor):
+                    term = self.fac * coriolis * c * (r_over_R0_cell ** (7 + ip) - 1.0) * self.R0 #self.rotdir**2
+                    dp2c_const[mask_rho] += term[mask_rho]
 
             dp2c = self.alpha * dp2c + self.alpha_const * dp2c_const
-            # Scale pressure perturbation by Msq * fac^2
-            dp2c *= Msq * self.fac**2
         else:
             print("Msq is near zero, pressure perturbation dp2c set to zero.")
 
@@ -356,7 +474,8 @@ class TravelingVortex(BaseTestCase):
         # Calculate rhoY (Potential Temperature * Density)
 
         if self.config.model_regimes.is_compressible:
-            p_total = self.p0 + dp2c  # Add perturbation to base pressure
+        # if True:
+            p_total = self.p0 + Msq * dp2c  # Add perturbation to base pressure
             # Ensure pressure is positive before taking power
             p_total_safe = np.maximum(p_total, 1e-9)
             variables.cell_vars[inner_slice + (VI.RHOY,)] = p_total_safe**thermo.gamminv
@@ -364,37 +483,33 @@ class TravelingVortex(BaseTestCase):
             # variables.cell_vars[inner_slice + (VI.RHOY,)] = (
             #     rho_total * rhoY0_cells[inner_slice[1]]
             # )
-            variables.cell_vars[..., VI.RHOY] = (
-                rhoY0_cells
-            )
-
+            variables.cell_vars[..., VI.RHOY] = rhoY0_cells
 
         # Calculate rhoX (Tracers) - Set to zero if not used
         if VI.RHOX < variables.num_vars_cell:
             variables.cell_vars[inner_slice + (VI.RHOX,)] = 0.0
 
         # --- Assign Pressure Perturbation p2 to MPV (Cells, Inner Domain Only) ---
-        p2c_unscaled = np.zeros_like(r_cell)
-        for ip, c in enumerate(self.coe):
-            term = c * (r_over_R0_cell ** (12 + ip) - 1.0) * self.rotdir**2
-            p2c_unscaled[mask_rho] += term[mask_rho]
-        p2c_const_unscaled = np.zeros_like(r_cell)
-        for ip, c in enumerate(self.const_coe):
-            term = c * (r_over_R0_cell ** (12 + ip) - 1.0) * self.rotdir**2
-            p2c_const_unscaled[mask_rho] += term[mask_rho]
-
-        p2c_unscaled = self.alpha * p2c_unscaled + self.alpha_const * p2c_const_unscaled
-
-        # Divide by background rhoY0, multiply by Gamma * fac^2
-        mpv.p2_cells[inner_slice] = (
-            thermo.Gamma
-            * self.fac**2
-            * np.divide(
-                p2c_unscaled,
-                rhoY0_cells[inner_slice[1]],
-                where=rhoY0_cells[inner_slice[1]] != 0,
-            )
-        )
+        # p2c_unscaled = np.zeros_like(r_cell)
+        # for ip, c in enumerate(self.coe):
+        #     term = self.fac**2 * c * (r_over_R0_cell ** (12 + ip) - 1.0) * self.rotdir**2
+        #     p2c_unscaled[mask_rho] += term[mask_rho]
+        # p2c_const_unscaled = np.zeros_like(r_cell)
+        # for ip, c in enumerate(self.const_coe):
+        #     term = self.fac * coriolis * c * (r_over_R0_cell ** (12 + ip) - 1.0) * self.rotdir**2
+        #     p2c_const_unscaled[mask_rho] += term[mask_rho]
+        #
+        # p2c_unscaled = self.alpha * p2c_unscaled + self.alpha_const * p2c_const_unscaled
+        #
+        # # Divide by background rhoY0, multiply by Gamma * fac^2
+        # mpv.p2_cells[inner_slice] = (
+        #     thermo.Gamma
+        #     * np.divide(
+        #         p2c_unscaled,
+        #         rhoY0_cells[inner_slice[1]],
+        #         where=rhoY0_cells[inner_slice[1]] != 0,
+        #     )
+        # )
 
         # --- Calculate Nodal Pressure Perturbation p2 (Nodes, Inner Domain Only) ---
         if grid.ndim == 2:
@@ -417,12 +532,18 @@ class TravelingVortex(BaseTestCase):
 
         p2_nodes_unscaled = np.zeros_like(r_node)
         for ip, c in enumerate(self.coe):
-            term = c * (r_over_R0_node ** (12 + ip) - 1.0) * self.rotdir**2
+            term = self.fac**2 * c * (r_over_R0_node ** (12 + ip) - 1.0) * self.rotdir**2
             p2_nodes_unscaled[mask_node] += term[mask_node]
+
         p2n_const_unscaled = np.zeros_like(r_node)
-        for ip, c in enumerate(self.const_coe):
-            term = c * (r_over_R0_node ** (12 + ip) - 1.0) * self.rotdir**2
-            p2n_const_unscaled[mask_node] += term[mask_node]
+        if not self.correct_distribution:
+            for ip, c in enumerate(self.const_coe):
+                term = self.fac**2 * c * (r_over_R0_node ** (12 + ip) - 1.0) * (self.rotdir ** 2)
+                p2n_const_unscaled[mask_node] += term[mask_node]
+        else:
+            for ip, c in enumerate(self.coe_cor):
+                term = self.fac * coriolis * c * (r_over_R0_node ** (7 + ip) - 1.0) * self.R0
+                p2n_const_unscaled[mask_node] += term[mask_node]
 
         p2_nodes_unscaled = (
             self.alpha * p2_nodes_unscaled + self.alpha_const * p2n_const_unscaled
@@ -433,10 +554,10 @@ class TravelingVortex(BaseTestCase):
         ]  # get number of ghost cells in y direction.
         mpv.p2_nodes[inner_slice] = (
             thermo.Gamma
-            * self.fac**2
             * np.divide(p2_nodes_unscaled, rhoY0_cells[ngy : -ngy + 1])  # Divide by 1.0
         )
-        # mpv.p2_nodes[...] = 0.0
+        # if self.correct_distribution:
+        #     mpv.p2_nodes[...] *= Msq
 
         # x = mpv.hydrostate.node_vars[..., HI.P0] / self.config.model_regimes.Msq
         # mpv.p2_nodes = np.repeat(x.reshape(1, -1), self.config.spatial_grid.grid.nshape[0], axis=0)
