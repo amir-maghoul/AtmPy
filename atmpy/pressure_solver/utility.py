@@ -18,3 +18,10 @@ def laplacian_inner_slice(ng_all: List[Tuple[int, int]]):
     """
 
     return tuple(slice(ng - 1, -ng + 1) for (ng, _) in ng_all)
+
+
+def single_element_slice(ndim: int, axis: int, element: int):
+    """Calculate the slice for a single element in the given direction."""
+    slices = [slice(None)]*ndim
+    slices[axis] = element
+    return tuple(slices)
