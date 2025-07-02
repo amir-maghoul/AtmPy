@@ -197,14 +197,23 @@ def plot_2d_static(
     cmap = "viridis"
     data_min = np.nanmin(plot_data_for_contour)
     data_max = np.nanmax(plot_data_for_contour)
-    levels = np.linspace(data_min, data_max, 15) if data_min != data_max else 15
+    level_points = 25
+    levels = np.linspace(data_min, data_max, level_points) if data_min != data_max else level_points
 
     contour = ax.contourf(
         x_coords, y_coords, plot_data_for_contour, cmap=cmap, levels=levels
     )
+    ax.contour(
+        x_coords, y_coords, plot_data_for_contour, colors="k", linewidths=0.2, levels=levels
+    )
 
     cbar = fig.colorbar(contour, ax=ax, orientation="vertical")
     cbar.set_label(f"{variable_name} ({data_var.attrs.get('units', '')})")
+
+    current_ticks = cbar.get_ticks()
+    all_ticks = np.unique(np.concatenate([current_ticks, [data_min, data_max]]))
+    cbar.set_ticks(all_ticks)
+    cbar.ax.set_yticklabels([f'{t:.6f}' for t in all_ticks])
     ax.set_xlabel("X (m)")
     ax.set_ylabel("Y (m)")
     ax.set_title(f"2D Static Plot: {variable_name} at t={time_value:.2f}s")
@@ -253,7 +262,7 @@ def animate_2d(
     data_min = np.nanmin(anim_data_slice.data)
     data_max = np.nanmax(anim_data_slice.data)
     cmap = "viridis"
-    levels = np.linspace(data_min, data_max, 15) if data_min != data_max else 15
+    levels = np.linspace(data_min, data_max, 25) if data_min != data_max else 25
 
     # Initial plot for structure
     # Determine transpose need based on first frame
@@ -266,6 +275,9 @@ def animate_2d(
         initial_plot_data = first_frame_data
 
     cont = ax.contourf(x_coords, y_coords, initial_plot_data, cmap=cmap, levels=levels)
+    ax.contour(
+        x_coords, y_coords, initial_plot_data, colors="k", linewidths=0.2, levels=levels
+    )
     cbar = fig.colorbar(cont, ax=ax)
     cbar.set_label(f"{variable_name} ({data_var.attrs.get('units', '')})")
     ax.set_xlabel("X (m)")
@@ -289,6 +301,9 @@ def animate_2d(
 
         cont = ax.contourf(
             x_coords, y_coords, current_data_for_contour, cmap=cmap, levels=levels
+        )
+        ax.contour(
+            x_coords, y_coords, current_data_for_contour, colors="k", linewidths=0.2, levels=levels
         )
 
         # Re-set labels and title as clear() removes them
