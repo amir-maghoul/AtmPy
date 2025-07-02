@@ -412,6 +412,10 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             p_full = np.zeros(self.grid.nshape, dtype=p_flat.dtype)
             p_full[inner_slice] = p_flat.reshape(inshape)
 
+            self.boundary_manager.apply_pressure_boundary_on_all_sides(
+                p_full
+            )
+
             # Apply the physics-based Helmholtz operator
             result = self.helmholtz_operator(
                 p_full, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible

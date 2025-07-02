@@ -125,6 +125,125 @@ def _perform_operator_probing(
 # =============================================================================
 
 
+# def compute_inverse_diagonal_components(
+#     pressure_solver: "ClassicalPressureSolver",
+#     dt: float,
+#     is_nongeostrophic: bool,
+#     is_nonhydrostatic: bool,
+#     is_compressible: bool,
+# ) -> Dict[str, Any]:
+#     """
+#     Computes an analytical approximation of the inverse diagonal of the Helmholtz operator.
+#
+#     This is a refactored version of the user-provided `precon_diag_prepare` function.
+#     It approximates the diagonal from div(M_inv * grad(p)) and adds the wcenter term.
+#     """
+#     # --- 1. Get necessary objects and parameters from the pressure solver ---
+#     grid = pressure_solver.grid
+#     mpv = pressure_solver.mpv
+#     coriolis = pressure_solver.coriolis
+#     ndim = grid.ndim
+#     dx, dy, dz = grid.dxyz
+#
+#     # --- 2. Calculate components of the inverted momentum matrix M_inv ---
+#     # This matrix accounts for Coriolis effects in the momentum equations.
+#     # In 2D (x,y), M_inv = (1 / (1 + (dt*f)^2)) * [[1, dt*f], [-dt*f, 1]]
+#     f = coriolis.strength[2]  # Assuming f-plane, f is the z-component of Omega
+#     denom = 1.0 / (1.0 + (dt * f) ** 2)
+#
+#     # Note: These components are scalars for an f-plane approximation
+#     M_inv_11 = denom
+#     M_inv_12 = dt * f * denom
+#     M_inv_21 = -dt * f * denom
+#     M_inv_22 = denom
+#
+#     # --- 3. Get the cell-centered P*Theta coefficient ---
+#     # This is mpv.wplus, which is computed from the current state.
+#     # We only need the first component since it's the same for all momenta.
+#     pTheta_cells = mpv.wplus[0]
+#
+#     # --- 4. Calculate the effective coefficients for each Laplacian term ---
+#     # hplus_ij = pTheta * M_inv_ij
+#     hplusxx = pTheta_cells * M_inv_11
+#     hplusyy = pTheta_cells * M_inv_22
+#     hplusxy = pTheta_cells * M_inv_12
+#     hplusyx = pTheta_cells * M_inv_21
+#     if ndim == 3:
+#         # Assuming no rotation effects on the vertical component for simplicity
+#         hpluszz = pTheta_cells  # M_inv_33 is 1
+#
+#     # --- 5. Define stencil weights based on the provided code ---
+#     # These seem to be analytical weights for a 9-point Laplacian stencil.
+#     if ndim == 2:
+#         # The logic `nine_pt = 0.5 * 0.5 = 0.25`, `coeff = 1.0 - nine_pt = 0.75`
+#         # is unusual. Replicating the logic from the user-provided code.
+#         # A standard 9-point Laplacian has different weights. Let's use a more
+#         # standard 5-point approximation for simplicity and robustness.
+#         # A 5-point laplacian term d/dx(d/dx) is approximated as (p_i+1 - 2p_i + p_i-1)/dx^2
+#         # The diagonal contribution is -2/dx^2.
+#         # However, the operator here is -div(grad(p)), so the diagonal is +2/dx^2.
+#         wxx = 2.0 / (dx * dx)
+#         wyy = 2.0 / (dy * dy)
+#     elif ndim == 3:
+#         wxx = 2.0 / (dx * dx)
+#         wyy = 2.0 / (dy * dy)
+#         wzz = 2.0 / (dz * dz)
+#
+#     # --- 6. Construct the approximate diagonal of the Laplacian part ---
+#     # The convolution with a 2x2... kernel averages the cell-centered
+#     # coefficients to the nodes where the operator diagonal lives.
+#     diag_kernel = np.ones([2] * ndim)
+#     inner_slice = grid.get_inner_slice()
+#
+#     # Initialize the diagonal with the correct inner-node shape
+#     one_element_inner = one_element_inner_slice(grid.ndim, full=False)
+#     diag_laplacian_part = np.zeros_like(mpv.wcenter[one_element_inner])
+#
+#     # The diagonal of the operator -div(C*grad(p)) at a node is approximately
+#     # (C_i+1/2 + C_i-1/2)/dx^2. The convolution averages C to the node, so C_avg/dx^2.
+#     # The factor of 2 comes from the left and right neighbors.
+#     diag_laplacian_part += (1.0 / (dx * dx)) * sp.signal.fftconvolve(
+#         hplusxx, diag_kernel, mode="valid"
+#     )
+#     if ndim >= 2:
+#         diag_laplacian_part += (1.0 / (dy * dy)) * sp.signal.fftconvolve(
+#             hplusyy, diag_kernel, mode="valid"
+#         )
+#     if ndim == 3:
+#         diag_laplacian_part += (1.0 / (dz * dz)) * sp.signal.fftconvolve(
+#             hpluszz, diag_kernel, mode="valid"
+#         )
+#
+#     # --- 7. Add the diagonal term from the pressure equation itself ---
+#     # The full operator diagonal is A_diag = (Lap_diag) + (wcenter)
+#     # NOTE: We must slice wcenter to match the inner shape of the laplacian part.
+#     full_diag = diag_laplacian_part + mpv.wcenter[one_element_inner]
+#
+#     # --- 8. Compute the inverse for the preconditioner ---
+#     diag_inv_inner = np.zeros_like(full_diag)
+#     non_zero_mask = np.abs(full_diag) > 1e-15
+#     diag_inv_inner[non_zero_mask] = 1.0 / full_diag[non_zero_mask]
+#
+#     return {"diag_inv": diag_inv_inner[one_element_inner]}
+#
+#
+# def apply_inverse_diagonal(r_flat: np.ndarray, *, diag_inv: np.ndarray) -> np.ndarray:
+#     """
+#     Applies the inverse analytical diagonal preconditioner.
+#     This function is identical in operation to apply_inverse_diagonal,
+#     but is named distinctly for clarity.
+#     """
+#     original_shape = diag_inv.shape
+#     if r_flat.shape[0] != np.prod(original_shape):
+#         raise ValueError(
+#             f"Shape mismatch: r flat {r_flat.shape} vs diag_inv {original_shape}"
+#         )
+#
+#     r_unflat = r_flat.reshape(original_shape)
+#     z_unflat = diag_inv * r_unflat
+#     return z_unflat.flatten()
+
+
 def compute_inverse_diagonal_components(
     pressure_solver: "ClassicalPressureSolver",
     dt: float,
@@ -208,7 +327,8 @@ def compute_tridiagonal_components(
     )
 
     inner_slice_nodes = one_element_inner_slice(grid.ndim, full=False)
-    inner_shape = mpv.wcenter[inner_slice_nodes].shape
+    # inner_shape = mpv.wcenter[inner_slice_nodes].shape
+    inner_shape = mpv.wcenter.shape
     num_inner_vert = inner_shape[gravity_axis]
 
     # Perform the probing
