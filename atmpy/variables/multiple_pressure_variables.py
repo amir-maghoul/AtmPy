@@ -177,6 +177,12 @@ class MPV:
             pi_cm: np.ndarray = np.exp(-(cells - 0.5 * dr) / Hex)
             pi_c: np.ndarray = np.exp(-(cells) / Hex)
 
+            # Y_c: np.ndarray = -Gamma * g * dr / (pi_cp - pi_cm)
+            # P_c: np.ndarray = (1.0 / Y_c)**thermo.gm1inv
+            # p_c: np.ndarray = pi_c**thermo.Gammainv
+            # rho_c: np.ndarray = P_c / Y_c
+            #
+            # self.hydrostate.cell_vars[..., HI.P2_0] = 1.0 / Y_c / Msq
             Y_c: np.ndarray = -Gamma * g * dr / (pi_cp - pi_cm)
             P_c: np.ndarray = pi_c**thermo.gm1inv
             p_c: np.ndarray = pi_c**thermo.Gammainv
@@ -190,100 +196,6 @@ class MPV:
             self.hydrostate.cell_vars[..., HI.S0] = 1.0 / Y_c
 
         else:
-            # In absence of gravity, we set every pressure to 1.
+            # In the absence of gravity, we set every pressure to 1.
             self.hydrostate.cell_vars[...] = 1.0
             self.hydrostate.node_vars[...] = 1.0
-
-
-def simple_test():
-    from atmpy.variables.utility import compute_stratification
-    from atmpy.grid.kgrid import Grid
-
-    R_gas = 287.4
-    R_vap = 461.0
-    Q_vap = 2.53e06
-    gamma = 1.4
-
-    h_ref = 10000.0
-    t_ref = 100.0
-    T_ref = 300.00
-    p_ref = 1e5
-    u_ref = h_ref / t_ref
-    scale_factor = 20.0
-    delth = 0.01 / T_ref
-    xc = 0.0
-    gravity = [0, 1.0, 0.0]
-    Nsq_ref = 1.0e-4
-
-    Msq = u_ref * u_ref / (R_gas * T_ref)
-    a = scale_factor * 5.0e3 / h_ref
-    axis = 1
-
-    xmin = -15.0 * scale_factor
-    xmax = 15.0 * scale_factor
-    ymin = 0.0
-    ymax = 1.0
-    zmin = -1.0
-    zmax = 1.0
-
-    def stratification(y):
-        Nsq = Nsq_ref * t_ref * t_ref
-        g = gravity[1] / Msq
-
-        return np.exp(Nsq * y / g)
-
-    def molly(x):
-        del0 = 0.25
-        L = xmax - xmin
-        xi_l = np.minimum(1.0, (x - xmin) / (del0 * L))
-        xi_r = np.minimum(1.0, (xmax - x) / (del0 * L))
-        return 0.5 * np.minimum(1.0 - np.cos(np.pi * xi_l), 1.0 - np.cos(np.pi * xi_r))
-
-    dims = [DimensionSpec(301 + 1, xmin, xmax, 2), DimensionSpec(10 + 1, ymin, ymax, 2)]
-    grid = create_grid(dims)
-
-    x = grid.x_cells.reshape(-1, 1)
-    y = grid.y_cells.reshape(1, -1)
-
-    xn = grid.x_nodes[:-1].reshape(-1, 1)
-    yn = grid.y_nodes[:-1].reshape(1, -1)
-
-    Y = stratification(y) + delth * molly(x) * np.sin(np.pi * y) / (
-        1.0 + (x - xc) ** 2 / (a**2)
-    )
-
-    Yn = stratification(yn) + delth * molly(xn) * np.sin(np.pi * yn) / (
-        1.0 + (xn - xc) ** 2 / (a**2)
-    )
-
-    mpv = MPV(grid)
-    mpv.state(gravity, Msq)
-    hydrostatics = Variables(grid, num_vars_cell=7, num_vars_node=7)
-    hydrostatics2 = Variables(grid, num_vars_cell=7, num_vars_node=7)
-    # compute_stratification(hydrostatics, Y, Yn, grid, axis, gravity, Msq)
-    print(hydrostatics.cell_vars[4, :, HI.P0])
-
-    # End of compute_stratification method
-
-
-if __name__ == "__main__":
-    # simple_test()
-    dt = 0.1
-
-    nx = 1
-    ngx = 2
-    nnx = nx + 2 * ngx
-    ny = 2
-    ngy = 2
-    nny = ny + 2 * ngy
-
-    dim = [DimensionSpec(nx, 0, 2, ngx), DimensionSpec(ny, 0, 2, ngy)]
-    grid = create_grid(dim)
-    # rng = np.random.default_rng()
-    # arr = np.arange(nnx * nny)
-    # rng.shuffle(arr)
-
-    mvp = MPV(grid)
-
-    mvp.state([0, 1, 0], 1.0)
-    print(mvp.hydrostate.cell_vars[..., HI.RHO0].reshape((1, -1)))
