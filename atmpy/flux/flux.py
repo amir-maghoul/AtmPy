@@ -218,7 +218,9 @@ class Flux:
             unphysical_fluxes.values(), self.kernels, directions
         ):
             inner_index = one_element_inner_slice(self.ndim, full=False)
-            self.flux[direction][inner_index + (VI.RHOY,)] = cell_averaging(flux, kernel)
+            self.flux[direction][inner_index + (VI.RHOY,)] = cell_averaging(
+                flux, kernel
+            )
 
     def apply_reconstruction(
         self, lmbda: float, direction: str
@@ -372,11 +374,12 @@ def main():
     kernel3d = create_averaging_kernels(1)[0]
     v = np.random.randint(10, size=(5))
     print(u)
-    res1 = sp.signal.fftconvolve(u, kernel, mode="valid")/kernel.sum()
+    res1 = sp.signal.fftconvolve(u, kernel, mode="valid") / kernel.sum()
     print(res1)
 
-    res2 = cell_averaging(u, kernel)/kernel.sum()
+    res2 = cell_averaging(u, kernel) / kernel.sum()
     print(res2)
+
 
 if __name__ == "__main__":
     main()

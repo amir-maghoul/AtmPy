@@ -1,6 +1,7 @@
 import numpy as np
 import scipy as sp
 
+
 def cell_averaging(data: np.ndarray, kernel: np.ndarray):
     """
     Uses the scipy.ndimage.convolve to average the cell centered variable onto interface (Pu in flux) or onto nodes
@@ -26,7 +27,7 @@ def cell_averaging(data: np.ndarray, kernel: np.ndarray):
         data = np.array(data, dtype=np.float64)
 
     # Use 'reflect' mode for speed and good boundary handling; the cropped
-    full_conv = sp.ndimage.convolve(data, kernel, mode='reflect')
+    full_conv = sp.ndimage.convolve(data, kernel, mode="reflect")
 
     # Calculate the cropping required for each dimension.
     # This is the amount to remove from the start of the array.
@@ -67,15 +68,21 @@ def cells_to_nodes_averaging(cell_data: np.ndarray) -> np.ndarray:
         return 0.5 * (cell_data[:-1] + cell_data[1:])
     elif ndim == 2:
         return 0.25 * (
-                cell_data[:-1, :-1] + cell_data[1:, :-1] +
-                cell_data[:-1, 1:] + cell_data[1:, 1:]
+            cell_data[:-1, :-1]
+            + cell_data[1:, :-1]
+            + cell_data[:-1, 1:]
+            + cell_data[1:, 1:]
         )
     elif ndim == 3:
         return 0.125 * (
-                cell_data[:-1, :-1, :-1] + cell_data[1:, :-1, :-1] +
-                cell_data[:-1, 1:, :-1] + cell_data[1:, 1:, :-1] +
-                cell_data[:-1, :-1, 1:] + cell_data[1:, :-1, 1:] +
-                cell_data[:-1, 1:, 1:] + cell_data[1:, 1:, 1:]
+            cell_data[:-1, :-1, :-1]
+            + cell_data[1:, :-1, :-1]
+            + cell_data[:-1, 1:, :-1]
+            + cell_data[1:, 1:, :-1]
+            + cell_data[:-1, :-1, 1:]
+            + cell_data[1:, :-1, 1:]
+            + cell_data[:-1, 1:, 1:]
+            + cell_data[1:, 1:, 1:]
         )
     else:
         raise ValueError("Unsupported dimensionality for cell-to-node averaging.")
