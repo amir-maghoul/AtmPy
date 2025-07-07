@@ -280,7 +280,7 @@ class BoundaryManager:
                     # Check if the operation's target_type matches the condition's type
                     if (
                         operation.target_type is not None
-                        or condition.type == operation.target_type
+                        and condition.type == operation.target_type
                     ):
                         condition.apply_extra(variable, operation)
                         applied = True
