@@ -164,13 +164,6 @@ class GlobalConstants:
         # Check for valid cp_gas and T_ref before calculating N_ref
         if self.cp_gas <= 0 or self.T_ref <= 0:
             raise ValueError("cp_gas and T_ref must be positive to calculate N_ref.")
-        # Avoid sqrt of negative if grav is negative, use absolute value
-        self.Nsq_ref = (
-            abs(self.grav * self.grav / (self.cp_gas * self.T_ref))
-            if self.grav != 0
-            else 0.0
-        )
-        self.N_ref = np.sqrt(self.Nsq_ref)
 
         # Check for valid gamma, R_gas, T_ref before calculating Cs
         if self.gamma <= 0 or self.R_gas <= 0 or self.T_ref <= 0:
@@ -206,14 +199,27 @@ class Physics:
     gravity: Gravity = field(init=False)
     coriolis: CoriolisOperator = field(init=False)
 
-    def update_derived_fields(self, constants: GlobalConstants, grid_cfg: SpatialGrid):
-        """Recalculates gravity and coriolis based on current config."""
+    def update_primary_constants(self, constants: GlobalConstants):
+        """
+        Updates primary physical values like scaled gravity strength.
+        This must be called before update_dependent_functions.
+        """
+        # Calculate the scaled gravity value 'g'
         g = constants.grav * constants.h_ref / (constants.R_gas * constants.T_ref)
-        ndim = grid_cfg.ndim
         non_zero = np.nonzero(self.gravity_strength)[0]
         if non_zero:
             self.gravity_strength = list(self.gravity_strength)
             self.gravity_strength[non_zero[0]] = g
+
+        print(
+            f"Physics primary constants updated. Scaled gravity: {self.gravity_strength}"
+        )
+
+    def update_dependent_fields(self, stratification: callable, grid_cfg: SpatialGrid):
+        """Recalculates gravity and coriolis based on current config."""
+        if stratification is not None:
+            self.stratification = stratification
+        ndim = grid_cfg.ndim
         self.gravity = Gravity(self.gravity_strength, ndim)
         self.coriolis = CoriolisOperator(self.coriolis_strength, self.gravity)
         print("Physics derived fields updated.")

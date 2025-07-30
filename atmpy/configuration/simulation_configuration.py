@@ -41,10 +41,11 @@ class SimulationConfig:
     def __post_init__(self):
         self.update_all_derived_fields()
 
-    def update_all_derived_fields(self):
+    def update_all_derived_fields(self, stratification: Optional[callable] = None):
         """Central method to update all dependent configurations."""
         self.global_constants.update_global_constants()
-        self.physics.update_derived_fields(self.global_constants, self.spatial_grid)
+        self.physics.update_primary_constants(self.global_constants)
+        self.physics.update_dependent_fields(stratification, self.spatial_grid)
         self.model_regimes.update_derived_fields(self.global_constants)
 
     def update_boundary_condition(
