@@ -6,7 +6,14 @@ import logging
 DEFAULT_PROFILE_STEPS = 20
 DEFAULT_VIS_VAR = "rho"
 DEFAULT_RUN_CASE = "TravelingVortex"
-CASE_CHOICES = ["TravelingVortex", "RisingBubble", "SineWaveAdvection1D"]
+CASE_CHOICES = [
+    "TravelingVortex",
+    "RisingBubble",
+    "SineWaveAdvection1D",
+    "TravelingVortexHS",
+    "InertialGravityWaves",
+    "InertialGravityLongWaves",
+]
 DEFAULT_DEBUG_PORT = 5678  # Default port for PyCharm debugger
 
 
