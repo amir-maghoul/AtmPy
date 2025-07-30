@@ -9,8 +9,6 @@ from typing import List, Union, TYPE_CHECKING, Callable
 # Import numba for JIT compilation, as used in the reference code.
 import numba as nb
 
-from atmpy.variables.utility import create_multi_dim_slice
-
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
     from atmpy.variables.variables import Variables
