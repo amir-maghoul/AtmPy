@@ -144,4 +144,5 @@ class Preconditioners(Enum):
     """Map name to function for the preconditioner"""
 
     DIAGONAL = "diagonal"
+    ANALYTICAL_DIAGONAL = "analytic_diagonal"
     COLUMN = "column"

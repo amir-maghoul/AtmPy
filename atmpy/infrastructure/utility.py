@@ -75,6 +75,15 @@ def directional_indices(
         )
 
 
+def directional_full_inner_slice(
+    ndim: int, direction: int, ng_direction: int
+) -> Tuple[slice, ...]:
+    """Compute the correct indexing of the flux vs. variable for the hll solvers and reconstruction."""
+    inner_idx = [slice(None)] * (ndim)
+    inner_idx[direction] = slice(ng_direction, -ng_direction)
+    return tuple(inner_idx)
+
+
 def one_element_inner_slice(ndim: int, full: bool = True) -> Tuple[slice, ...]:
     """Create the slice of the one layer inner point, meaning slice(1, -1) in each direction."""
     inner_idx = [slice(1, -1)] * (ndim + 1)
