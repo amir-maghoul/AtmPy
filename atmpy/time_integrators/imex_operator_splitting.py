@@ -142,7 +142,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         # --- Save Initial State (t^n) ---
         initial_vars_arr = np.copy(self.variables.cell_vars)
-        initial_p2_nodes_arr = np.copy(self.mpv.p2_nodes)
 
         ######################### Predictor Stage: Compute advective fluxes (Pv)^{n+1/2} ###############################
         # Sol^n and p^n are currently in self.variables and self.mpv
@@ -151,9 +150,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # self.variables contains Sol^{n+1/2} and self.mpv.p2_nodes contains p^{n+1/2} (these are intermediate)
 
         ######################### Corrector Stage: Advance state from t^n to t^{n+1} ###################################
-        self._corrector_step(
-            self.dt, initial_vars_arr, initial_p2_nodes_arr, global_time_step_num
-        )
+        self._corrector_step(self.dt, initial_vars_arr, global_time_step_num)
         # After this, self.variables contains Sol^{n+1} and self.mpv.p2_nodes contains p^{n+1}
 
         logging.info(f"--- Finished time step {global_time_step_num} ---")
@@ -200,8 +197,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         #################################### 3.b Save the value of pressure after advection ############################
         self.mpv.p2_nodes0[...] = self.mpv.p2_nodes
-        # Save Sol# and return
-        predictor_end_vars = np.copy(self.variables.cell_vars)
 
         ###################### 4. Non-Advective Implicit Euler Substep for dt/2 ########################################
         #################################### (Eq. 15 of BK19) ##########################################################
@@ -240,7 +235,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self,
         dt: float,
         initial_vars_arr: np.ndarray,
-        initial_p2_nodes_arr: np.ndarray,
         global_time_step_num: int,
     ) -> None:
         logging.debug(f"Corrector (step {global_time_step_num}): Starting")
@@ -248,7 +242,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ############################ 1. Reset state variables to t^n ###################################################
         self.variables.cell_vars[...] = initial_vars_arr
-        if self.is_compressible:
+        if (
+            self.is_compressible and self.is_nonhydrostatic
+        ) or not self.is_nonhydrostatic:
             self.mpv.p2_nodes[...] = self.mpv.p2_nodes0
         logging.debug(f"Corrector (step {global_time_step_num}): State reset to t^n")
 
@@ -304,15 +300,12 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         """Integrates the problem on time step using the explicit euler in the NON-ADVECTIVE stage. This means
         that the algorithm does not use the half-time advective values to compute the updates. Rather, we compute
         directly from the full-variables in the main euler equation."""
-        g = self.gravity.strength  # The gravity strength
         cellvars = self.variables.cell_vars  # Temp variable for cell variables
         p2n = np.copy(self.mpv.p2_nodes)  # Temp allocation for p2_nodes
 
-        # Calculate the buoyancy PX'
-        dbuoy = cellvars[..., VI.RHOY] * cellvars[..., VI.RHOX] / cellvars[..., VI.RHO]
         ###################### Update variables
         self._forward_pressure_update(cellvars, dt, p2n)
-        self._forward_momenta_update(cellvars, dt, p2n, dbuoy, g)
+        self._forward_momenta_update(cellvars, dt, p2n)
         self._forward_buoyancy_update(cellvars, dt)
         ####################### Update boundary values
         # Update the boundary nodes for pressure variable
@@ -333,6 +326,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         """
 
         cellvars = self.variables.cell_vars
+        nonhydro = self.is_nonhydrostatic
+        g = self.gravity.strength
 
         # First calculate the extra explicit buoyancy term that is not calculated in the coriolis matrix inversion:
         bouyoncy = cellvars[..., VI.RHOY] * (
@@ -340,17 +335,12 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
         # Update the corresponding vertical momentum explicitly
-        g = self.gravity.strength
-
-        if self.is_nonhydrostatic:
-            cellvars[..., self.vertical_momentum_index] -= dt * (
-                (g / self.Msq) * bouyoncy
-            )
+        cellvars[..., self.vertical_momentum_index] = (
+            nonhydro * cellvars[..., self.vertical_momentum_index]
+        ) - dt * (g / self.Msq) * bouyoncy
 
         # Remove background wind
-        self.variables.adjust_background_wind(
-            self.wind_speed, scale=-1.0, in_place=True
-        )
+        self.variables.adjust_background_wind(self.wind_speed, scale=-1.0)
 
         # Apply the solver inverse matrix (Matrix combining the switches, the coriolis force and the singular buoyancy term)
         self.coriolis.apply_inverse(
@@ -366,7 +356,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
         # Restore background wind
-        self.variables.adjust_background_wind(self.wind_speed, scale=1.0, in_place=True)
+        self.variables.adjust_background_wind(self.wind_speed, scale=1.0)
 
         # Update all other variables on the boundary.
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
@@ -410,8 +400,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
         ############################# 4. Apply BCs to Pre-Corrected State ##############################################
-        # # TODO: Check if necessary
-        # self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
+        self.boundary_manager.apply_boundary_on_all_sides(self.variables.cell_vars)
 
         ############################# 5. Compute RHS (Divergence of Pre-Corrected Momenta) #############################
 
@@ -475,8 +464,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         cellvars: np.ndarray,
         dt: float,
         p2n: np.ndarray,
-        dbuoy: np.ndarray,
-        g: float,
     ):
         """Update the momenta
 
@@ -488,13 +475,15 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             The nodal pressure variables
         dbuoy : np.ndarray
             The pressured perturbation of Chi: PX'
-        g: float
-            The gravity strength
         """
         coriolis = self.coriolis.strength
+        g = self.gravity.strength
         adjusted_momenta = self.variables.adjust_background_wind(
-            self.wind_speed, -1.0, in_place=True
+            self.wind_speed, -1.0, in_place=False
         )
+
+        # Calculate the buoyancy PX'
+        dbuoy = cellvars[..., VI.RHOY] * cellvars[..., VI.RHOX] / cellvars[..., VI.RHO]
 
         # pressure gradient factor: (P/Gamma)
         rhoYovG = self.pressure_solver._calculate_P_over_Gamma(cellvars)
@@ -549,12 +538,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         ################################################################################################################
         # Zero out the container and the ghost cells of momenta
         self.mpv.set_rhs_to_zero()
-        # boundary_operation = [
-        #     WallAdjustment(
-        #         target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.0
-        #     )
-        # ]
-        # self.boundary_manager.apply_extra_all_sides(pressure_weighted_momenta, boundary_operation)
 
         ################################################################################################################
         # Divergence
