@@ -226,7 +226,7 @@ def plot_2d_static(
     ax.set_xlabel("X (m)")
     ax.set_ylabel("Y (m)")
     ax.set_title(f"2D Static Plot: {variable_name} at t={time_value:.2f}s")
-    ax.set_aspect("equal", adjustable="box")
+    # ax.set_aspect("equal", adjustable="box")
     if ax is None:
         plt.show()
 
@@ -291,7 +291,7 @@ def animate_2d(
     cbar.set_label(f"{variable_name} ({data_var.attrs.get('units', '')})")
     ax.set_xlabel("X (m)")
     ax.set_ylabel("Y (m)")
-    ax.set_aspect("equal", adjustable="box")
+    # ax.set_aspect("equal", adjustable="box")
 
     def update(frame_idx_in_animation):
         nonlocal cont  # Allow modification of cont
@@ -324,7 +324,7 @@ def animate_2d(
         ax.set_xlabel("X (m)")
         ax.set_ylabel("Y (m)")
         ax.set_title(f"2D Animation: {variable_name} at t={time_value:.2f}s")
-        ax.set_aspect("equal", adjustable="box")
+        # ax.set_aspect("equal", adjustable="box")
         # The colorbar is associated with `fig`, not `ax`, so it might persist or need careful handling
         # For simplicity, we are not re-creating/updating colorbar in each frame here.
         # If cbar needs to update dynamically (e.g. if levels change), it's more complex.
