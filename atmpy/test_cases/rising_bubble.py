@@ -62,8 +62,8 @@ class RisingBubble(BaseTestCase):
 
         nx = 10
         ny = 10
-        # nx = 120
-        # ny = 80
+        nx = 160
+        ny = 80
         # Grid Configuration
         grid_updates = {
             "ndim": 2,
@@ -103,22 +103,23 @@ class RisingBubble(BaseTestCase):
         # UPDATED Y-direction BCs
         self.set_boundary_condition(
             BoundarySide.BOTTOM,
-            BdryType.REFLECTIVE_GRAVITY,
+            BdryType.WALL,
             mpv_type=BdryType.WALL,  # MPV often uses WALL for REFLECTIVE_GRAVITY
         )
         self.set_boundary_condition(
             BoundarySide.TOP,
-            BdryType.REFLECTIVE_GRAVITY,
+            BdryType.WALL,
             mpv_type=BdryType.WALL,  # MPV often uses WALL for REFLECTIVE_GRAVITY
         )
 
         # Temporal Setting
         temporal_updates = {
-            "CFL": 0.5,
-            "dtfixed": 0.01,
-            "dtfixed0": 0.01,
-            "tout": np.arange(0.1, 0.71, 0.1),
-            "stepmax": 10000,
+            "CFL": 0.9,
+            "dtfixed": 0.0001,
+            "dtfixed0": 0.0001,
+            "tout": np.arange(0.0, 0.71, 0.1),
+            "tmax": 0.3,
+            "stepmax": 10_000,
             "use_acoustic_cfl": True,
         }
         self.set_temporal(temporal_updates)
@@ -160,6 +161,7 @@ class RisingBubble(BaseTestCase):
             "output_folder": "rising_bubble",
             "output_base_name": "_rising_bubble",
             "output_timesteps": True,
+            "output_frequency_steps": 10,
         }
         self.set_outputs(output_updates)
 

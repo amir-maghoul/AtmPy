@@ -47,7 +47,7 @@ def traveling_vortex_stratification(y: float) -> float:
     return 1.0
 
 
-class TravelingVortex(BaseTestCase):
+class TravelingVortexHS(BaseTestCase):
     """
     Traveling Vortex test case based on the setup described in PyBella.
     This involves an isentropic vortex embedded in a uniform flow on a doubly
@@ -300,7 +300,7 @@ class TravelingVortex(BaseTestCase):
 
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
-            "CFL": 0.45,
+            "CFL": 0.40,
             "dtfixed": 0.001,
             "dtfixed0": 0.001,
             "tout": np.array([0.0, 10.0]),
@@ -335,7 +335,7 @@ class TravelingVortex(BaseTestCase):
         physics_updates = {
             "wind_speed": [self.u0, self.v0, self.w0],
             "gravity_strength": (0.0, 0.0, 0.0),  # Zero gravity case
-            "coriolis_strength": (0.0, 0.0, 0.0),
+            "coriolis_strength": (0.0, 0.0, 100.0),
             "stratification": traveling_vortex_stratification,  # Isothermal background
         }
         self.set_physics(physics_updates)
@@ -568,6 +568,8 @@ class TravelingVortex(BaseTestCase):
         )  # Divide by 1.0
         # if self.correct_distribution:
         #     mpv.p2_nodes[...] *= Msq
+
+        # mpv.p2_nodes[...] = mpv.hydrostate.node_vars[..., HI.P2_0] * Msq
 
         # x = mpv.hydrostate.node_vars[..., HI.P0] / self.config.model_regimes.Msq
         # mpv.p2_nodes = np.repeat(x.reshape(1, -1), self.config.spatial_grid.grid.nshape[0], axis=0)

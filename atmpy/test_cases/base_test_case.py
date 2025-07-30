@@ -84,12 +84,13 @@ class BaseTestCase(ABC):
     def set_physics(self, physics_updates: dict):
         """Update the physics configuration."""
         physics_config = self.config.physics
+        stratification = physics_updates.pop("stratification", None)
         for key, value in physics_updates.items():
             if hasattr(physics_config, key):
                 setattr(physics_config, key, value)
             else:
                 print(f"Warning: Physics setting '{key}' not found in config.")
-        self.config.update_all_derived_fields()
+        self.config.update_all_derived_fields(stratification)
 
     def set_model_regimes(self, model_regime_updates: dict):
         """Update the model regime configuration."""
