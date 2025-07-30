@@ -140,9 +140,7 @@ class Solver:
                 self.config.temporal.dtfixed0 is not None and self.current_step == 0
             ):  # Use dtfixed0 for the very first step if specified
                 current_dt = self.config.temporal.dtfixed0
-            elif (
-                self.config.temporal.dtfixed0 is not None and self.current_step > 0
-            ):  # Original line was "if self.config.temporal.dtfixed0 is not None:"
+            elif self.config.temporal.dtfixed0 is not None and self.current_step > 0:
                 current_dt = (
                     self.config.temporal.dtfixed
                 )  # After first step, use dtfixed if dtfixed0 was present
