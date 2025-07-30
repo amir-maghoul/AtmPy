@@ -185,18 +185,6 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         inner_slice = one_element_inner_slice(self.ndim, full=False)
         self.mpv.wcenter[inner_slice] = dPdpi
 
-        # #################### Update the boundary nodes for the dP/dpi container. ######################################
-        # # Create the operation context to scale down the nodes. Notice the side is set to be BdrySide.ALL.
-        # # This will apply the 'extra' method whenever the boundary is defined to be WALL.
-        # boundary_operation = [
-        #     WallAdjustment(
-        #         target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
-        #     )
-        # ]
-        # self.boundary_manager.apply_extra_all_sides(
-        #     self.mpv.wcenter, boundary_operation, target_mpv=False
-        # )
-
     def calculate_enthalpy_weighted_pressure_gradient(
         self, p: np.ndarray, dt: float, is_nongeostrophic: bool, is_nonhydrostatic: bool
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -226,6 +214,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         pTheta = self.mpv.wplus[
             0
         ]  # Capital P. it is written small for naming in Python.
+
         ##################### Calculate exner pressure gradient times coefficient (cell-centered) ######################
         ##################### These are the nominator terms under the divergence in the Helmholtz equation #############
         Pu = -dt * pTheta * dpdx
@@ -526,6 +515,13 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         # Calculate (P*Theta): Coefficient of pressure term in momentum equation
         Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
+        # Apply wall correction
+        boundary_operation = [
+            WallAdjustment(
+                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.0
+            )
+        ]
+        self.boundary_manager.apply_extra_all_sides(Y, boundary_operation)
         return self._calculate_P_over_Gamma(cellvars) * Y
 
     def _calculate_coefficient_dPdpi(self, cellvars: np.ndarray, dt: float):
