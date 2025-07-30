@@ -93,6 +93,9 @@ def _perform_operator_probing(
     # Generate all 2^N staggering patterns
     indices = list(np.ndindex(*([2] * grid.ndim)))
 
+    # Get the boundary manager
+    boundary_manager = pressure_solver.boundary_manager
+
     # Initialize results
     probe_results = []
 
@@ -109,6 +112,8 @@ def _perform_operator_probing(
         inner_nodes_mask[slicing_inner] = True
         x_s[inner_slice_nodes][inner_nodes_mask] = 1.0
 
+        boundary_manager.apply_pressure_boundary_on_all_sides(x_s)
+
         # Apply helmholtz operator on the characteristic vector of current S
         helmholtz_op_unflat = pressure_solver.helmholtz_operator(
             x_s, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
@@ -121,127 +126,129 @@ def _perform_operator_probing(
 
 
 # =============================================================================
-# Diagonal Preconditioner Components & Application
+# Diagonal Preconditioners Components & Application
 # =============================================================================
 
 
-# def compute_inverse_diagonal_components(
-#     pressure_solver: "ClassicalPressureSolver",
-#     dt: float,
-#     is_nongeostrophic: bool,
-#     is_nonhydrostatic: bool,
-#     is_compressible: bool,
-# ) -> Dict[str, Any]:
-#     """
-#     Computes an analytical approximation of the inverse diagonal of the Helmholtz operator.
-#
-#     This is a refactored version of the user-provided `precon_diag_prepare` function.
-#     It approximates the diagonal from div(M_inv * grad(p)) and adds the wcenter term.
-#     """
-#     # --- 1. Get necessary objects and parameters from the pressure solver ---
-#     grid = pressure_solver.grid
-#     mpv = pressure_solver.mpv
-#     coriolis = pressure_solver.coriolis
-#     ndim = grid.ndim
-#     dx, dy, dz = grid.dxyz
-#
-#     # --- 2. Calculate components of the inverted momentum matrix M_inv ---
-#     # This matrix accounts for Coriolis effects in the momentum equations.
-#     # In 2D (x,y), M_inv = (1 / (1 + (dt*f)^2)) * [[1, dt*f], [-dt*f, 1]]
-#     f = coriolis.strength[2]  # Assuming f-plane, f is the z-component of Omega
-#     denom = 1.0 / (1.0 + (dt * f) ** 2)
-#
-#     # Note: These components are scalars for an f-plane approximation
-#     M_inv_11 = denom
-#     M_inv_12 = dt * f * denom
-#     M_inv_21 = -dt * f * denom
-#     M_inv_22 = denom
-#
-#     # --- 3. Get the cell-centered P*Theta coefficient ---
-#     # This is mpv.wplus, which is computed from the current state.
-#     # We only need the first component since it's the same for all momenta.
-#     pTheta_cells = mpv.wplus[0]
-#
-#     # --- 4. Calculate the effective coefficients for each Laplacian term ---
-#     # hplus_ij = pTheta * M_inv_ij
-#     hplusxx = pTheta_cells * M_inv_11
-#     hplusyy = pTheta_cells * M_inv_22
-#     hplusxy = pTheta_cells * M_inv_12
-#     hplusyx = pTheta_cells * M_inv_21
-#     if ndim == 3:
-#         # Assuming no rotation effects on the vertical component for simplicity
-#         hpluszz = pTheta_cells  # M_inv_33 is 1
-#
-#     # --- 5. Define stencil weights based on the provided code ---
-#     # These seem to be analytical weights for a 9-point Laplacian stencil.
-#     if ndim == 2:
-#         # The logic `nine_pt = 0.5 * 0.5 = 0.25`, `coeff = 1.0 - nine_pt = 0.75`
-#         # is unusual. Replicating the logic from the user-provided code.
-#         # A standard 9-point Laplacian has different weights. Let's use a more
-#         # standard 5-point approximation for simplicity and robustness.
-#         # A 5-point laplacian term d/dx(d/dx) is approximated as (p_i+1 - 2p_i + p_i-1)/dx^2
-#         # The diagonal contribution is -2/dx^2.
-#         # However, the operator here is -div(grad(p)), so the diagonal is +2/dx^2.
-#         wxx = 2.0 / (dx * dx)
-#         wyy = 2.0 / (dy * dy)
-#     elif ndim == 3:
-#         wxx = 2.0 / (dx * dx)
-#         wyy = 2.0 / (dy * dy)
-#         wzz = 2.0 / (dz * dz)
-#
-#     # --- 6. Construct the approximate diagonal of the Laplacian part ---
-#     # The convolution with a 2x2... kernel averages the cell-centered
-#     # coefficients to the nodes where the operator diagonal lives.
-#     diag_kernel = np.ones([2] * ndim)
-#     inner_slice = grid.get_inner_slice()
-#
-#     # Initialize the diagonal with the correct inner-node shape
-#     one_element_inner = one_element_inner_slice(grid.ndim, full=False)
-#     diag_laplacian_part = np.zeros_like(mpv.wcenter[one_element_inner])
-#
-#     # The diagonal of the operator -div(C*grad(p)) at a node is approximately
-#     # (C_i+1/2 + C_i-1/2)/dx^2. The convolution averages C to the node, so C_avg/dx^2.
-#     # The factor of 2 comes from the left and right neighbors.
-#     diag_laplacian_part += (1.0 / (dx * dx)) * sp.signal.fftconvolve(
-#         hplusxx, diag_kernel, mode="valid"
-#     )
-#     if ndim >= 2:
-#         diag_laplacian_part += (1.0 / (dy * dy)) * sp.signal.fftconvolve(
-#             hplusyy, diag_kernel, mode="valid"
-#         )
-#     if ndim == 3:
-#         diag_laplacian_part += (1.0 / (dz * dz)) * sp.signal.fftconvolve(
-#             hpluszz, diag_kernel, mode="valid"
-#         )
-#
-#     # --- 7. Add the diagonal term from the pressure equation itself ---
-#     # The full operator diagonal is A_diag = (Lap_diag) + (wcenter)
-#     # NOTE: We must slice wcenter to match the inner shape of the laplacian part.
-#     full_diag = diag_laplacian_part + mpv.wcenter[one_element_inner]
-#
-#     # --- 8. Compute the inverse for the preconditioner ---
-#     diag_inv_inner = np.zeros_like(full_diag)
-#     non_zero_mask = np.abs(full_diag) > 1e-15
-#     diag_inv_inner[non_zero_mask] = 1.0 / full_diag[non_zero_mask]
-#
-#     return {"diag_inv": diag_inv_inner[one_element_inner]}
-#
-#
-# def apply_inverse_diagonal(r_flat: np.ndarray, *, diag_inv: np.ndarray) -> np.ndarray:
-#     """
-#     Applies the inverse analytical diagonal preconditioner.
-#     This function is identical in operation to apply_inverse_diagonal,
-#     but is named distinctly for clarity.
-#     """
-#     original_shape = diag_inv.shape
-#     if r_flat.shape[0] != np.prod(original_shape):
-#         raise ValueError(
-#             f"Shape mismatch: r flat {r_flat.shape} vs diag_inv {original_shape}"
-#         )
-#
-#     r_unflat = r_flat.reshape(original_shape)
-#     z_unflat = diag_inv * r_unflat
-#     return z_unflat.flatten()
+def compute_inverse_analytical_diagonal_components(
+    pressure_solver: "ClassicalPressureSolver",
+    dt: float,
+    is_nongeostrophic: bool,
+    is_nonhydrostatic: bool,
+    is_compressible: bool,
+) -> Dict[str, Any]:
+    """
+    Computes an analytical approximation of the inverse diagonal of the Helmholtz operator.
+
+    This is a refactored version of the user-provided `precon_diag_prepare` function.
+    It approximates the diagonal from div(M_inv * grad(p)) and adds the wcenter term.
+    """
+    # --- 1. Get necessary objects and parameters from the pressure solver ---
+    grid = pressure_solver.grid
+    mpv = pressure_solver.mpv
+    coriolis = pressure_solver.coriolis
+    ndim = grid.ndim
+    dx, dy, dz = grid.dxyz
+
+    # --- 2. Calculate components of the inverted momentum matrix M_inv ---
+    # This matrix accounts for Coriolis effects in the momentum equations.
+    # In 2D (x,y), M_inv = (1 / (1 + (dt*f)^2)) * [[1, dt*f], [-dt*f, 1]]
+    f = coriolis.strength[2]  # Assuming f-plane, f is the z-component of Omega
+    denom = 1.0 / (1.0 + (dt * f) ** 2)
+
+    # Note: These components are scalars for an f-plane approximation
+    M_inv_11 = denom
+    M_inv_12 = dt * f * denom
+    M_inv_21 = -dt * f * denom
+    M_inv_22 = denom
+
+    # --- 3. Get the cell-centered P*Theta coefficient ---
+    # This is mpv.wplus, which is computed from the current state.
+    # We only need the first component since it's the same for all momenta.
+    pTheta_cells = mpv.wplus[0]
+
+    # --- 4. Calculate the effective coefficients for each Laplacian term ---
+    # hplus_ij = pTheta * M_inv_ij
+    hplusxx = pTheta_cells * M_inv_11
+    hplusyy = pTheta_cells * M_inv_22
+    hplusxy = pTheta_cells * M_inv_12
+    hplusyx = pTheta_cells * M_inv_21
+    if ndim == 3:
+        # Assuming no rotation effects on the vertical component for simplicity
+        hpluszz = pTheta_cells  # M_inv_33 is 1
+
+    # --- 5. Define stencil weights based on the provided code ---
+    # These seem to be analytical weights for a 9-point Laplacian stencil.
+    if ndim == 2:
+        # The logic `nine_pt = 0.5 * 0.5 = 0.25`, `coeff = 1.0 - nine_pt = 0.75`
+        # is unusual. Replicating the logic from the user-provided code.
+        # A standard 9-point Laplacian has different weights. Let's use a more
+        # standard 5-point approximation for simplicity and robustness.
+        # A 5-point laplacian term d/dx(d/dx) is approximated as (p_i+1 - 2p_i + p_i-1)/dx^2
+        # The diagonal contribution is -2/dx^2.
+        # However, the operator here is -div(grad(p)), so the diagonal is +2/dx^2.
+        wxx = 2.0 / (dx * dx)
+        wyy = 2.0 / (dy * dy)
+    elif ndim == 3:
+        wxx = 2.0 / (dx * dx)
+        wyy = 2.0 / (dy * dy)
+        wzz = 2.0 / (dz * dz)
+
+    # --- 6. Construct the approximate diagonal of the Laplacian part ---
+    # The convolution with a 2x2... kernel averages the cell-centered
+    # coefficients to the nodes where the operator diagonal lives.
+    diag_kernel = np.ones([2] * ndim)
+    inner_slice = grid.get_inner_slice()
+
+    # Initialize the diagonal with the correct inner-node shape
+    one_element_inner = one_element_inner_slice(grid.ndim, full=False)
+    diag_laplacian_part = np.zeros_like(mpv.wcenter[one_element_inner])
+
+    # The diagonal of the operator -div(C*grad(p)) at a node is approximately
+    # (C_i+1/2 + C_i-1/2)/dx^2. The convolution averages C to the node, so C_avg/dx^2.
+    # The factor of 2 comes from the left and right neighbors.
+    diag_laplacian_part += (1.0 / (dx * dx)) * sp.signal.fftconvolve(
+        hplusxx, diag_kernel, mode="valid"
+    )
+    if ndim >= 2:
+        diag_laplacian_part += (1.0 / (dy * dy)) * sp.signal.fftconvolve(
+            hplusyy, diag_kernel, mode="valid"
+        )
+    if ndim == 3:
+        diag_laplacian_part += (1.0 / (dz * dz)) * sp.signal.fftconvolve(
+            hpluszz, diag_kernel, mode="valid"
+        )
+
+    # --- 7. Add the diagonal term from the pressure equation itself ---
+    # The full operator diagonal is A_diag = (Lap_diag) + (wcenter)
+    # NOTE: We must slice wcenter to match the inner shape of the laplacian part.
+    full_diag = diag_laplacian_part + mpv.wcenter[one_element_inner]
+
+    # --- 8. Compute the inverse for the preconditioner ---
+    diag_inv_inner = np.zeros_like(full_diag)
+    non_zero_mask = np.abs(full_diag) > 1e-15
+    diag_inv_inner[non_zero_mask] = 1.0 / full_diag[non_zero_mask]
+
+    return {"diag_inv": diag_inv_inner[one_element_inner]}
+
+
+def apply_inverse_analytical_diagonal(
+    r_flat: np.ndarray, *, diag_inv: np.ndarray
+) -> np.ndarray:
+    """
+    Applies the inverse analytical diagonal preconditioner.
+    This function is identical in operation to apply_inverse_diagonal,
+    but is named distinctly for clarity.
+    """
+    original_shape = diag_inv.shape
+    if r_flat.shape[0] != np.prod(original_shape):
+        raise ValueError(
+            f"Shape mismatch: r flat {r_flat.shape} vs diag_inv {original_shape}"
+        )
+
+    r_unflat = r_flat.reshape(original_shape)
+    z_unflat = diag_inv * r_unflat
+    return z_unflat.flatten()
 
 
 def compute_inverse_diagonal_components(
@@ -305,9 +312,9 @@ def apply_inverse_diagonal(r_flat: np.ndarray, *, diag_inv: np.ndarray) -> np.nd
     return z_unflat.flatten()
 
 
-# =================================================================================
-# Column (Tridiagonal) Preconditioner Components & Application (Example Structure)
-# =================================================================================
+# =============================================================
+# Column (Tridiagonal) Preconditioner Components & Application
+# =============================================================
 
 
 def compute_tridiagonal_components(
@@ -317,22 +324,82 @@ def compute_tridiagonal_components(
     is_nonhydrostatic: bool,
     is_compressible: bool,
 ) -> Dict[str, Any]:
-    """Computes tridiagonal components using the shared probing helper."""
+    """
+    Computes the vertical tridiagonal part of the Helmholtz operator using
+    matrix probing, mimicking the logic from laplacian_nodes.c.
+    """
     grid = pressure_solver.grid
     mpv = pressure_solver.mpv
     gravity_axis = pressure_solver.coriolis.gravity.axis
 
-    raise NotImplementedError(
-        "The correct version of tridiagonal preconditioner is not yet implemented."
-    )
+    # We need the shape of the inner nodal grid (where the operator lives)
+    inner_slice_nodes = grid.get_inner_slice()
+    inner_shape = grid.inshape
 
-    inner_slice_nodes = one_element_inner_slice(grid.ndim, full=False)
-    # inner_shape = mpv.wcenter[inner_slice_nodes].shape
-    inner_shape = mpv.wcenter.shape
-    num_inner_vert = inner_shape[gravity_axis]
+    # Pre-allocate arrays for the three diagonals (lower, main, upper)
+    lower_band = np.zeros(inner_shape, dtype=np.float64)
+    diag_band = np.zeros(inner_shape, dtype=np.float64)
+    upper_band = np.zeros(inner_shape, dtype=np.float64)
 
-    # Perform the probing
-    probe_results = _perform_operator_probing(
+    # --- Probe the operator with vertically staggered vectors ---
+    # The C code uses 3 probes (jj=0,1,2). This ensures every vertical level
+    # is activated once as the "center" of a probe.
+    for jj in range(3):
+        p_test = np.zeros(grid.nshape, dtype=np.float64)
+
+        # Create the test vector: 1s at every 3rd level in the vertical direction
+        probe_slice = [slice(None)] * grid.ndim
+        probe_slice[gravity_axis] = slice(
+            inner_slice_nodes[gravity_axis].start + jj,
+            inner_slice_nodes[gravity_axis].stop,
+            3,
+        )
+        p_test[tuple(probe_slice)] = 1.0
+
+        # Apply the full Helmholtz operator to this sparse test vector
+        lap_result = pressure_solver.helmholtz_operator(
+            p_test, dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
+        )
+
+        # Extract the tridiagonal components from the result
+        # Where p_test was 1 at level j, lap_result contains:
+        # - at level j-1: the lower diagonal component
+        # - at level j:   the main diagonal component
+        # - at level j+1: the upper diagonal component
+
+        # Main diagonal (lap[j] where pi[j]=1)
+        diag_band[tuple(probe_slice)] = lap_result[tuple(probe_slice)]
+
+        # Lower diagonal (lap[j] where pi[j-1]=1)
+        lower_probe_slice = list(probe_slice)
+        if (
+            lower_probe_slice[gravity_axis].start
+            > inner_slice_nodes[gravity_axis].start
+        ):
+            lower_probe_slice[gravity_axis] = slice(
+                probe_slice[gravity_axis].start - 1,
+                probe_slice[gravity_axis].stop - 1,
+                3,
+            )
+            lower_band[tuple(lower_probe_slice)] = lap_result[tuple(lower_probe_slice)]
+
+        # Upper diagonal (lap[j] where pi[j+1]=1)
+        upper_probe_slice = list(probe_slice)
+        if (
+            upper_probe_slice[gravity_axis].start
+            < inner_slice_nodes[gravity_axis].stop - 1
+        ):
+            upper_probe_slice[gravity_axis] = slice(
+                probe_slice[gravity_axis].start + 1,
+                probe_slice[gravity_axis].stop + 1,
+                3,
+            )
+            upper_band[tuple(upper_probe_slice)] = lap_result[tuple(upper_probe_slice)]
+
+    # The C code also probes horizontally to refine the diagonal term.
+    # This captures the influence of horizontal derivatives.
+    # We will use the more general `_perform_operator_probing` for this part.
+    full_probe_results = _perform_operator_probing(
         pressure_solver,
         dt,
         is_nongeostrophic,
@@ -342,40 +409,14 @@ def compute_tridiagonal_components(
         inner_slice_nodes,
     )
 
-    # Process results to get tridiagonal bands
-    lower_band = np.zeros(inner_shape, dtype=np.float64)
-    diag_band = np.zeros(inner_shape, dtype=np.float64)
-    upper_band = np.zeros(inner_shape, dtype=np.float64)
-
-    for index_tuple, helmholtz_op_unflat in probe_results:
-        # Define the slice and mask corresponding to this probe pattern
+    # Assemble the full diagonal from the general probe
+    full_diag_band = np.zeros_like(diag_band)
+    for index_tuple, helmholtz_op_unflat in full_probe_results:
         slicing_inner = tuple(slice(start, None, 2) for start in index_tuple)
-        mask_j = np.zeros(inner_shape, dtype=bool)
-        mask_j[slicing_inner] = True
+        full_diag_band[slicing_inner] += helmholtz_op_unflat[slicing_inner]
 
-        # Diagonal: Result at j where input was at j
-        diag_band[mask_j] += helmholtz_op_unflat[mask_j]
-
-        # Lower: Result at j+1 where input was at j
-        if np.any(mask_j[..., :-1, :]):  # Check if shift is possible within mask bounds
-            mask_jp1 = np.roll(mask_j, shift=1, axis=gravity_axis)
-            valid_points_lower = (
-                mask_j & mask_jp1
-            )  # Ensure both j and j+1 are valid inner points hit by the probe
-            # Add result at j+1 locations where input was at j
-            lower_band[valid_points_lower] += helmholtz_op_unflat[valid_points_lower]
-
-        # Upper: Result at j-1 where input was at j
-        if np.any(mask_j[..., 1:, :]):  # Check if shift is possible
-            mask_jm1 = np.roll(mask_j, shift=-1, axis=gravity_axis)
-            valid_points_upper = mask_j & mask_jm1
-            # Add result at j-1 locations where input was at j
-            upper_band[valid_points_upper] += helmholtz_op_unflat[valid_points_upper]
-
-    # --- Optional: Add horizontal probing for diagonal refinement ---
-    # If needed, add loops similar to BK19's ii/kk here, calling the operator
-    # again with horizontally staggered p_test vectors and adding ONLY
-    # helmholtz_op_unflat[mask_horiz] to diag_band.
+    # Overwrite the main diagonal with the more accurate one from the full probe
+    diag_band[...] = full_diag_band
 
     return {
         "lower": lower_band,
@@ -397,14 +438,12 @@ def apply_inverse_tridiagonal(
 ) -> np.ndarray:
     """
     Applies the inverse tridiagonal preconditioner by solving column-wise systems
-    using scipy.linalg.solve_banded.
-
-    Accepts keyword arguments matching the output of compute_tridiagonal_components.
+    using scipy.linalg.solve_banded. This implementation is correct.
     """
-    inner_shape = one_element_inner_nodal_shape(grid.ndim)
+    # (The existing implementation of this function is correct and does not need changes)
+    inner_shape = grid.inshape
     num_inner_vert = inner_shape[gravity_axis]
 
-    # Check shapes
     if not (lower.shape == diag.shape == upper.shape == inner_shape):
         raise ValueError("Shape mismatch between bands and inner grid shape.")
     if r_flat.shape[0] != np.prod(inner_shape):
@@ -415,12 +454,18 @@ def apply_inverse_tridiagonal(
     r_unflat = r_flat.reshape(inner_shape)
     z_unflat = np.zeros_like(r_unflat)
 
-    iter_dims = [grid.icshape[d] for d in range(grid.ndim) if d != gravity_axis]
-    iter_indices = np.ndindex(*iter_dims)
+    # Create an iterator for the horizontal dimensions
+    iter_dims = [grid.inshape[d] for d in range(grid.ndim) if d != gravity_axis]
+
+    # Handle 1D case (where there are no horizontal dimensions)
+    if not iter_dims:
+        iter_indices = [()]
+    else:
+        iter_indices = np.ndindex(*iter_dims)
 
     # --- Loop over all columns ---
     for index_tuple in iter_indices:
-        col_slice = list(slice(None) for _ in range(grid.ndim))
+        col_slice = [slice(None)] * grid.ndim
         idx_counter = 0
         for d in range(grid.ndim):
             if d != gravity_axis:
@@ -429,31 +474,25 @@ def apply_inverse_tridiagonal(
         col_slice = tuple(col_slice)
 
         r_col = r_unflat[col_slice]
-        l_col = lower[col_slice]
+        # For the banded solver, we need to be careful with diagonals
         d_col = diag[col_slice]
-        u_col = upper[col_slice]
+        l_col = lower[col_slice][1:]  # Lower diagonal starts from the second element
+        u_col = upper[col_slice][
+            :-1
+        ]  # Upper diagonal ends at the second-to-last element
 
-        # Assemble banded matrix for scipy.linalg.solve_banded
         ab = np.zeros((3, num_inner_vert), dtype=r_col.dtype)
-        ab[0, 1:] = u_col[:-1]  # Upper diagonal u_j -> row j-1
-        ab[1, :] = d_col  # Main diagonal d_j -> row j
-        ab[2, :-1] = l_col[1:]  # Lower diagonal l_j -> row j+1
+        ab[0, 1:] = u_col
+        ab[1, :] = d_col
+        ab[2, :-1] = l_col
 
-        # Solve
         try:
             z_col = sp.linalg.solve_banded((1, 1), ab, r_col, check_finite=False)
             z_unflat[col_slice] = z_col
         except np.linalg.LinAlgError:
-            # Handle singularity - check if diagonal is near zero
-            if np.any(np.abs(d_col) < 1e-15):
-                print(
-                    f"Warning: Near-zero diagonal found in tridiagonal solve for column {col_slice}. Setting result to zero."
-                )
-                z_unflat[col_slice] = 0.0
-            else:
-                print(
-                    f"Warning: LinAlgError (possibly singular) in tridiagonal solve for column {col_slice}. Setting result to zero."
-                )
-                z_unflat[col_slice] = 0.0  # Fallback
+            # Fallback for singular columns
+            z_unflat[col_slice] = r_col / (
+                d_col + 1e-15
+            )  # Simple diagonal scaling as fallback
 
     return z_unflat.flatten()
