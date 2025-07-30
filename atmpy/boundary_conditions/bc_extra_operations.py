@@ -63,7 +63,6 @@ class WallAdjustment(ExtraBCOperation):
 class WallFluxCorrection(ExtraBCOperation):
     def __init__(self, factor: float, **kwargs):
         super().__init__(**kwargs)
-        self.target_type = BdryType.WALL
         self.factor = factor
 
     def get_identifier(self) -> str:

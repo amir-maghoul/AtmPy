@@ -284,10 +284,6 @@ class BoundaryManager:
                     ):
                         condition.apply_extra(variable, operation)
                         applied = True
-                if not applied:
-                    print(
-                        f"  Warning: Operation {operation.get_identifier()} did not match any {bc_dict_name} conditions."
-                    )
 
             # Handle operations targeting specific sides
             else:

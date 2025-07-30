@@ -391,13 +391,13 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
                 / cell_vars[nsource + (VI.RHO,)]
             )
 
-            # Calculate intermediate rho and evaluate the corresponding ghost cell.
+            # Calculate intermediate values for update
             rho = rhoY * strat
-            cell_vars[nimage + (VI.RHO,)] = rho
-
-            # Find velocity in the direction of gravity and update ghost cells.
             v = Pv / rhoY
             Th_slc = 1.0
+
+            ########################### Update the variables ##################################################
+            cell_vars[nimage + (VI.RHO,)] = rho
             cell_vars[nimage + (gravity_momentum_index,)] = rho * v
 
             # This is the actual horizontal velocity, since the gravity axis can never be the first axis.
@@ -444,9 +444,9 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         elif isinstance(operation, WallFluxCorrection):
             # Assumption: Variables is the momenta stacked on the last axis.
             factor = operation.factor
+            momenta_slice = slice(VI.RHOU.value, VI.RHOU.value + self.ndim)
             pad_slice = self.padded_slices()
-            for i in range(variables.shape[-1]):
-                variables[pad_slice + (i,)] *= factor
+            variables[pad_slice + (momenta_slice,)] *= factor
         else:
             pass
 
@@ -628,9 +628,9 @@ class Wall(BaseBoundaryCondition):
         elif isinstance(operation, WallFluxCorrection):
             # Assumption: Variables is the momenta stacked on the last axis.
             factor = operation.factor
+            momenta_slice = slice(VI.RHOU.value, VI.RHOU.value + self.ndim)
             pad_slice = self.padded_slices()
-            for i in range(variables.shape[-1]):
-                variables[pad_slice + (i,)] *= factor
+            variables[pad_slice + (momenta_slice,)] *= factor
         else:
             pass
 
