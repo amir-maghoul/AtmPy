@@ -51,7 +51,7 @@ def modified_hll(
     # -------------------------------------
     # -------------------------------------
 
-    # Compute the ADVECTING flux: Pu/Theta = rho*Theta*u/Theta = rho*u
+    # Compute Pu/Theta = rho*Theta*u/Theta = rho*u
     left_factor = (
         Pu[directional_inner_idx] * upl[left_idx] / left_state[left_idx + (PVI.Y,)]
     )
@@ -59,7 +59,7 @@ def modified_hll(
         Pu[directional_inner_idx] * upr[right_idx] / right_state[right_idx + (PVI.Y,)]
     )
 
-    #  Compute the ADVECTED values
+    #  Compute the total ADVECTING Flux
     # Exclude VI.RHO and VI.RHOY from other variables
     variable_indices = slice(2, None)
 
