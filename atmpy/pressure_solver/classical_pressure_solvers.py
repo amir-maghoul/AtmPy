@@ -214,6 +214,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         pTheta = self.mpv.wplus[
             0
         ]  # Capital P. it is written small for naming in Python.
+        # pTheta = self._calculate_coefficient_pTheta(self.variables.cell_vars)
 
         ##################### Calculate exner pressure gradient times coefficient (cell-centered) ######################
         ##################### These are the nominator terms under the divergence in the Helmholtz equation #############
@@ -515,13 +516,6 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         # Calculate (P*Theta): Coefficient of pressure term in momentum equation
         Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
-        # Apply wall correction
-        boundary_operation = [
-            WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.0
-            )
-        ]
-        self.boundary_manager.apply_extra_all_sides(Y, boundary_operation)
         return self._calculate_P_over_Gamma(cellvars) * Y
 
     def _calculate_coefficient_dPdpi(self, cellvars: np.ndarray, dt: float):
