@@ -53,7 +53,6 @@ class ExtraBCOperation(ABC):
 class WallAdjustment(ExtraBCOperation):
     def __init__(self, factor: float, **kwargs):  # Use kwargs for base init
         super().__init__(**kwargs)
-        self.target_type = BdryType.WALL
         self.factor = factor
 
     def get_identifier(self) -> str:

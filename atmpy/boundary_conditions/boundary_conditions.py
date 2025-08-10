@@ -444,7 +444,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         elif isinstance(operation, WallFluxCorrection):
             # Assumption: Variables is the momenta stacked on the last axis.
             factor = operation.factor
-            momenta_slice = slice(VI.RHOU.value, VI.RHOU.value + self.ndim)
+            momenta_slice = slice(0, self.ndim)
             pad_slice = self.padded_slices()
             variables[pad_slice + (momenta_slice,)] *= factor
         else:
