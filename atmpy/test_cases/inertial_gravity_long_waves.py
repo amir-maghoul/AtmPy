@@ -199,7 +199,7 @@ class InertialGravityLongWaves(BaseTestCase):
         of the `sol_init` function from `test_internal_long_wave.py`.
         """
         print("Initializing solution for Inertial Gravity Waves (PyBella logic)...")
-
+        is_compressible = self.config.model_regimes.is_compressible
         grid = self.config.spatial_grid.grid
         gl = self.config.global_constants
         Msq = self.config.model_regimes.Msq
@@ -239,14 +239,18 @@ class InertialGravityLongWaves(BaseTestCase):
 
         # 6. Set the solution variables from the balanced state
         # The hydrostatic state is 1D, so we broadcast it to the full 2D domain.
-        rhoY0_2d = np.tile(mpv.hydrostate.cell_vars[:, HI.RHOY0], (grid.ncx_total, 1))
-        rho_final = HySt.rhoY0 / Y_cells
+        if is_compressible:
+            rhoY0 = HySt.rhoY0
+        else:
+            rhoY0 = np.tile(mpv.hydrostate.cell_vars[:, HI.RHOY0], (grid.ncx_total, 1))
+
+        rho_final = rhoY0 / Y_cells
 
         variables.cell_vars[..., VI.RHO] = rho_final
         variables.cell_vars[..., VI.RHOU] = rho_final * self.u0
         variables.cell_vars[..., VI.RHOV] = rho_final * self.v0
         variables.cell_vars[..., VI.RHOW] = rho_final * self.w0
-        variables.cell_vars[..., VI.RHOY] = HySt.rhoY0
+        variables.cell_vars[..., VI.RHOY] = rhoY0
 
         mpv.p2_cells = HySt.p20
         mpv.p2_nodes[:, ngy:-ngy] = HySt.p20_nodes[:, ngy:-ngy]
