@@ -337,60 +337,167 @@ def animate_2d(
 
 
 def plot_3d_static(
-    ds: xr.Dataset, variable_name: str, time_index: int, ax: Optional[plt.Axes] = None
+        ds: xr.Dataset,
+        variable_name: str,
+        time_index: int,
+        slice_dim: str,
+        slice_value: float,
+        ax: Optional[plt.Axes] = None,
 ) -> None:
-    """Placeholder for 3D static plotting."""
-    if "x" not in ds.coords or "y" not in ds.coords or "z" not in ds.coords:
-        logger.error("Coordinates 'x', 'y', and 'z' not found for 3D plot.")
-        return
-    logger.info(
-        f"3D static plot for {variable_name} at time index {time_index} - Not yet implemented."
-    )
+    """
+    Plots a 2D slice of a 3D variable at a specific time index.
+    """
     if ax is None:
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection="3d")
-    ax.set_title(f"3D Static Plot: {variable_name} (Not Implemented)")
+        fig, ax = plt.subplots(figsize=(10, 8))
+    else:
+        fig = ax.figure
+
+    if variable_name not in ds:
+        logger.error(f"Variable '{variable_name}' not found in dataset.")
+        return
+
+    data_var = ds[variable_name]
+    data_at_time = data_var.isel(time=time_index)
+
+    is_nodal = "node" in variable_name
+    slice_dim_actual = f"{slice_dim}_node" if is_nodal else slice_dim
+
+    # Validate that the dimension exists before trying to slice
+    if slice_dim_actual not in data_at_time.dims:
+        logger.error(
+            f"Dimension '{slice_dim_actual}' not found in variable '{variable_name}'. Available dims: {data_at_time.dims}")
+        return
+
+    # Now, perform the selection with the correct dimension name
+    plot_data_2d = data_at_time.sel({slice_dim_actual: slice_value}, method="nearest")
+
+    actual_slice_val = plot_data_2d[slice_dim_actual].item()
+    time_value = plot_data_2d["time"].item()
+
+    # Determine the remaining two dimensions for plotting
+    plot_dims = [dim for dim in ['x', 'y', 'z'] if dim != slice_dim]
+    x_dim_name, y_dim_name = (
+        [f"{dim}_node" for dim in plot_dims] if is_nodal else plot_dims
+    )
+
+    x_coords = ds[x_dim_name].values
+    y_coords = ds[y_dim_name].values
+
+    # Orient the data correctly for contourf (ny, nx)
+    if plot_data_2d.dims[0] == y_dim_name:
+        plot_data_for_contour = plot_data_2d.data
+    elif plot_data_2d.dims[0] == x_dim_name:
+        plot_data_for_contour = plot_data_2d.data.T
+    else:
+        logger.error(f"Unexpected dimension order in sliced data: {plot_data_2d.dims}")
+        return
+
+    # --- Plotting ---
+    cmap = "viridis"
+    data_min = np.nanmin(plot_data_for_contour)
+    data_max = np.nanmax(plot_data_for_contour)
+    levels = np.linspace(data_min, data_max, 25) if data_min != data_max else 25
+
+    contour = ax.contourf(x_coords, y_coords, plot_data_for_contour, cmap=cmap, levels=levels)
+    ax.contour(x_coords, y_coords, plot_data_for_contour, colors="k", linewidths=0.2, levels=levels)
+
+    # --- Colorbar and Labels ---
+    cbar = fig.colorbar(contour, ax=ax, orientation="vertical")
+    cbar.set_label(f"{variable_name} ({data_var.attrs.get('units', '')})")
+    all_ticks = np.unique(np.concatenate([cbar.get_ticks(), [data_min, data_max]]))
+    cbar.set_ticks(all_ticks)
+    cbar.ax.set_yticklabels([f"{t:.6f}" for t in all_ticks])
+
+    ax.set_xlabel(f"{x_dim_name} (m)")
+    ax.set_ylabel(f"{y_dim_name} (m)")
+    ax.set_title(
+        f"3D Slice: {variable_name} at t={time_value:.2f}s\n"
+        f"Slice along {slice_dim} at {actual_slice_val:.3f}m"
+    )
     if ax is None:
         plt.show()
 
 
 def animate_3d(
-    ds: xr.Dataset,
-    variable_name: str,
-    time_indices_range: List[int],
-    fig: Optional[plt.Figure] = None,
-    ax: Optional[plt.Axes] = None,
+        ds: xr.Dataset,
+        variable_name: str,
+        time_indices_range: List[int],
+        slice_dim: str,
+        slice_value: float,
+        fig: Optional[plt.Figure] = None,
+        ax: Optional[plt.Axes] = None,
 ) -> Optional[FuncAnimation]:
-    """Placeholder for 3D animation."""
-    if "x" not in ds.coords or "y" not in ds.coords or "z" not in ds.coords:
-        logger.error("Coordinates 'x', 'y', and 'z' not found for 3D animation.")
-        return None
-    logger.info(
-        f"3D animation for {variable_name} between time indices {time_indices_range} - Not yet implemented."
-    )
+    """Animates a 2D slice of a 3D variable over a range of time indices."""
     if fig is None or ax is None:
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection="3d")  # Ensure 3D axis for placeholder
+        fig, ax = plt.subplots(figsize=(10, 8))
 
-    # Basic animation structure
-    def init():
-        ax.set_title(f"3D Animation: {variable_name} (Not Implemented)")
-        return []
+    if variable_name not in ds:
+        logger.error(f"Variable '{variable_name}' not found in dataset.")
+        return None
 
-    def update(frame):
-        ax.set_title(f"3D Animation: {variable_name} frame {frame} (Not Implemented)")
-        return []
+    data_var = ds[variable_name]
 
-    ani = FuncAnimation(
-        fig,
-        update,
-        frames=len(range(min(time_indices_range), max(time_indices_range) + 1)),
-        init_func=init,
-        blit=False,
-        interval=200,
+    # --- FIX: Determine the correct dimension names BEFORE slicing ---
+    is_nodal = "node" in variable_name
+    slice_dim_actual = f"{slice_dim}_node" if is_nodal else slice_dim
+
+    if slice_dim_actual not in data_var.dims:
+        logger.error(
+            f"Dimension '{slice_dim_actual}' not found in variable '{variable_name}'. Available dims: {data_var.dims}")
+        return None
+
+    data_slice = data_var.sel({slice_dim_actual: slice_value}, method="nearest")
+    actual_slice_val = data_slice[slice_dim_actual].item()
+
+    plot_dims = [dim for dim in ['x', 'y', 'z'] if dim != slice_dim]
+    x_dim_name, y_dim_name = (
+        [f"{dim}_node" for dim in plot_dims] if is_nodal else plot_dims
     )
-    return ani
+    x_coords = ds[x_dim_name].values
+    y_coords = ds[y_dim_name].values
 
+    start_index, end_index = min(time_indices_range), max(time_indices_range)
+    if start_index == end_index: end_index += 1
+    end_index = min(end_index, len(ds["time"]))
+    frames_indices = list(range(start_index, end_index))
+
+    anim_data = data_slice.isel(time=frames_indices)
+    data_min, data_max = np.nanmin(anim_data.data), np.nanmax(anim_data.data)
+    cmap = "viridis"
+    levels = np.linspace(data_min, data_max, 25) if data_min != data_max else 25
+
+    # Create an initial contour plot to establish the colorbar
+    ax.clear()
+    initial_data_raw = data_slice.isel(time=start_index)
+    initial_plot_data = initial_data_raw.data.T if initial_data_raw.dims[0] == x_dim_name else initial_data_raw.data
+    cont = ax.contourf(x_coords, y_coords, initial_plot_data, cmap=cmap, levels=levels)
+    cbar = fig.colorbar(cont, ax=ax)
+    cbar.set_label(f"{variable_name} ({data_var.attrs.get('units', '')})")
+
+    def update(frame_idx_in_animation):
+        ax.clear()
+
+        actual_time_index = frames_indices[frame_idx_in_animation]
+        current_data = data_slice.isel(time=actual_time_index)
+        time_value = current_data["time"].item()
+
+        plot_data = current_data.data.T if current_data.dims[0] == x_dim_name else current_data.data
+
+        ax.contourf(x_coords, y_coords, plot_data, cmap=cmap, levels=levels)
+        ax.contour(x_coords, y_coords, plot_data, colors='k', linewidths=0.2, levels=levels)
+
+        ax.set_xlabel(f"{x_dim_name} (m)")
+        ax.set_ylabel(f"{y_dim_name} (m)")
+        ax.set_title(
+            f"3D Slice Animation: {variable_name} at t={time_value:.2f}s\n"
+            f"Slice along {slice_dim} at {actual_slice_val:.3f}m"
+        )
+        # Note: We don't return the collections for blitting as it's complex with contourf.
+        # blit=False is more robust.
+        return []
+
+    ani = FuncAnimation(fig, update, frames=len(frames_indices), interval=500, blit=False)
+    return ani
 
 def visualize_data(
     input_file: str,
@@ -398,7 +505,9 @@ def visualize_data(
     plot_type: str,  # 'static' or 'animate'
     time_indices: Optional[
         List[int]
-    ] = None,  # For static: single index. For animation: [start, end]
+    ] = None,
+    slice_dim: str = 'z',
+    slice_value: float = 0.0,
 ):
     """
     Main dispatcher for visualization.
@@ -469,8 +578,13 @@ def visualize_data(
             plot_2d_static(ds, variable_name, static_time_index, ax=ax)
         elif ndim == 3:
             plot_3d_static(
-                ds, variable_name, static_time_index, ax=ax
-            )  # ax might need to be 3D for this
+                ds,
+                variable_name,
+                static_time_index,
+                slice_dim=slice_dim,  # Pass the new argument
+                slice_value=slice_value,  # Pass the new argument
+                ax=ax,
+            )
         else:
             logger.error(f"Unsupported dimensionality for static plot: {ndim}")
 
@@ -516,11 +630,18 @@ def visualize_data(
                 ds, variable_name, anim_time_indices_range, fig=fig, ax=ax
             )
         elif ndim == 3:
-            if fig.axes[0].name != "3d":
+            if hasattr(ax, 'get_zlim'): # A simple check for a 3D axis
                 fig.clear()
-                ax = fig.add_subplot(111, projection="3d")
+                ax = fig.add_subplot(111)
+
             animation_object = animate_3d(
-                ds, variable_name, anim_time_indices_range, fig=fig, ax=ax
+                ds,
+                variable_name,
+                anim_time_indices_range,
+                slice_dim=slice_dim,      # Pass the new argument
+                slice_value=slice_value,  # Pass the new argument
+                fig=fig,
+                ax=ax,
             )
         else:
             logger.error(f"Unsupported dimensionality for animation: {ndim}")

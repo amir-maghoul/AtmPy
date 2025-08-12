@@ -8,6 +8,7 @@ DEFAULT_VIS_VAR = "rho"
 DEFAULT_RUN_CASE = "TravelingVortex"
 CASE_CHOICES = [
     "TravelingVortex",
+    "TravelingVortex3D",
     "RisingBubble",
     "SineWaveAdvection1D",
     "TravelingVortexHS",
@@ -123,6 +124,20 @@ def parse_arguments():
         type=str,
         nargs="*",
         help="The file to read visualization from",
+    )
+
+    vis_group.add_argument(
+        "--slice-dim",
+        type=str,
+        choices=['x', 'y', 'z'],
+        default='z',
+        help="Dimension to slice along for 3D plots ('x', 'y', or 'z'). Default: 'z'."
+    )
+    vis_group.add_argument(
+        "--slice-value",
+        type=float,
+        default=0.0,
+        help="Coordinate value at which to take the 3D slice. Default: 0.0."
     )
 
     args = parser.parse_args()

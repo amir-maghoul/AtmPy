@@ -34,6 +34,7 @@ from atmpy.test_cases.sine_advection_1d import SineWaveAdvection1D
 from atmpy.test_cases.traveling_vortex import TravelingVortex
 from atmpy.test_cases.traveling_vortex_hydrostatic_balance import TravelingVortexHS
 from atmpy.test_cases.rising_bubble import RisingBubble
+from atmpy.test_cases.travelling_vortex3D import TravelingVortex3D
 from atmpy.time_integrators.contexts import TimeIntegratorContext
 from atmpy.variables.multiple_pressure_variables import MPV
 from atmpy.variables.variables import Variables
@@ -57,6 +58,8 @@ np.set_printoptions(linewidth=300, suppress=True, precision=7)
 def get_base_config_for_case(case_name: str) -> SimulationConfig:
     if case_name == "TravelingVortex":
         case_instance = TravelingVortex()
+    elif case_name == "TravelingVortex3D":
+        case_instance = TravelingVortex3D()
     elif case_name == "InertialGravityWaves":
         case_instance = InertialGravityWaves()
     elif case_name == "InertialGravityLongWaves":
@@ -122,6 +125,8 @@ if args.mode in ["run", "debug"]:
     ################################ CHOICE OF TEST CASE ###################################################################
     if args.case == "TravelingVortex":
         case = TravelingVortex(config_override=loaded_config_override)
+    elif args.case == "TravelingVortex3D":
+        case = TravelingVortex3D(config_override=loaded_config_override)
     elif args.case == "TravelingVortexHS":
         case = TravelingVortexHS(config_override=loaded_config_override)
     elif args.case == "InertialGravityWaves":
@@ -138,7 +143,8 @@ if args.mode in ["run", "debug"]:
     # case = TravelingVortexHS()
     # case = RisingBubble()
     # case = InertialGravityWaves()
-    case = InertialGravityLongWaves()
+    # case = InertialGravityLongWaves()
+    # case = TravelingVortex3D()
     config = case.config  # This 'config' has the definitive grid for THIS run.
 
     if args.profile:  # Profiler config adjustments
@@ -332,6 +338,8 @@ elif args.mode == "visualize":
         variable_name=args.variable,
         plot_type=args.plot_type,
         time_indices=args.steps,
+        slice_dim=args.slice_dim,
+        slice_value=args.slice_value,
     )
     logger.info("Visualization process finished.")
 
