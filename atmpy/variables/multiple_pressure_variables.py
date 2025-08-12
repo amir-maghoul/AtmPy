@@ -113,39 +113,104 @@ class MPV:
         return grid
 
     def compute_dS_on_nodes(self):
-        """Compute the derivative of S with respect to the direction of gravity. The S variable is assumed to be
-        defined on the nodes.
+        """
+        Computes the derivative of the nodal stratification (S) along the
+        gravity axis and broadcasts the result to the full cell grid.
+
+        The derivative is computed between nodes, resulting in a cell-centered
+        quantity.
 
         Returns
         -------
         ndarray of shape grid.cshape
-            The derivative of S with respect to the direction of gravity.
+            The derivative of S with respect to the gravity direction, defined
+            on the cell centers.
         """
+        # 1. Get grid spacing and 1D nodal stratification array.
         dr: float = self.grid.dxyz[self.direction]
         S0: np.ndarray = self.hydrostate.node_vars[..., HI.S0]
+
+        # 2. Compute the derivative. The result `dS` is 1D and has a length
+        #    equal to the number of cells in the gravity direction.
         dS: np.ndarray = np.diff(S0) / dr
 
+        # 3. Handle the 1D base case.
         if self.grid.ndim == 1:
             return dS
 
-        tile_shape: list = self._get_tile_shape()
-        dS = np.tile(dS, tile_shape)
-        return dS
+        # 4. Reshape the 1D result to be broadcastable.
+        #    For a 3D grid with gravity in y-dir, this changes the shape
+        #    from (ny,) to (1, ny, 1).
+        new_shape = [1] * self.grid.ndim
+        new_shape[self.direction] = dS.shape[0]
+        dS_reshaped = dS.reshape(tuple(new_shape))
+
+        # 5. Broadcast the reshaped array to the full cell grid shape.
+        #    This is memory-efficient as it creates a view, not a copy.
+        dS_full = np.broadcast_to(dS_reshaped, self.grid.cshape)
+
+        return dS_full
+
+    # def compute_dS_on_nodes(self):
+    #     """Compute the derivative of S with respect to the direction of gravity. The S variable is assumed to be
+    #     defined on the nodes.
+    #
+    #     Returns
+    #     -------
+    #     ndarray of shape grid.cshape
+    #         The derivative of S with respect to the direction of gravity.
+    #     """
+    #     dr: float = self.grid.dxyz[self.direction]
+    #     S0: np.ndarray = self.hydrostate.node_vars[..., HI.S0]
+    #     dS: np.ndarray = np.diff(S0) / dr
+    #
+    #     if self.grid.ndim == 1:
+    #         return dS
+    #
+    #     tile_shape: list = self._get_tile_shape()
+    #     dS = np.tile(dS, tile_shape)
+    #     return dS
+
+    # def get_S0c_on_cells(self):
+    #     """Get method to get the S0c attribute. The S0 variable is assumed to be defined on the cells."""
+    #     S0c: np.ndarray = self.hydrostate.cell_vars[..., HI.S0]
+    #     if self.grid.ndim == 1:
+    #         return S0c
+    #
+    #     tile_shape: list = self._get_tile_shape()
+    #     S0c = np.tile(S0c, tile_shape)
+    #     return S0c
+    #
+    # def _get_tile_shape(self):
+    #     tile_shape = list(self.grid.cshape)
+    #     tile_shape[self.direction] = 1
+    #     return tile_shape
 
     def get_S0c_on_cells(self):
-        """Get method to get the S0c attribute. The S0 variable is assumed to be defined on the cells."""
+        """
+        Gets the 1D stratification array S0c and broadcasts it to the full
+        grid shape (e.g., 2D or 3D) using NumPy broadcasting.
+
+        This is the recommended, most efficient method.
+        """
+        # 1. Get the 1D stratification array defined along the gravity axis.
         S0c: np.ndarray = self.hydrostate.cell_vars[..., HI.S0]
+
+        # If the grid is already 1D, no change is needed.
         if self.grid.ndim == 1:
             return S0c
 
-        tile_shape: list = self._get_tile_shape()
-        S0c = np.tile(S0c, tile_shape)
-        return S0c
+        # 2. Reshape the 1D array to be broadcastable.
+        #    Create a new shape tuple like [1, 1, ..., 1].
+        new_shape = [1] * self.grid.ndim
 
-    def _get_tile_shape(self):
-        tile_shape = list(self.grid.cshape)
-        tile_shape[self.direction] = 1
-        return tile_shape
+        #    Set the dimension along the gravity axis to its actual size.
+        #    This transforms S0c from shape (N,) to, for example, (1, N, 1) for g_axis = 1
+        new_shape[self.direction] = S0c.shape[0]
+        S0c_reshaped = S0c.reshape(tuple(new_shape))
+
+        # 3. Use np.broadcast_to to create a read-only view of the array
+        return np.broadcast_to(S0c_reshaped, self.grid.cshape)
 
     def set_rhs_to_zero(self):
         self.rhs[...] = 0.0
