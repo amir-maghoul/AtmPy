@@ -99,9 +99,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Helper for nodal boundary conditions
         # That is setting the flag is_nodal for all dimensions and all sides (therefore ndim*2) to True
         # since p2_nodes is nodal.
-        self._nodal_bc_contexts = (
-            [BCApplicationContext(is_nodal=True)] * self.grid.ndim * 2
-        )
+        self._nodal_bc_contexts = [BCApplicationContext(is_nodal=True)] * self.ndim * 2
 
     def _get_advection_routine(
         self,
@@ -121,8 +119,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
     def _get_dimensional_sweep_order(self, global_time_step_num: int) -> List[str]:
         """Determines the order of dimensional sweeps based on the global time step."""
-        base_directions = dimension_directions(self.grid.ndim)
-        if self.grid.ndim == 1:
+        base_directions = dimension_directions(self.ndim)
+        if self.ndim == 1:
             return base_directions
         if global_time_step_num % 2 == 0:
             return base_directions
@@ -303,10 +301,16 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         cellvars = self.variables.cell_vars  # Temp variable for cell variables
         p2n = np.copy(self.mpv.p2_nodes)  # Temp allocation for p2_nodes
 
+        # Calculate the buoyancy PX'
+        dbuoy = cellvars[..., VI.RHOY] * cellvars[..., VI.RHOX] / cellvars[..., VI.RHO]
+        vertical_velocity = (
+            cellvars[..., self.vertical_momentum_index] / cellvars[..., VI.RHO]
+        )
+
         ###################### Update variables
         self._forward_pressure_update(cellvars, dt, p2n)
-        self._forward_momenta_update(cellvars, dt, p2n)
-        self._forward_buoyancy_update(cellvars, dt)
+        self._forward_momenta_update(cellvars, dt, p2n, dbuoy)
+        self._forward_buoyancy_update(cellvars, dt, vertical_velocity)
         ####################### Update boundary values
         # Update the boundary nodes for pressure variable
         self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.p2_nodes)
@@ -421,7 +425,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.mpv.wcenter *= self.is_compressible
 
         ############################ 6. Solve the elliptic helmholtz equation ##########################################
-        rtol = 1.0e-8
+        rtol = 1.0e-6
         p2_inner_flat, solver_info = self.pressure_solver.solve_helmholtz(
             rhs_flat,
             dt,
@@ -464,6 +468,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         cellvars: np.ndarray,
         dt: float,
         p2n: np.ndarray,
+        dbuoy: np.ndarray,
     ):
         """Update the momenta
 
@@ -482,9 +487,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.wind_speed, -1.0, in_place=False
         )
 
-        # Calculate the buoyancy PX'
-        dbuoy = cellvars[..., VI.RHOY] * cellvars[..., VI.RHOX] / cellvars[..., VI.RHO]
-
         # pressure gradient factor: (P/Gamma)
         rhoYovG = self.pressure_solver._calculate_P_over_Gamma(cellvars)
 
@@ -501,26 +503,23 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             - coriolis[2] * adjusted_momenta[..., 1]
             + coriolis[1] * adjusted_momenta[..., 2]
         )
-        if self.grid.ndim >= 2:
+        if self.ndim >= 2:
             cellvars[..., VI.RHOV] -= dt * (
                 rhoYovG * dpdy
                 - coriolis[0] * adjusted_momenta[..., 2]
                 + coriolis[2] * adjusted_momenta[..., 0]
             )
-        if self.grid.ndim == 3:
+        if self.ndim == 3:
             cellvars[..., VI.RHOW] -= dt * (
-                rhoYovG * dpdy
+                rhoYovG * dpdz
                 - coriolis[1] * adjusted_momenta[..., 0]
                 + coriolis[0] * adjusted_momenta[..., 1]
             )
 
         # Updates: The momentum in the direction of gravity
         # Find vertical vs horizontal velocities:
-        if (
-            self.grid.ndim >= 2
-            and self.pressure_solver.vertical_momentum_index < cellvars.shape[-1]
-        ):
-            cellvars[..., self.pressure_solver.vertical_momentum_index] -= dt * (
+        if self.ndim >= 2 and self.vertical_momentum_index < cellvars.shape[-1]:
+            cellvars[..., self.vertical_momentum_index] -= dt * (
                 (g / self.Msq) * dbuoy * self.is_nonhydrostatic
             )
 
@@ -541,7 +540,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ################################################################################################################
         # Divergence
-        inner_slice = one_element_inner_slice(self.grid.ndim, full=False)
+        inner_slice = one_element_inner_slice(self.ndim, full=False)
         self.mpv.rhs[inner_slice] = self.discrete_operator.divergence(
             pressure_weighted_momenta,
         )
@@ -566,7 +565,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         dp2n[inner_slice] -= dt * dpidP * self.mpv.rhs[inner_slice]
         self.mpv.p2_nodes[...] += self.is_compressible * dp2n
 
-    def _forward_buoyancy_update(self, cellvars: np.ndarray, dt: float):
+    def _forward_buoyancy_update(
+        self, cellvars: np.ndarray, dt: float, vertical_velocity: np.ndarray
+    ):
         """Update the X' variable (rho X in the variables)
 
         Parameters
@@ -575,6 +576,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
            The cell variables
         dt : float
             The time step
+        vertical_velocity : np.ndarray
+            The pre-update value of vertical velocity.
         """
         # get Chi variable and the derivative
         S0c = self.mpv.get_S0c_on_cells()
@@ -589,18 +592,14 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Update the variable
         ###############################################################################################################
         cellvars[..., VI.RHOX] = (
-            currentX
-            - dt
-            * cellvars[..., self.pressure_solver.vertical_momentum_index]
-            * dSdy
-            * cellvars[..., VI.RHO]
+            currentX - dt * vertical_velocity * dSdy * cellvars[..., VI.RHO]
         )
 
     def _calculate_enthalpy_weighted_momenta(self, cellvars: np.ndarray):
         """Calculate the vector [Pu, [Pv], [Pw]] which is equal to rho*Theta*velocities. This is needed in multiple
         parts of the code"""
         Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
-        momenta_indices = [VI.RHOU, VI.RHOV, VI.RHOW][: self.grid.ndim]
+        momenta_indices = [VI.RHOU, VI.RHOV, VI.RHOW][: self.ndim]
         return cellvars[..., momenta_indices] * Y[..., np.newaxis]
 
     def get_dt(self):

@@ -157,3 +157,5 @@ def _1d_directional_advection(
         variables.cell_vars[...] += lmbda * (
             flux_obj.flux[direction][left_idx] - flux_obj.flux[direction][right_idx]
         )
+
+    boundary_manager.apply_boundary_on_direction(variables.cell_vars, direction)
