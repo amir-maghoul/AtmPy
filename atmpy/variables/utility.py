@@ -40,7 +40,7 @@ def cell_averaging(data: np.ndarray, kernel: np.ndarray):
     slices = [slice(start, stop) for start, stop in zip(start_crop, end_crop_exclusive)]
 
     # Crop the full convolution to the 'valid' region
-    return full_conv[tuple(slices)] / kernel.sum()
+    return full_conv[tuple(slices)]
 
 
 def cells_to_nodes_averaging(cell_data: np.ndarray) -> np.ndarray:

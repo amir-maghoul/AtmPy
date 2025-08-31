@@ -427,12 +427,12 @@ class MPV:
         icx, icy = self.grid.cshape
         icxn, icyn = self.grid.nshape
         dx, dy = self.grid.dx, self.grid.dy
-        height = self.grid.y_nodes[-ngy] - self.grid.y_nodes[ngy]
+        height = self.grid.y_nodes[-ngy - 1]
 
         # --- BLOCK 1: Cell-based pressure correction (p2_cells) ---
         x_idx_m_c = slice(0, -1)
         x_idx_c_c = slice(1, None)
-        y_idx_c = slice(ngy, -ngy + 1)
+        y_idx_c = slice(ngy, -ngy)
         xn_idx_c = slice(
             1, -1
         )  # Original code had this slice, seems off but we translate exactly
@@ -479,25 +479,30 @@ class MPV:
         )
         pibot_c[active_x_c] -= dotPU_c * coeff_c[active_x_c]
 
-        p20_hydro_c = self.hydrostate.cell_vars[y_idx_c, HI.P2_0].reshape(1, -1)
-        self.p2_cells[active_x_c, y_idx_c] += (
-            pibot_c[active_x_c].reshape(-1, 1) - p20_hydro_c
-        )
+        y_idx = slice(ngy, -ngy + 1)
+        x_idx = slice(ngx, -ngx + 1)
+
+        p20_hydro_c = self.hydrostate.cell_vars[y_idx, HI.P2_0].reshape(1, -1)
+        self.p2_cells[x_idx, y_idx] += pibot_c[x_idx].reshape(-1, 1) - p20_hydro_c
 
         # --- BLOCK 2: Node-based pressure correction (p2_nodes) ---
-        y_idx_n = slice(ngy, -ngy)
+        y_idx_n = slice(ngy, -ngy + 1)
+        height = self.grid.y_nodes[-ngy]
 
         beta_n = np.zeros(icx)
         bdpdx_n = np.zeros(icx)
 
-        beta_n[1:] = np.sum(Pc * thc * dy, axis=1)
+        Pc_n = rho_y[1:, y_idx_n]
+        thc_n = Pc_n / rho[1:, y_idx_n]
+
+        beta_n[1:] = np.sum(Pc_n * thc_n * dy, axis=1)
         beta_n = np.where(beta_n == 0, 1e-12, beta_n)
         beta_n *= Gammainv / height
 
         bdpdx_n[1:] = np.sum(
-            Pc
-            * thc
-            * (self.p2_nodes[1:-1, y_idx_n] - self.p2_nodes[:-2, y_idx_n])
+            Pc_n
+            * thc_n
+            * (self.p2_nodes[1:-1, y_idx_c] - self.p2_nodes[:-2, y_idx_c])
             * dy,
             axis=1,
         )
@@ -537,20 +542,20 @@ class MPV:
             ngx, ngy, icxn, icyn, self.p2_nodes, self.dp2_nodes
         )
 
-        delp2 = 0.5 * (self.p2_nodes[-ngx - 1, y_idx_n] - self.p2_nodes[ngx, y_idx_n])
+        delp2 = 0.5 * (self.p2_nodes[-ngx - 1, y_idx_c] - self.p2_nodes[ngx, y_idx_c])
         delp2 = delp2.reshape(1, -1)
 
         num_x_inner_nodes = icxn - 2 * ngx
         sgn = np.ones((num_x_inner_nodes, 1))
         sgn[1::2] *= -1
 
-        self.p2_nodes[ngx:-ngx, y_idx_n] += sgn * delp2
+        self.p2_nodes[ngx:-ngx, y_idx_c] += sgn * delp2
 
         # --- BLOCK 4: Final State Update (based on corrected CELL pressure) ---
         self.dp2_nodes[...] = 0.0
 
         inner_domain_c = self.grid.get_inner_slice()
-        p20_hydro_nd_c = self.get_S0c_on_cells()
+        p20_hydro_nd_c = self.get_S0c_on_cells().copy()
         p20_hydro_nd_c[...] = self.hydrostate.cell_vars[:, HI.P2_0]
 
         pi = Msq * (self.p2_cells[inner_domain_c] + p20_hydro_nd_c[inner_domain_c])
