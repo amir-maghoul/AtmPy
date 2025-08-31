@@ -1,5 +1,7 @@
 import numpy as np
 from typing import Callable
+
+from atmpy.flux.utility import diffs_inner_slicing
 from atmpy.infrastructure.utility import directional_indices, direction_axis
 from atmpy.infrastructure.enums import PrimitiveVariableIndices as PVI
 
@@ -77,13 +79,12 @@ def calculate_slopes(
     -----
     The limited slope has two fewer rows/columns in the direction of calculation than the original variables.
     """
-    left_idx, right_idx, directional_inner_idx = directional_indices(
-        ndim, direction_str, full=True
+    left_idx, right_idx, directional_inner_idx = diffs_inner_slicing(
+        ndim, direction_str
     )
-    # Use twice indexing: once to eliminate the extra zero due to the size difference between vars and differences
-    # (differences should have one less element) and once to obtain the left values
-    left_variable_slopes = diffs[left_idx][left_idx]
-    right_variable_slopes = diffs[left_idx][right_idx]
+
+    left_variable_slopes = diffs[left_idx]
+    right_variable_slopes = diffs[right_idx]
     limited_slopes = np.zeros_like(diffs)
     # Since the limiter returns an array with 2 fewer rows/columns, it should be placed in the inner cells of
     # an array with the same shape as variables

@@ -1,6 +1,8 @@
 import numpy as np
 from typing import List
 
+from atmpy.infrastructure.utility import direction_axis
+
 
 def create_averaging_kernels(dimension: int) -> List[np.ndarray]:
     """
@@ -61,3 +63,46 @@ def create_averaging_kernels(dimension: int) -> List[np.ndarray]:
 
     else:
         raise ValueError("dimension must be 1, 2, or 3.")
+
+
+def diffs_inner_slicing(ndim: int, direction: str):
+    """Compute the correct indexing of the slopes container.
+
+    Parameters
+    ----------
+    ndim : int
+        The spatial dimension of the problem.
+    direction_string : str
+        The direction of the flow/in which the slopes are calculated.
+
+    Returns
+    -------
+    Tuple
+        consisting of
+        left state indices
+        right state indices
+        the inner indices in the direction of the flow
+
+    Notes
+    -----
+    In this function, the rights and inner slices happen (by circumstance) to be the same. But two different variables
+    are chosen to duplicate to avoid usage/reading confusions.
+    """
+
+    lefts = [slice(None)] * (ndim + 1)
+    rights = [slice(None)] * (ndim + 1)
+    inner = [slice(None)] * (ndim + 1)
+
+    if direction in ["x", "y", "z"]:
+        direction = direction_axis(direction)
+        lefts[direction] = slice(0, -2)
+        rights[direction] = slice(1, -1)
+        inner[direction] = slice(1, -1)
+    else:
+        raise ValueError("Invalid direction string")
+
+    return (
+        tuple(lefts),
+        tuple(rights),
+        tuple(inner),
+    )

@@ -268,7 +268,7 @@ class Flux:
         # Calculate the P = rho*Theta by averaging and advecting
         scale = 0.5 * (
             (cell_vars[lefts_idx + (VI.RHOY,)] + cell_vars[rights_idx + (VI.RHOY,)])
-            - 0.5 * lmbda * (Pu[rights_idx] - Pu[lefts_idx])
+            - lmbda * (Pu[rights_idx] - Pu[lefts_idx])
         )
 
         lefts.cell_vars[lefts_idx + (VI.RHOY,)] = scale
