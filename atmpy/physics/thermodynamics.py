@@ -28,4 +28,4 @@ class Thermodynamics:
         self.gm1 = gamma - 1.0
         self.gm1inv = 1.0 / (gamma - 1.0)
         self.Gamma = (gamma - 1.0) / gamma
-        self.Gammainv = 1.0 / self.Gamma
+        self.Gammainv = gamma / (gamma - 1.0)

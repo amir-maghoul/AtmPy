@@ -14,6 +14,7 @@ from atmpy.infrastructure.enums import (
 from atmpy.boundary_conditions.bc_extra_operations import (
     WallAdjustment,
     WallFluxCorrection,
+    WallVariableZeroOut,
 )
 from atmpy.infrastructure.utility import (
     one_element_inner_slice,
@@ -211,10 +212,10 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         #### Calculate the needed values for the updates in the RHS of the momenta equations (the Exner pressure #######
         #### perturbation (Pi^prime)_x, _y, _z (see RHS of momenta eq.) and the P*Theta coefficients)  ##################
         dpdx, dpdy, dpdz = self.discrete_operator.gradient(p)
-        pTheta = self.mpv.wplus[
-            0
-        ]  # Capital P. it is written small for naming in Python.
-        # pTheta = self._calculate_coefficient_pTheta(self.variables.cell_vars)
+        # pTheta = self.mpv.wplus[
+        #     0
+        # ]  # Capital P. it is written small for naming in Python.
+        pTheta = self._calculate_coefficient_pTheta(self.variables.cell_vars)
 
         ##################### Calculate exner pressure gradient times coefficient (cell-centered) ######################
         ##################### These are the nominator terms under the divergence in the Helmholtz equation #############
@@ -363,6 +364,15 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         np.ndarray
             The full Helmholtz operator of shape (nnx-2, nny-2, nnz-2)
         """
+        # Zero out the coefficients of the Helmholtz operator on the ghost cells
+        boundary_operation = [
+            WallVariableZeroOut(
+                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.0
+            )
+        ]
+        self.boundary_manager.apply_extra_all_sides(
+            self.mpv.wplus[0], boundary_operation, target_mpv=True
+        )
         ############### Calculate the Laplacian ########################################################################
         laplacian_full = self.isentropic_laplacian(
             p, dt, is_nongeostrophic, is_nonhydrostatic
@@ -459,7 +469,6 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self._compute_and_store_precondition_data(
             dt, is_nongeostrophic, is_nonhydrostatic, is_compressible
         )
-
         if self.precon_data is not None:
 
             # Capture the current preconditioner data and the specific apply function
@@ -524,8 +533,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         Notes
         -----
-        The shape of the output is the same as the inner NODES, which incidentally (but evidently) is equal to the cell
-        shape of the grid (cshape).
+        The shape of the output is one less NODES (nnx - 2, nny - 2, nnz - 2).
 
         It calculates this term for the Helmholtz equation of pressure.
         Remember the P and pi are connected to each other through the following formula:
@@ -548,11 +556,11 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         dPdpi = coeff * cells_to_nodes_averaging(P**exponent)
 
         # Apply wall correction
-        boundary_operation = [
-            WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
-            )
-        ]
-        self.boundary_manager.apply_extra_all_sides(dPdpi, boundary_operation)
+        # boundary_operation = [
+        #     WallAdjustment(
+        #         target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
+        #     )
+        # ]
+        # self.boundary_manager.apply_extra_all_sides(dPdpi, boundary_operation)
 
         return dPdpi

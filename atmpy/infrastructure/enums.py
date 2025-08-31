@@ -8,9 +8,9 @@ class VariableIndices(IntEnum):
     RHO = 0  # Density
     RHOY = 1  # Potential Temperature
     RHOX = 2  # Perturbation of X (Chi): X'
-    RHOU = 3  # Horizontal Velocity x-component
-    RHOV = 4  # Horizontal Velocity y-component
-    RHOW = 5  # Vertical Velocity
+    RHOU = 3  # Horizontal Momentum x-component
+    RHOV = 4  # Vertical Momentum
+    RHOW = 5  # Horizontal Momentum y-component
 
 
 # For now the assumption is that the number of cell variables and the number of primitive variables are the same
@@ -22,8 +22,8 @@ class PrimitiveVariableIndices(IntEnum):
     Y = 1  # Potential Temperature
     X = 2  # Perturbation of X (Chi): X'
     U = 3  # Horizontal Velocity x-component
-    V = 4  # Horizontal Velocity y-component
-    W = 5  # Vertical Velocity
+    V = 4  # Vertical Velocity
+    W = 5  # Horizontal Velocity y-component
 
 
 class HydrostateIndices(IntEnum):

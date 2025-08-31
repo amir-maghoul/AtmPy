@@ -9,7 +9,7 @@ from typing import Tuple
 #    These are the core computational strategies.
 # =============================================================================
 # Cache=True speeds up subsequent runs after the first compilation
-_NJIT_OPTIONS = {"nogil": True, "cache": True, "fastmath": True}
+_NJIT_OPTIONS = {"nogil": True, "cache": True, "fastmath": False}
 
 
 @nb.njit(**_NJIT_OPTIONS)
@@ -129,15 +129,15 @@ def _gradient_3d_numba(
 
                 # Average gradient in x across the cell
                 Dpx[i, j, k] = (
-                    p100 + p110 + p101 + p111 - p000 - p010 - p001 - p011
+                    (p100 - p000) + (p110 - p010) + (p101 - p001) + (p111 - p011)
                 ) * inv_dx_quarter
                 # Average gradient in y across the cell
                 Dpy[i, j, k] = (
-                    p010 + p110 + p011 + p111 - p000 - p100 - p001 - p101
+                    (p010 - p000) + (p110 - p100) + (p011 - p001) + (p111 - p101)
                 ) * inv_dy_quarter
                 # Average gradient in z across the cell
                 Dpz[i, j, k] = (
-                    p001 + p101 + p011 + p111 - p000 - p100 - p010 - p110
+                    (p001 - p000) + (p101 - p100) + (p011 - p010) + (p111 - p110)
                 ) * inv_dz_quarter
     return Dpx, Dpy, Dpz
 

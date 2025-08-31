@@ -337,12 +337,12 @@ def animate_2d(
 
 
 def plot_3d_static(
-        ds: xr.Dataset,
-        variable_name: str,
-        time_index: int,
-        slice_dim: str,
-        slice_value: float,
-        ax: Optional[plt.Axes] = None,
+    ds: xr.Dataset,
+    variable_name: str,
+    time_index: int,
+    slice_dim: str,
+    slice_value: float,
+    ax: Optional[plt.Axes] = None,
 ) -> None:
     """
     Plots a 2D slice of a 3D variable at a specific time index.
@@ -365,7 +365,8 @@ def plot_3d_static(
     # Validate that the dimension exists before trying to slice
     if slice_dim_actual not in data_at_time.dims:
         logger.error(
-            f"Dimension '{slice_dim_actual}' not found in variable '{variable_name}'. Available dims: {data_at_time.dims}")
+            f"Dimension '{slice_dim_actual}' not found in variable '{variable_name}'. Available dims: {data_at_time.dims}"
+        )
         return
 
     # Now, perform the selection with the correct dimension name
@@ -375,7 +376,7 @@ def plot_3d_static(
     time_value = plot_data_2d["time"].item()
 
     # Determine the remaining two dimensions for plotting
-    plot_dims = [dim for dim in ['x', 'y', 'z'] if dim != slice_dim]
+    plot_dims = [dim for dim in ["x", "y", "z"] if dim != slice_dim]
     x_dim_name, y_dim_name = (
         [f"{dim}_node" for dim in plot_dims] if is_nodal else plot_dims
     )
@@ -398,8 +399,17 @@ def plot_3d_static(
     data_max = np.nanmax(plot_data_for_contour)
     levels = np.linspace(data_min, data_max, 25) if data_min != data_max else 25
 
-    contour = ax.contourf(x_coords, y_coords, plot_data_for_contour, cmap=cmap, levels=levels)
-    ax.contour(x_coords, y_coords, plot_data_for_contour, colors="k", linewidths=0.2, levels=levels)
+    contour = ax.contourf(
+        x_coords, y_coords, plot_data_for_contour, cmap=cmap, levels=levels
+    )
+    ax.contour(
+        x_coords,
+        y_coords,
+        plot_data_for_contour,
+        colors="k",
+        linewidths=0.2,
+        levels=levels,
+    )
 
     # --- Colorbar and Labels ---
     cbar = fig.colorbar(contour, ax=ax, orientation="vertical")
@@ -419,13 +429,13 @@ def plot_3d_static(
 
 
 def animate_3d(
-        ds: xr.Dataset,
-        variable_name: str,
-        time_indices_range: List[int],
-        slice_dim: str,
-        slice_value: float,
-        fig: Optional[plt.Figure] = None,
-        ax: Optional[plt.Axes] = None,
+    ds: xr.Dataset,
+    variable_name: str,
+    time_indices_range: List[int],
+    slice_dim: str,
+    slice_value: float,
+    fig: Optional[plt.Figure] = None,
+    ax: Optional[plt.Axes] = None,
 ) -> Optional[FuncAnimation]:
     """Animates a 2D slice of a 3D variable over a range of time indices."""
     if fig is None or ax is None:
@@ -443,13 +453,14 @@ def animate_3d(
 
     if slice_dim_actual not in data_var.dims:
         logger.error(
-            f"Dimension '{slice_dim_actual}' not found in variable '{variable_name}'. Available dims: {data_var.dims}")
+            f"Dimension '{slice_dim_actual}' not found in variable '{variable_name}'. Available dims: {data_var.dims}"
+        )
         return None
 
     data_slice = data_var.sel({slice_dim_actual: slice_value}, method="nearest")
     actual_slice_val = data_slice[slice_dim_actual].item()
 
-    plot_dims = [dim for dim in ['x', 'y', 'z'] if dim != slice_dim]
+    plot_dims = [dim for dim in ["x", "y", "z"] if dim != slice_dim]
     x_dim_name, y_dim_name = (
         [f"{dim}_node" for dim in plot_dims] if is_nodal else plot_dims
     )
@@ -457,7 +468,8 @@ def animate_3d(
     y_coords = ds[y_dim_name].values
 
     start_index, end_index = min(time_indices_range), max(time_indices_range)
-    if start_index == end_index: end_index += 1
+    if start_index == end_index:
+        end_index += 1
     end_index = min(end_index, len(ds["time"]))
     frames_indices = list(range(start_index, end_index))
 
@@ -469,7 +481,11 @@ def animate_3d(
     # Create an initial contour plot to establish the colorbar
     ax.clear()
     initial_data_raw = data_slice.isel(time=start_index)
-    initial_plot_data = initial_data_raw.data.T if initial_data_raw.dims[0] == x_dim_name else initial_data_raw.data
+    initial_plot_data = (
+        initial_data_raw.data.T
+        if initial_data_raw.dims[0] == x_dim_name
+        else initial_data_raw.data
+    )
     cont = ax.contourf(x_coords, y_coords, initial_plot_data, cmap=cmap, levels=levels)
     cbar = fig.colorbar(cont, ax=ax)
     cbar.set_label(f"{variable_name} ({data_var.attrs.get('units', '')})")
@@ -481,10 +497,16 @@ def animate_3d(
         current_data = data_slice.isel(time=actual_time_index)
         time_value = current_data["time"].item()
 
-        plot_data = current_data.data.T if current_data.dims[0] == x_dim_name else current_data.data
+        plot_data = (
+            current_data.data.T
+            if current_data.dims[0] == x_dim_name
+            else current_data.data
+        )
 
         ax.contourf(x_coords, y_coords, plot_data, cmap=cmap, levels=levels)
-        ax.contour(x_coords, y_coords, plot_data, colors='k', linewidths=0.2, levels=levels)
+        ax.contour(
+            x_coords, y_coords, plot_data, colors="k", linewidths=0.2, levels=levels
+        )
 
         ax.set_xlabel(f"{x_dim_name} (m)")
         ax.set_ylabel(f"{y_dim_name} (m)")
@@ -496,17 +518,18 @@ def animate_3d(
         # blit=False is more robust.
         return []
 
-    ani = FuncAnimation(fig, update, frames=len(frames_indices), interval=500, blit=False)
+    ani = FuncAnimation(
+        fig, update, frames=len(frames_indices), interval=500, blit=False
+    )
     return ani
+
 
 def visualize_data(
     input_file: str,
     variable_name: str,
     plot_type: str,  # 'static' or 'animate'
-    time_indices: Optional[
-        List[int]
-    ] = None,
-    slice_dim: str = 'z',
+    time_indices: Optional[List[int]] = None,
+    slice_dim: str = "z",
     slice_value: float = 0.0,
 ):
     """
@@ -630,7 +653,7 @@ def visualize_data(
                 ds, variable_name, anim_time_indices_range, fig=fig, ax=ax
             )
         elif ndim == 3:
-            if hasattr(ax, 'get_zlim'): # A simple check for a 3D axis
+            if hasattr(ax, "get_zlim"):  # A simple check for a 3D axis
                 fig.clear()
                 ax = fig.add_subplot(111)
 
@@ -638,7 +661,7 @@ def visualize_data(
                 ds,
                 variable_name,
                 anim_time_indices_range,
-                slice_dim=slice_dim,      # Pass the new argument
+                slice_dim=slice_dim,  # Pass the new argument
                 slice_value=slice_value,  # Pass the new argument
                 fig=fig,
                 ax=ax,
