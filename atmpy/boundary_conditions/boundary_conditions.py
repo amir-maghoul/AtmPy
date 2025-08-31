@@ -163,6 +163,16 @@ class BaseBoundaryCondition(ABC):
         boundary_nodes_slice[self.direction] = idx
         return tuple(boundary_nodes_slice)
 
+    def _nodal_boundary_slice(self) -> Tuple[slice, ...]:
+        idx = (
+            self.ng[self.side_axis] - 1
+            if self.side_axis == 0
+            else -self.ng[self.side_axis]
+        )
+        boundary_nodes_slice = [slice(None)] * self.ndim
+        boundary_nodes_slice[self.direction] = idx
+        return tuple(boundary_nodes_slice)
+
     def padded_slices(self) -> Tuple[slice, ...]:
         """Returns the slice of the padded part."""
         side = self._find_side_axis()
@@ -455,7 +465,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         if isinstance(operation, WallAdjustment):
             # Assumption: Variables is a single nodal variable
             factor = operation.factor
-            boundary_nodes_slice = self._boundary_slice()
+            boundary_nodes_slice = self._nodal_boundary_slice()
             variables[boundary_nodes_slice] *= factor
         elif isinstance(operation, WallFluxCorrection):
             # Assumption: Variables is the momenta stacked on the last axis.
@@ -639,7 +649,7 @@ class Wall(BaseBoundaryCondition):
         if isinstance(operation, WallAdjustment):
             # Assumption: Variables is a single nodal variable of one element less than the original nodal array.
             factor = operation.factor
-            boundary_nodes_slice = self._boundary_slice()
+            boundary_nodes_slice = self._nodal_boundary_slice()
             variables[boundary_nodes_slice] *= factor
         elif isinstance(operation, WallFluxCorrection):
             # Assumption: Variables is the momenta stacked on the last axis.

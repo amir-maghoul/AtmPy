@@ -145,6 +145,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
                 factor=0.0,
             )
         ]
+
         boundary_operations = [solid_wall_operation, reflective_wall_operation]
         self.discrete_operator.boundary_operations = boundary_operations
 
@@ -556,11 +557,11 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         dPdpi = coeff * cells_to_nodes_averaging(P**exponent)
 
         # Apply wall correction
-        # boundary_operation = [
-        #     WallAdjustment(
-        #         target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
-        #     )
-        # ]
-        # self.boundary_manager.apply_extra_all_sides(dPdpi, boundary_operation)
+        boundary_operation = [
+            WallAdjustment(
+                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
+            )
+        ]
+        self.boundary_manager.apply_extra_all_sides(dPdpi, boundary_operation)
 
         return dPdpi
