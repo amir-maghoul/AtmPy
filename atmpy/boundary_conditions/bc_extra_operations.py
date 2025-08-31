@@ -68,6 +68,15 @@ class WallFluxCorrection(ExtraBCOperation):
         return f"WallFluxCorrection(factor={self.factor}, target={self.get_target_description()})"
 
 
+class WallVariableZeroOut(ExtraBCOperation):
+    def __init__(self, factor: int, **kwargs):
+        super().__init__(**kwargs)
+        self.factor = factor
+
+    def get_identifier(self) -> str:
+        return f"WallVariableZeroOut(factor={self.factor}, target={self.get_target_description()})"
+
+
 ######################################
 # Operation for PERIODIC BCs
 ######################################

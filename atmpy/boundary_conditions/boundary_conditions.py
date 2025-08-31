@@ -24,12 +24,13 @@ if TYPE_CHECKING:
         BCInstantiationOptions,
         ReflectiveGravityBCInstantiationOptions as RFBCInstantiationOptions,
     )
-    from atmpy.boundary_conditions.bc_extra_operations import ExtraBCOperation
     from atmpy.variables.multiple_pressure_variables import MPV
 
 from atmpy.boundary_conditions.bc_extra_operations import (
+    ExtraBCOperation,
     WallAdjustment,
     WallFluxCorrection,
+    WallVariableZeroOut,
 )
 from atmpy.infrastructure.utility import (
     direction_axis,
@@ -87,6 +88,16 @@ class BaseBoundaryCondition(ABC):
         self.type: BdryType = inst_opts.type
         self.side = inst_opts.side
         self.side_axis: int = self._find_side_axis()
+
+    @property
+    def application_priority(self) -> int:
+        """
+        Defines the application priority for this BC type.
+        Lower numbers are applied first. BCs with dependencies should have a higher number.
+        0: Independent BCs (Wall, Periodic)
+        1: Dependent BCs (ReflectiveGravity)
+        """
+        return 0  # Default to independent
 
     @abstractmethod
     def apply(self, cell_vars):
@@ -332,6 +343,11 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         if self.facet not in ["begin", "end"]:
             raise ValueError("Facet must be either 'begin' or 'end'.")
         self.is_compressible: bool = inst_opts.is_compressible
+
+    @property
+    def application_priority(self) -> int:
+        """This BC depends on other directions being filled first, so it runs in a later stage."""
+        return 1
 
     def apply(self, cell_vars: np.ndarray):
         """Apply the reflective boundary condition for the given side of the gravity axis. If self.side is top, this means
@@ -621,7 +637,7 @@ class Wall(BaseBoundaryCondition):
         """
 
         if isinstance(operation, WallAdjustment):
-            # Assumption: Variables is a single nodal variable
+            # Assumption: Variables is a single nodal variable of one element less than the original nodal array.
             factor = operation.factor
             boundary_nodes_slice = self._boundary_slice()
             variables[boundary_nodes_slice] *= factor
@@ -631,6 +647,11 @@ class Wall(BaseBoundaryCondition):
             momenta_slice = slice(VI.RHOU.value, VI.RHOU.value + self.ndim)
             pad_slice = self.padded_slices()
             variables[pad_slice + (momenta_slice,)] *= factor
+        elif isinstance(operation, WallVariableZeroOut):
+            # Assumption: Variable is a single cellular variable
+            factor = operation.factor
+            pad_slice = self.padded_slices()
+            variables[pad_slice] *= factor
         else:
             pass
 

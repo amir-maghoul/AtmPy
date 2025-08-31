@@ -19,6 +19,7 @@ from atmpy.boundary_conditions.contexts import (
     BoundaryConditionsConfiguration,
     BCApplicationContext,
 )
+from dataclasses import replace
 
 
 class BoundaryManager:
@@ -28,12 +29,18 @@ class BoundaryManager:
         # The keys will be the boundary sides and the values are the created BC instances.
         self.boundary_conditions: Dict[BdrySide, "BaseBC"] = {}
         self.mpv_boundary_conditions: Dict[BdrySide, "BaseBC"] = {}
+        self._sorted_bcs: List["BaseBC"] = []
+        self._sorted_mpv_bcs: List["BaseBC"] = []
         self.setup_conditions(bc_config)
 
     def setup_conditions(self, bc_config: "BoundaryConditionsConfiguration") -> None:
         """Set up the boundary conditions in dictionaries for main and MPV variables."""
         self.boundary_conditions.clear()
         self.mpv_boundary_conditions.clear()
+
+        # Temporary lists to hold instances before sorting
+        temp_bcs = []
+        temp_mpv_bcs = []
 
         for inst_opts in bc_config.options:
             # Validate side/direction compatibility
@@ -44,16 +51,25 @@ class BoundaryManager:
             ############################### Create and store PRIMARY BC instance #######################################
             bc_instance = get_boundary_conditions(inst_opts.type, inst_opts)
             self.boundary_conditions[inst_opts.side] = bc_instance
+            temp_bcs.append(bc_instance)
 
             ############################### Create and store MPV BC instance (if specified) ############################
             mpv_type_to_use = inst_opts.mpv_boundary_type
             if mpv_type_to_use is None:
                 raise ValueError("The MPV boundary type must be specified.")
 
+            inst_opts = replace(inst_opts, type=mpv_type_to_use)
             mpv_bc_instance = get_boundary_conditions(
                 inst_opts.mpv_boundary_type, inst_opts
             )
             self.mpv_boundary_conditions[inst_opts.side] = mpv_bc_instance
+            temp_mpv_bcs.append(mpv_bc_instance)
+
+        # Sort the instances based on their priority property and store them
+        self._sorted_bcs = sorted(temp_bcs, key=lambda bc: bc.application_priority)
+        self._sorted_mpv_bcs = sorted(
+            temp_mpv_bcs, key=lambda bc: bc.application_priority
+        )
 
     @staticmethod
     def _validate_side_direction_compatibility(side: BdrySide, direction: str) -> None:
@@ -119,7 +135,10 @@ class BoundaryManager:
         logging.debug(
             "Applying full PRIMARY boundary conditions on *main variables*..."
         )
-        for side, condition in self.boundary_conditions.items():
+        for condition in self._sorted_bcs:
+            logging.debug(
+                f"Applying {condition.type.name} on side {condition.side} (Priority: {condition.application_priority})"
+            )
             condition.apply(cells)  # Pass context if required
 
     def apply_boundary_on_single_var_one_side(
@@ -296,7 +315,7 @@ class BoundaryManager:
                     # Check if operation's target type matches condition's type
                     if (
                         operation.target_type is not None
-                        or condition.type == operation.target_type
+                        and condition.type == operation.target_type
                     ):
                         condition.apply_extra(variable, operation)
                     else:
@@ -316,10 +335,6 @@ def boundary_manager_2d_updated():
     from atmpy.variables.variables import Variables
     from atmpy.variables.multiple_pressure_variables import MPV  # Import MPV
     from atmpy.infrastructure.enums import VariableIndices as VI
-    from atmpy.boundary_conditions.bc_extra_operations import (
-        WallAdjustment,
-        WallFluxCorrection,
-    )
     from atmpy.boundary_conditions.contexts import (
         BCInstantiationOptions,
         BoundaryConditionsConfiguration,
