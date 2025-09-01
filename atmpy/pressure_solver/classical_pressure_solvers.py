@@ -560,6 +560,9 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         boundary_operation = [
             WallAdjustment(
                 target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
+            ),
+            WallAdjustment(
+                target_side=BdrySide.ALL, target_type=BdryType.REFLECTIVE_GRAVITY, factor=0.5
             )
         ]
         self.boundary_manager.apply_extra_all_sides(dPdpi, boundary_operation)

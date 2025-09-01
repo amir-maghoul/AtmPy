@@ -97,6 +97,14 @@ class TravelingVortex3D(BaseTestCase):
         self.yc: float = 0.0  # Vortex center y
         self.zc: float = 0.0  # Vortex center z
 
+        self.t_ref = 100.0
+        self.g = 0.0
+        coriolis_factor = 0
+        force = 1.0e-4 * self.t_ref * coriolis_factor  # Constant coriolis force
+        self.cor_f = [0.0, 0.0, 0.0]
+        self.coriolis_axis = 1
+        self.cor_f[self.coriolis_axis] = force
+
         ####################### Polynomial coefficients for pressure perturbation ######################################
         # Coefficients remain the same as they are based on a 2D radial profile.
         self.coe_correct = np.zeros((25,))
@@ -209,8 +217,8 @@ class TravelingVortex3D(BaseTestCase):
         print("Setting up 3D Traveling Vortex configuration...")
 
         #################################### Grid Configuration ########################################################
-        nx = ny = 64
-        nz = 64
+        nx = nz = 5
+        ny = 5
 
         grid_updates = {
             "ndim": 3,
@@ -235,7 +243,7 @@ class TravelingVortex3D(BaseTestCase):
             "R_gas": 287.4,
             "p_ref": 1.0e5,
             "T_ref": 300.0,
-            "h_ref": 10_000.0,
+            "h_ref": 10_000,
             "t_ref": 100.0,
             "grav": 10,
         }
@@ -264,7 +272,7 @@ class TravelingVortex3D(BaseTestCase):
 
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
-            "CFL": 0.45,
+            "CFL": 0.8,
             "dtfixed": 0.001,
             "dtfixed0": None,
             "tout": np.array([0.0, 1.0]),
@@ -296,10 +304,12 @@ class TravelingVortex3D(BaseTestCase):
         self.set_numerics(numerics_updates)
 
         ################################### Physics Settings ###########################################################
+        cor = self.cor_f
+        g = self.g
         physics_updates = {
             "wind_speed": [self.u0, self.v0, self.w0],
-            "gravity_strength": (0.0, 0.0, 0.0), # Gravity is zero for this test case
-            "coriolis_strength": (0.0, 0.0, 0.0),
+            "gravity_strength": (0.0, g, 0.0),  # Gravity is zero for this test case
+            "coriolis_strength": cor,
             "stratification": traveling_vortex_stratification,
         }
         self.set_physics(physics_updates)
@@ -310,7 +320,7 @@ class TravelingVortex3D(BaseTestCase):
             "output_folder": "traveling_vortex_3d",
             "output_base_name": "_traveling_vortex_3d",
             "output_timesteps": True,
-            "output_frequency_steps": 20,
+            "output_frequency_steps": 10,
         }
         self.set_outputs(output_updates)
 
@@ -331,19 +341,63 @@ class TravelingVortex3D(BaseTestCase):
         )
 
     def initialize_solution(self, variables: "Variables", mpv: "MPV"):
-        """Initialize density, momentum, potential temperature, and pressure fields for 3D."""
+        """Initialize density, momentum, potential temperature, and pressure fields for 3D.
+
+        Notice the initial states are:
+
+        rho(x, y, z) = rho_c * 1/2 * (1-r^2)^6 if r <= 1 else rho_c [notice rho_c is 1/2 above]
+        u(x, y, z) = -1024 * sin(Θ) * (1-r)^6 * r^6 + u_c if r <= 1 else u_c
+        v(x, y, z) = 1024 * cos(Θ) * (1-r)^6 * r^6 + v_c if r <= 1 else v_c
+
+        therefore the tangential velocity is:
+        V_Θ = 1024 * (1-r)^6 * r^6
+
+        Radial momentum balance equation:
+        dp/dr = rho * (V_theta ^2 / r + f V_theta) with f is the CONSTANT coriolis force in the vertical direction.
+
+        ----------------------------------------------------------------------------------------------------------------
+        from Wolfram|Alpha:
+
+         Radial pressure gradient for constant density
+          (1-x)^12 * x^11 =
+                x^11 - 12 x^12 + 66 x^13 - 220 x^14 + 495 x^15 - 792 x^16 + 924 x^17 - 792 x^18 + 495 x^19 - 220 x^20
+                + 66 x^21 - 12 x^22 + x^23
+
+         Radial pressure distribution as deviation from pressure at the center for constant density
+          int_0^x ((1-y)^12 * y^11) dy
+                x^12/12 - (12 x^13)/13 + (33 x^14)/7 - (44 x^15)/3 + (495 x^16)/16 - (792 x^17)/17 + (154 x^18)/3
+                -(792 x^19)/19 + (99 x^20)/4 - (220 x^21)/21 + 3 x^22 - (12 x^23)/23 + x^24/24
+
+         Radial pressure gradient for the density variation
+          (1-x^2)^6 * (1-x)^12 * x^11 =
+                x^35 - 12 x^34 + 60 x^33 - 148 x^32 + 114 x^31 + 348 x^30 - 1076 x^29 + 900 x^28 + 1071 x^27
+                - 3128 x^26 + 2040 x^25 + 2040 x^24 - 4420 x^23 + 2040 x^22 + 2040 x^21 - 3128 x^20 + 1071 x^19
+                + 900 x^18 - 1076 x^17 + 348 x^16 + 114 x^15 - 148 x^14 + 60 x^13 - 12 x^12 + x^11
+
+         Radial pressure distribution as deviation from pressure at the center for the variable density part
+         int_0^x ((1-y^2)^6 * (1-y)^12 * y^11) dy =
+                x^12/12 - (12 x^13)/13 + (30 x^14)/7 - (148 x^15)/15 + (57 x^16)/8 + (348 x^17)/17 - (538 x^18)/9 +
+                (900 x^19)/19 + (1071 x^20)/20 - (3128 x^21)/21 + (1020 x^22)/11 + (2040 x^23)/23 - (1105 x^24)/6 +
+                (408 x^25)/5 + (1020 x^26)/13 - (3128 x^27)/27 + (153 x^28)/4 + (900 x^29)/29 - (538 x^30)/15 +
+                (348 x^31)/31 + (57 x^32)/16 - (148 x^33)/33 + (30 x^34)/17 - (12 x^35)/35 + x^36/36
+
+
+
+        """
         print("Initializing solution for 3D Traveling Vortex...")
 
         grid = self.config.spatial_grid.grid
         thermo = Thermodynamics()
         thermo.update(self.config.global_constants.gamma)
         Msq = self.config.model_regimes.Msq
-        coriolis = self.config.physics.coriolis_strength[1] # Use Fy for consistency with Y-vertical
 
         # --- Calculate Hydrostatic Base State ---
         gravity = self.config.physics.gravity_strength
         g_axis = self.config.physics.gravity.axis
         mpv.state(gravity, Msq)
+        coriolis = self.config.physics.coriolis_strength[
+            self.coriolis_axis
+        ]  # Coriolis force in z-direction which is *NOT* the vertical direction
 
         # Get slice for the full inner domain
         inner_slice = grid.get_inner_slice()
@@ -394,7 +448,7 @@ class TravelingVortex3D(BaseTestCase):
 
         u_total = self.u0 + u_pert
         w_total = self.w0 + w_pert
-        v_total = np.full_like(u_total, self.v0) # v-velocity is uniform background
+        v_total = np.full_like(u_total, self.v0)  # v-velocity is uniform background
 
         # --- Calculate Density ---
         rho_total = np.full_like(r_cell, self.rho0)
@@ -407,18 +461,34 @@ class TravelingVortex3D(BaseTestCase):
             # Main pressure term
             term_main = np.zeros_like(r_cell)
             for ip, c in enumerate(self.coe):
-                term = self.fac**2 * c * (r_over_R0_cell ** (12 + ip) - 1.0) * self.rotdir**2
+                term = (
+                    self.fac**2
+                    * c
+                    * (r_over_R0_cell ** (12 + ip) - 1.0)
+                    * self.rotdir**2
+                )
                 term_main[mask_rho] += term[mask_rho]
 
             # Coriolis/Constant term
             dp2c_const = np.zeros_like(r_cell)
             if self.correct_distribution:
                 for ip, c in enumerate(self.coe_cor):
-                    term = self.fac * coriolis * c * (r_over_R0_cell ** (7 + ip) - 1.0) * self.R0
+                    term = (
+                        self.fac
+                        * coriolis
+                        * c
+                        * (r_over_R0_cell ** (7 + ip) - 1.0)
+                        * self.R0
+                    )
                     dp2c_const[mask_rho] += term[mask_rho]
             else:
-                 for ip, c in enumerate(self.const_coe):
-                    term = self.fac**2 * c * (r_over_R0_cell ** (12 + ip) - 1.0) * self.rotdir**2
+                for ip, c in enumerate(self.const_coe):
+                    term = (
+                        self.fac**2
+                        * c
+                        * (r_over_R0_cell ** (12 + ip) - 1.0)
+                        * self.rotdir**2
+                    )
                     dp2c_const[mask_rho] += term[mask_rho]
 
             dp2c = self.alpha * term_main + self.alpha_const * dp2c_const
@@ -463,7 +533,7 @@ class TravelingVortex3D(BaseTestCase):
 
         # --- Calculate Nodal Pressure Perturbation p2 (Nodes, Inner Domain Only) ---
         if grid.ndim == 3:
-             XN, YN, ZN = np.meshgrid(
+            XN, YN, ZN = np.meshgrid(
                 grid.x_nodes[inner_slice[0]],
                 grid.y_nodes[inner_slice[1]],
                 grid.z_nodes[inner_slice[2]],
@@ -477,7 +547,7 @@ class TravelingVortex3D(BaseTestCase):
         dx_node = dx_node - Lx * np.round(dx_node / Lx)
         dz_node = dz_node - Lz * np.round(dz_node / Lz)
 
-        r_node = np.sqrt(dx_node**2 + dz_node**2) # Radius is in xz-plane
+        r_node = np.sqrt(dx_node**2 + dz_node**2)  # Radius is in xz-plane
         r_over_R0_node = np.divide(r_node, self.R0, where=self.R0 != 0)
         mask_node = r_node < self.R0
 
@@ -486,21 +556,36 @@ class TravelingVortex3D(BaseTestCase):
         # Main term
         term_main_node = np.zeros_like(r_node)
         for ip, c in enumerate(self.coe):
-            term = self.fac**2 * c * (r_over_R0_node ** (12 + ip) - 1.0) * self.rotdir**2
+            term = (
+                self.fac**2 * c * (r_over_R0_node ** (12 + ip) - 1.0) * self.rotdir**2
+            )
             term_main_node[mask_node] += term[mask_node]
 
         # Coriolis/Constant term
         p2n_const_unscaled = np.zeros_like(r_node)
         if self.correct_distribution:
             for ip, c in enumerate(self.coe_cor):
-                term = self.fac * coriolis * c * (r_over_R0_node ** (7 + ip) - 1.0) * self.R0
+                term = (
+                    self.fac
+                    * coriolis
+                    * c
+                    * (r_over_R0_node ** (7 + ip) - 1.0)
+                    * self.R0
+                )
                 p2n_const_unscaled[mask_node] += term[mask_node]
         else:
             for ip, c in enumerate(self.const_coe):
-                term = self.fac**2 * c * (r_over_R0_node ** (12 + ip) - 1.0) * self.rotdir**2
+                term = (
+                    self.fac**2
+                    * c
+                    * (r_over_R0_node ** (12 + ip) - 1.0)
+                    * self.rotdir**2
+                )
                 p2n_const_unscaled[mask_node] += term[mask_node]
 
-        p2_nodes_unscaled = self.alpha * term_main_node + self.alpha_const * p2n_const_unscaled
+        p2_nodes_unscaled = (
+            self.alpha * term_main_node + self.alpha_const * p2n_const_unscaled
+        )
 
         # --- Correctly broadcast the nodal hydrostatic state ---
         rhoY0_nodes_1d_full = mpv.hydrostate.node_vars[..., HI.RHOY0]

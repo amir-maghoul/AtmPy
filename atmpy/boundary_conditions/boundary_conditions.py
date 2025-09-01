@@ -155,15 +155,16 @@ class BaseBoundaryCondition(ABC):
     def _boundary_slice(self) -> Tuple[slice, ...]:
         """Create the slice for the nodes/cells at the boundary."""
         idx = (
-            self.ng[self.side_axis] - 1
+            self.ng[self.side_axis]
             if self.side_axis == 0
-            else -self.ng[self.side_axis]
+            else -self.ng[self.side_axis] - 1
         )
-        boundary_nodes_slice = copy.deepcopy(self.full_inner_slice)
+        # boundary_nodes_slice = copy.deepcopy(self.full_inner_slice)
+        boundary_nodes_slice = [slice(None)] * self.ndim
         boundary_nodes_slice[self.direction] = idx
         return tuple(boundary_nodes_slice)
 
-    def _nodal_boundary_slice(self) -> Tuple[slice, ...]:
+    def _reduced_boundary_slice(self) -> Tuple[slice, ...]:
         idx = (
             self.ng[self.side_axis] - 1
             if self.side_axis == 0
@@ -465,7 +466,7 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         if isinstance(operation, WallAdjustment):
             # Assumption: Variables is a single nodal variable
             factor = operation.factor
-            boundary_nodes_slice = self._nodal_boundary_slice()
+            boundary_nodes_slice = self._reduced_boundary_slice() if operation.coeff else self._boundary_slice()
             variables[boundary_nodes_slice] *= factor
         elif isinstance(operation, WallFluxCorrection):
             # Assumption: Variables is the momenta stacked on the last axis.
@@ -649,7 +650,7 @@ class Wall(BaseBoundaryCondition):
         if isinstance(operation, WallAdjustment):
             # Assumption: Variables is a single nodal variable of one element less than the original nodal array.
             factor = operation.factor
-            boundary_nodes_slice = self._nodal_boundary_slice()
+            boundary_nodes_slice = self._boundary_slice() if operation.coeff else self._boundary_slice()
             variables[boundary_nodes_slice] *= factor
         elif isinstance(operation, WallFluxCorrection):
             # Assumption: Variables is the momenta stacked on the last axis.

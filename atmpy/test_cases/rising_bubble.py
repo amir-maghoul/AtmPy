@@ -138,7 +138,7 @@ class RisingBubble(BaseTestCase):
             "is_ArakawaKonor": 0,
             "is_nongeostrophic": 1,
             "is_nonhydrostatic": 1,
-            "is_compressible": 1,
+            "is_compressible": 0,
         }
         self.set_model_regimes(regime_updates)
 

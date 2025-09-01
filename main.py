@@ -144,7 +144,7 @@ if args.mode in ["run", "debug"]:
     # case = RisingBubble()
     # case = InertialGravityWaves()
     # case = InertialGravityLongWaves()
-    # case = TravelingVortex3D()
+    case = TravelingVortex3D()
     config = case.config  # This 'config' has the definitive grid for THIS run.
 
     if args.profile:  # Profiler config adjustments

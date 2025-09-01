@@ -96,6 +96,12 @@ class TravelingVortex(BaseTestCase):
         self.xc: float = 0.0  # Vortex center x
         self.yc: float = 0.0  # Vortex center y
 
+        self.coriolis_axis = 2
+        coriolis_factor = 0
+        force = 1.0e-4 * 100 * coriolis_factor  # Constant coriolis force
+        self.cor_f = [0.0, 0.0, 0.0]
+        self.cor_f[self.coriolis_axis] = force
+
         ####################### Polynomial coefficients for pressure perturbation ######################################
 
         self.coe_correct = np.zeros((25,))
@@ -253,9 +259,9 @@ class TravelingVortex(BaseTestCase):
         print("Setting up Traveling Vortex configuration...")
 
         #################################### Grid Configuration ########################################################
-        nx = 8
-        ny = 8
-        nx = ny = 64
+        # nx = 64
+        # ny = 30
+        nx = ny = 40
 
         grid_updates = {
             "ndim": 2,
@@ -335,7 +341,7 @@ class TravelingVortex(BaseTestCase):
         physics_updates = {
             "wind_speed": [self.u0, self.v0, self.w0],
             "gravity_strength": (0.0, 0.0, 0.0),  # Zero gravity case
-            "coriolis_strength": (0.0, 0.0, 0.0),
+            "coriolis_strength": self.cor_f,
             "stratification": traveling_vortex_stratification,  # Isothermal background
         }
         self.set_physics(physics_updates)
@@ -346,7 +352,7 @@ class TravelingVortex(BaseTestCase):
             "output_folder": "traveling_vortex",
             "output_base_name": "_traveling_vortex",
             "output_timesteps": True,
-            "output_frequency_steps": 2,
+            "output_frequency_steps": 10,
             # output_suffix is updated automatically based on grid
         }
         self.set_outputs(output_updates)
@@ -377,7 +383,7 @@ class TravelingVortex(BaseTestCase):
         thermo = Thermodynamics()
         thermo.update(self.config.global_constants.gamma)
         Msq = self.config.model_regimes.Msq
-        coriolis = self.config.physics.coriolis_strength[2]
+        coriolis = self.config.physics.coriolis_strength[self.coriolis_axis]
         # coriolis = self.fac
 
         # --- Calculate Hydrostatic Base State ---

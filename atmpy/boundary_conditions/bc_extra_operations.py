@@ -51,9 +51,10 @@ class ExtraBCOperation(ABC):
 # Operation for Wall BCs
 ######################################
 class WallAdjustment(ExtraBCOperation):
-    def __init__(self, factor: float, **kwargs):  # Use kwargs for base init
+    def __init__(self, factor: float, coeff: bool=True, **kwargs):  # Use kwargs for base init
         super().__init__(**kwargs)
         self.factor = factor
+        self.coeff: bool = coeff
 
     def get_identifier(self) -> str:
         return f"WallAdjustment(factor={self.factor}, target={self.get_target_description()})"

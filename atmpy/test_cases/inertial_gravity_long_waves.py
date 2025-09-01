@@ -48,9 +48,8 @@ class InertialGravityLongWaves(BaseTestCase):
         self.v0: float = 0.0  # Background velocity V
         self.w0: float = 0.0  # Background velocity W
 
-        # Match Project 1's scale_factor
-        self.scale_factor = 1.0
-        self.xc: float = 0.0
+        self.scale_factor = 20.0
+        self.xc: float = -0.0
 
         if run_setup_method:
             self.setup()
@@ -111,8 +110,8 @@ class InertialGravityLongWaves(BaseTestCase):
         tout_val = self.scale_factor * 1.0 * 3000.0 / self.config.global_constants.t_ref
         temporal_updates = {
             "CFL": 0.9,
-            "dtfixed": 1.0,
-            "dtfixed0": None,
+            "dtfixed": 10,
+            "dtfixed0": 10,
             "tout": np.array([tout_val]),
             "tmax": tout_val + 1.0,  # Ensure it runs at least one tout
             "stepmax": 50000,
@@ -125,7 +124,7 @@ class InertialGravityLongWaves(BaseTestCase):
         regime_updates = {
             "is_nongeostrophic": 1,
             "is_nonhydrostatic": 1,
-            "is_compressible": 1,
+            "is_compressible": 0,
         }
         self.set_model_regimes(regime_updates)
 
@@ -150,7 +149,7 @@ class InertialGravityLongWaves(BaseTestCase):
         physics_updates = {
             "wind_speed": [self.u0, self.v0, self.w0],
             "gravity_strength": (0.0, 1.0, 0.0),
-            "coriolis_strength": (coriolis_strength, 0.0, 0.0),
+            "coriolis_strength": (0.0, coriolis_strength, 0.0),
             "stratification": self.inertial_gravity_waves_stratification,
         }
         self.set_physics(physics_updates)

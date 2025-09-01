@@ -54,10 +54,13 @@ def create_averaging_kernels(dimension: int) -> List[np.ndarray]:
 
         # kernel_x (shape: 2 x 3 x 3)
         kx = np.stack([base_2d, base_2d], axis=0)
+        kx /= kx.sum()
         # kernel_y (shape: 3 x 2 x 3) - conceptually rotate to y-axis
         ky = np.stack([base_2d, base_2d], axis=1)
+        ky /= ky.sum()
         # kernel_z (shape: 3 x 3 x 2) - conceptually rotate to z-axis
         kz = np.dstack([base_2d, base_2d])
+        kz /= kz.sum()
 
         return [kx, ky, kz]
 
