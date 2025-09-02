@@ -4,4 +4,7 @@ __pycache__/
 api_key_test.py
 redundancies.py
 output_data/
+Result_Pictures/
+pdfs/
+
 
