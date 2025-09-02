@@ -159,8 +159,8 @@ class BaseBoundaryCondition(ABC):
             if self.side_axis == 0
             else -self.ng[self.side_axis] - 1
         )
-        # boundary_nodes_slice = copy.deepcopy(self.full_inner_slice)
-        boundary_nodes_slice = [slice(None)] * self.ndim
+        boundary_nodes_slice = copy.deepcopy(self.full_inner_slice)
+        # boundary_nodes_slice = [slice(None)] * self.ndim
         boundary_nodes_slice[self.direction] = idx
         return tuple(boundary_nodes_slice)
 
@@ -170,7 +170,8 @@ class BaseBoundaryCondition(ABC):
             if self.side_axis == 0
             else -self.ng[self.side_axis]
         )
-        boundary_nodes_slice = [slice(None)] * self.ndim
+        # boundary_nodes_slice = [slice(None)] * self.ndim
+        boundary_nodes_slice = copy.deepcopy(self.full_inner_slice)
         boundary_nodes_slice[self.direction] = idx
         return tuple(boundary_nodes_slice)
 
@@ -650,7 +651,7 @@ class Wall(BaseBoundaryCondition):
         if isinstance(operation, WallAdjustment):
             # Assumption: Variables is a single nodal variable of one element less than the original nodal array.
             factor = operation.factor
-            boundary_nodes_slice = self._boundary_slice() if operation.coeff else self._boundary_slice()
+            boundary_nodes_slice = self._reduced_boundary_slice() if operation.coeff else self._boundary_slice()
             variables[boundary_nodes_slice] *= factor
         elif isinstance(operation, WallFluxCorrection):
             # Assumption: Variables is the momenta stacked on the last axis.

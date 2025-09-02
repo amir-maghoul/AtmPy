@@ -552,10 +552,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # This will apply the 'extra' method whenever the boundary is defined to be WALL.
         boundary_operation = [
             WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=2.0, coeff=False
+                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=2.0, coeff=True
             ),
             WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.REFLECTIVE_GRAVITY, factor=2.0, coeff=False
+                target_side=BdrySide.ALL, target_type=BdryType.REFLECTIVE_GRAVITY, factor=2.0, coeff=True
             )
         ]
         self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.rhs)
