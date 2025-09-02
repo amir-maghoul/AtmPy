@@ -217,8 +217,8 @@ class TravelingVortex3D(BaseTestCase):
         print("Setting up 3D Traveling Vortex configuration...")
 
         #################################### Grid Configuration ########################################################
-        nx = nz = 5
-        ny = 5
+        nx = nz = 40
+        ny = 6
 
         grid_updates = {
             "ndim": 3,
@@ -286,7 +286,7 @@ class TravelingVortex3D(BaseTestCase):
         regime_updates = {
             "is_nongeostrophic": 1,
             "is_nonhydrostatic": 1,
-            "is_compressible": 1,
+            "is_compressible": 0,
         }
         self.set_model_regimes(regime_updates)
 
@@ -298,7 +298,7 @@ class TravelingVortex3D(BaseTestCase):
             "first_order_advection_routine": AdvectionRoutines.FIRST_ORDER_RK,
             "second_order_advection_routine": AdvectionRoutines.STRANG_SPLIT,
             "linear_solver": LinearSolvers.BICGSTAB,
-            "preconditioner": Preconditioners.DIAGONAL,
+            "preconditioner": Preconditioners.COLUMN,
             "initial_projection": True,
         }
         self.set_numerics(numerics_updates)

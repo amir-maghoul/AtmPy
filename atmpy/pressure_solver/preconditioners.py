@@ -112,7 +112,7 @@ def _perform_operator_probing(
         inner_nodes_mask[slicing_inner] = True
         x_s[inner_slice_nodes][inner_nodes_mask] = 1.0
 
-        boundary_manager.apply_pressure_boundary_on_all_sides(x_s)
+        # boundary_manager.apply_pressure_boundary_on_all_sides(x_s)
 
         # Apply helmholtz operator on the characteristic vector of current S
         helmholtz_op_unflat = pressure_solver.helmholtz_operator(
