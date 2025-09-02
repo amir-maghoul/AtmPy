@@ -426,6 +426,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ############################ 6. Solve the elliptic helmholtz equation ##########################################
         rtol = 1.0e-6
+        max_iter = 1000
         p2_inner_flat, solver_info = self.pressure_solver.solve_helmholtz(
             rhs_flat,
             dt,
@@ -433,6 +434,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.is_nonhydrostatic,
             self.is_compressible,
             rtol=rtol,
+            max_iter=max_iter,
         )
 
         ############################ 7. Prepare p2 for Correction Step #################################################

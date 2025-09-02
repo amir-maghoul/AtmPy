@@ -365,6 +365,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         np.ndarray
             The full Helmholtz operator of shape (nnx-2, nny-2, nnz-2)
         """
+        self.boundary_manager.apply_pressure_boundary_on_all_sides(p)
         # Zero out the coefficients of the Helmholtz operator on the ghost cells
         boundary_operation = [
             WallVariableZeroOut(
@@ -414,8 +415,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             inner_slice = self.grid.get_inner_slice()
             self.p_buffer.fill(0.0)
             self.p_buffer[inner_slice] = p_flat.reshape(inshape)
-
-            self.boundary_manager.apply_pressure_boundary_on_all_sides(self.p_buffer)
+            # self.boundary_manager.apply_pressure_boundary_on_all_sides(self.p_buffer)
 
             # Apply the physics-based Helmholtz operator
             result = self.helmholtz_operator(
@@ -559,10 +559,10 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         # Apply wall correction
         boundary_operation = [
             WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5
+                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5, coeff=True
             ),
             WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.REFLECTIVE_GRAVITY, factor=0.5
+                target_side=BdrySide.ALL, target_type=BdryType.REFLECTIVE_GRAVITY, factor=0.5, coeff=True
             )
         ]
         self.boundary_manager.apply_extra_all_sides(dPdpi, boundary_operation)

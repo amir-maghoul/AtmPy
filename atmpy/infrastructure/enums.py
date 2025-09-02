@@ -120,6 +120,7 @@ class LinearSolvers(Enum):
 
     BICGSTAB = "bicgstab"
     GMRES = "gmres"
+    TFQMR = "tfqmr"
 
 
 class TimeIntegrators(Enum):

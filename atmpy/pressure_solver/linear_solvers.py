@@ -36,6 +36,7 @@ class ILinearSolver(ABC):
         rtol: float,
         max_iter: int,
         M: "np.ndarray",
+        x0: "np.ndarray" = None,
     ):
         pass
 
@@ -48,10 +49,11 @@ class BiCGStabSolver(ILinearSolver):
         rtol: float,
         max_iter: int,
         M: "np.ndarray",
+        x0: "np.ndarray" = None,
     ):
         iterations = IterationCounter()
         x, info = sp.sparse.linalg.bicgstab(
-            A, b, rtol=rtol, maxiter=max_iter, M=M, callback=iterations
+            A, b, rtol=rtol, maxiter=max_iter, M=M, callback=iterations, x0=x0
         )
         self.iterations_ = iterations.count
         return x, info
@@ -65,10 +67,28 @@ class GMRESSolver(ILinearSolver):
         rtol: float,
         max_iter: int,
         M: "np.ndarray",
+        x0: "np.ndarray" = None,
     ):
         iterations = IterationCounter()
         x, info = sp.sparse.linalg.gmres(
-            A, b, rtol=rtol, maxiter=max_iter, M=M, callback=iterations
+            A, b, rtol=rtol, maxiter=max_iter, M=M, callback=iterations, x0=x0
+        )
+        self.iterations_ = iterations.count
+        return x, info
+
+class TFQMRSolver(ILinearSolver):
+    def solve(
+        self,
+        A: "np.ndarray",
+        b: "np.ndarray",
+        rtol: float,
+        max_iter: int,
+        M: "np.ndarray",
+        x0: "np.ndarray" = None,
+    ):
+        iterations = IterationCounter()
+        x, info = sp.sparse.linalg.tfqmr(
+            A, b, rtol=rtol, maxiter=max_iter, M=M, callback=iterations, x0=x0
         )
         self.iterations_ = iterations.count
         return x, info

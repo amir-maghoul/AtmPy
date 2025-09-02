@@ -64,6 +64,7 @@ ADVECTION_ROUTINES = {
 LINEAR_SOLVERS = {
     LinearSolvers.BICGSTAB: BiCGStabSolver,
     LinearSolvers.GMRES: GMRESSolver,
+    LinearSolvers.TFQMR: TFQMRSolver,
 }
 
 TIME_INTEGRATORS = {
@@ -78,12 +79,12 @@ PRESSURE_SOLVERS = {
 
 PRECONDITIONERS = {
     Preconditioners.DIAGONAL: apply_inverse_diagonal,
-    Preconditioners.ANALYTICAL_DIAGONAL: apply_inverse_analytical_diagonal,
+    # Preconditioners.ANALYTICAL_DIAGONAL: apply_inverse_analytical_diagonal,
     Preconditioners.COLUMN: apply_inverse_tridiagonal,
 }
 
 PRECONDITIONER_COMPONENTS = {
     Preconditioners.DIAGONAL: compute_inverse_diagonal_components,
-    Preconditioners.ANALYTICAL_DIAGONAL: compute_inverse_analytical_diagonal_components,
+    # Preconditioners.ANALYTICAL_DIAGONAL: compute_inverse_analytical_diagonal_components,
     Preconditioners.COLUMN: compute_tridiagonal_components,
 }
