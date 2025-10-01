@@ -467,7 +467,11 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
         if isinstance(operation, WallAdjustment):
             # Assumption: Variables is a single nodal variable
             factor = operation.factor
-            boundary_nodes_slice = self._reduced_boundary_slice() if operation.coeff else self._boundary_slice()
+            boundary_nodes_slice = (
+                self._reduced_boundary_slice()
+                if operation.coeff
+                else self._boundary_slice()
+            )
             variables[boundary_nodes_slice] *= factor
         elif isinstance(operation, WallFluxCorrection):
             # Assumption: Variables is the momenta stacked on the last axis.
@@ -651,7 +655,11 @@ class Wall(BaseBoundaryCondition):
         if isinstance(operation, WallAdjustment):
             # Assumption: Variables is a single nodal variable of one element less than the original nodal array.
             factor = operation.factor
-            boundary_nodes_slice = self._reduced_boundary_slice() if operation.coeff else self._boundary_slice()
+            boundary_nodes_slice = (
+                self._reduced_boundary_slice()
+                if operation.coeff
+                else self._boundary_slice()
+            )
             variables[boundary_nodes_slice] *= factor
         elif isinstance(operation, WallFluxCorrection):
             # Assumption: Variables is the momenta stacked on the last axis.
