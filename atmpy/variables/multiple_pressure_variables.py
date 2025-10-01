@@ -575,6 +575,104 @@ class MPV:
             if var_index < main_vars.num_vars_cell:
                 main_vars.cell_vars[inner_domain_c][..., var_index] *= rho_ratio
 
+    def compute_hydrostate_from_profile3D(
+        self,
+        Y_cells_nd: np.ndarray,
+        Y_nodes_nd: np.ndarray,
+        gravity_strength: Union[np.ndarray, list, tuple],
+        Msq: float,
+    ):
+        """
+        Computes an N-D hydrostatically balanced state by performing a 1D
+        vertical integration for each horizontal column. This is a robust,
+        correct implementation based on the PyBella/C reference logic.
+        NOTE: This function expects input arrays defined on the FULL grid (incl. ghosts)
+              and returns state arrays defined on the INNER grid.
+        """
+        thermo = Thermodynamics()
+        Gamma = thermo.Gamma
+        gm1_inv = thermo.gm1inv
+        Gamma_inv = thermo.Gammainv
+
+        g_axis = self.direction
+        g = gravity_strength[g_axis]
+
+        # Get grid parameters for the INNER domain for the output arrays
+        icshape = self.grid.icshape
+        inshape = self.grid.inshape
+
+        # Vertical grid parameters
+        ny_total = self.grid.ncy_total
+        ny_inner = icshape[g_axis]
+        ngy = self.grid.ng[g_axis][0]
+        dy = self.grid.dxyz[g_axis]
+
+        # Initialize the output HydrostaticStateND object with inner shapes
+        HySt = HydrostaticStateND(icshape, inshape)
+
+        # Initial conditions at the reference level (p=1.0 at the lowest inner cell)
+        pi0 = self.p0**thermo.gm1
+
+        # --- Loop over all horizontal columns to perform 1D vertical integration ---
+        horiz_dims = [d for d in range(self.grid.ndim) if d != g_axis]
+        # Use the FULL grid shape for the iterator bounds
+        iter_shape = [self.grid.cshape[d] for d in horiz_dims]
+
+        horizontal_iterator = np.ndindex(*iter_shape)
+
+        for horiz_idx_tuple in horizontal_iterator:
+            col_idx_full = [slice(None)] * self.grid.ndim
+            idx_counter = 0
+            for d in range(self.grid.ndim):
+                if d != g_axis:
+                    col_idx_full[d] = horiz_idx_tuple[idx_counter]
+                    idx_counter += 1
+
+            # Extract the 1D vertical profiles for this column from the FULL input arrays
+            Y_col_cells = Y_cells_nd[tuple(col_idx_full)]
+
+            # --- Cell-centered pressure integration for the current column ---
+            pi_hydro_col = np.zeros(ny_total)
+            pi_hydro_col[ngy] = pi0  # Set reference pressure at the first inner cell
+
+            # Integrate downwards from reference level into lower ghost cells
+            for j in range(ngy - 1, -1, -1):
+                Y_interface = 0.5 * (Y_col_cells[j] + Y_col_cells[j + 1])
+                d_pi = (Gamma * g / Y_interface) * dy  # Pressure increases downwards
+                pi_hydro_col[j] = pi_hydro_col[j + 1] + d_pi
+
+            # Integrate upwards from reference level
+            for j in range(ngy, ny_total - 1):
+                Y_interface = 0.5 * (Y_col_cells[j] + Y_col_cells[j + 1])
+                d_pi = -(Gamma * g / Y_interface) * dy  # Pressure decreases upwards
+                pi_hydro_col[j + 1] = pi_hydro_col[j] + d_pi
+
+            # Slice out the INNER part of the result and place it in the output array
+            inner_col_idx = tuple(col_idx_full[d] for d in horiz_dims)
+            HySt.rhoY0[inner_col_idx] = (pi_hydro_col[ngy:-ngy]) ** gm1_inv
+            HySt.p20[inner_col_idx] = pi_hydro_col[ngy:-ngy] / Msq
+
+            # --- Node-centered pressure integration for the current column ---
+            pi_hydro_n_col = np.zeros(self.grid.nny_total)
+            pi_hydro_n_col[ngy] = pi0  # Reference at the first inner node
+
+            # Integrate upwards from the reference node
+            for j in range(ngy, self.grid.nny_total - 1):
+                # Use the potential temperature from cell j
+                Y_cell_center = Y_col_cells[j]
+                d_pi = -(Gamma * g / Y_cell_center) * dy
+                pi_hydro_n_col[j + 1] = pi_hydro_n_col[j] + d_pi
+
+            # Integrate downwards from reference node
+            for j in range(ngy - 1, -1, -1):
+                Y_cell_center = Y_col_cells[j]
+                d_pi = (Gamma * g / Y_cell_center) * dy
+                pi_hydro_n_col[j] = pi_hydro_n_col[j + 1] + d_pi
+
+            HySt.p20_nodes[inner_col_idx] = pi_hydro_n_col[ngy:-ngy] / Msq
+
+        return HySt
+
 
 # """This module handles multiple pressure variables. It is used to calculate the hydrostate pressure.
 # The code is the modified version of what appears in PyBella project.
