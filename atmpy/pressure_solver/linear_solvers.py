@@ -76,6 +76,7 @@ class GMRESSolver(ILinearSolver):
         self.iterations_ = iterations.count
         return x, info
 
+
 class TFQMRSolver(ILinearSolver):
     def solve(
         self,

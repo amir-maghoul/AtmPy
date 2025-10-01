@@ -32,7 +32,7 @@ from atmpy.test_cases.inertial_gravity_long_waves import InertialGravityLongWave
 from atmpy.test_cases.inertial_gravity_waves import InertialGravityWaves
 from atmpy.test_cases.sine_advection_1d import SineWaveAdvection1D
 from atmpy.test_cases.traveling_vortex import TravelingVortex
-from atmpy.test_cases.traveling_vortex_hydrostatic_balance import TravelingVortexHS
+from atmpy.test_cases.traveling_vortexQG import TravelingVortexQG
 from atmpy.test_cases.rising_bubble import RisingBubble
 from atmpy.test_cases.travelling_vortex3D import TravelingVortex3D
 from atmpy.time_integrators.contexts import TimeIntegratorContext
@@ -60,12 +60,12 @@ def get_base_config_for_case(case_name: str) -> SimulationConfig:
         case_instance = TravelingVortex()
     elif case_name == "TravelingVortex3D":
         case_instance = TravelingVortex3D()
+    elif case_name == "TravelingVortexQG":
+        case_instance = TravelingVortexQG()
     elif case_name == "InertialGravityWaves":
         case_instance = InertialGravityWaves()
     elif case_name == "InertialGravityLongWaves":
         case_instance = InertialGravityLongWaves()
-    elif case_name == "TravelingVortexHS":
-        case_instance = TravelingVortexHS()
     elif case_name == "RisingBubble":
         case_instance = RisingBubble()
     elif case_name == "SineWaveAdvection1D":
@@ -127,8 +127,8 @@ if args.mode in ["run", "debug"]:
         case = TravelingVortex(config_override=loaded_config_override)
     elif args.case == "TravelingVortex3D":
         case = TravelingVortex3D(config_override=loaded_config_override)
-    elif args.case == "TravelingVortexHS":
-        case = TravelingVortexHS(config_override=loaded_config_override)
+    elif args.case == "TravelingVortexQG":
+        case = TravelingVortexQG(config_override=loaded_config_override)
     elif args.case == "InertialGravityWaves":
         case = InertialGravityWaves(config_override=loaded_config_override)
     elif args.case == "InertialGravityLongWaves":
@@ -144,7 +144,9 @@ if args.mode in ["run", "debug"]:
     # case = RisingBubble()
     # case = InertialGravityWaves()
     # case = InertialGravityLongWaves()
-    case = TravelingVortex3D()
+    # case = TravelingVortex3D()
+    # case = TravelingVortexQG()
+
     config = case.config  # This 'config' has the definitive grid for THIS run.
 
     if args.profile:  # Profiler config adjustments
