@@ -74,15 +74,15 @@ class TravelingVortex3D(BaseTestCase):
         ############################### Vortex Specific Parameters #####################################################
         self.correct_distribution = True
 
-        self.u0: float = 1.0  # Background velocity U
+        self.u0: float = 0.0  # Background velocity U
         self.v0: float = 0.0  # Background velocity V
-        self.w0: float = 1.0  # Background velocity W
+        self.w0: float = 0.0  # Background velocity W
         self.p0: float = 1.0  # Background pressure (dimensionless)
 
         if self.correct_distribution:
             self.rho0: float = 0.5  # Background density (dimensionless)
             self.del_rho: float = 0.5  # Density deficit at center
-            self.alpha = 1
+            self.alpha = 0
             self.alpha_const = 1
         else:
             self.rho0: float = 1  # Background density (dimensionless)
@@ -92,18 +92,35 @@ class TravelingVortex3D(BaseTestCase):
 
         self.rotdir: float = 1.0  # Rotation direction
         self.R0: float = 0.4  # Vortex radius scale
-        self.fac: float = 1.0 * 1024.0  # Vortex magnitude factor
+        self.fac: float = 1.0 * 1.0  # Vortex magnitude factor
         self.xc: float = 0.0  # Vortex center x
         self.yc: float = 0.0  # Vortex center y
         self.zc: float = 0.0  # Vortex center z
 
+        self.baroclinic = False
+        self.stratified_atmosphere = False
+
+
+        self.dtfixed0 = None
+        self.dtfixed = self.dtfixed0 if self.dtfixed0 else 0.001
+        self.tmax = 1.0
+        self.acoustic_cfl = True
+        self.output_freq = 10
+        self.boxsize = 0.5
+        self.h_ref = 10_000.0
         self.t_ref = 100.0
-        self.g = 0.0
-        coriolis_factor = 0
+
+
+        self.g = 1.0 if self.stratified_atmosphere else 0.0
+        coriolis_factor = 100000
         force = 1.0e-4 * self.t_ref * coriolis_factor  # Constant coriolis force
         self.cor_f = [0.0, 0.0, 0.0]
         self.coriolis_axis = 1
         self.cor_f[self.coriolis_axis] = force
+
+        self.is_nongeostrophic = 1
+        self.is_nonhydrostatic = 1
+        self.is_compressible = 1
 
         ####################### Polynomial coefficients for pressure perturbation ######################################
         # Coefficients remain the same as they are based on a 2D radial profile.
@@ -149,6 +166,8 @@ class TravelingVortex3D(BaseTestCase):
         self.const_coe_correct[11] = -12.0 / 23.0
         self.const_coe_correct[12] = 1.0 / 24.0
 
+        # This is as a result of an integral of the rho*u_theta defined in Kadioglu 2008 PLUS the integral of rho_0*u_theta
+        # Where rho_0 is mostly set to 0.5 (see above for differences)
         self.coe_cor_correct = np.zeros((19,))
         self.coe_cor_correct[0] = 1.0 / 7.0
         self.coe_cor_correct[1] = -3.0 / 4.0
@@ -204,8 +223,6 @@ class TravelingVortex3D(BaseTestCase):
             self.coe_d = self.coe_d_correct
             self.coe_cor = self.coe_cor_correct
         else:
-            # Note: C code has specific arrays for incorrect distribution, which are not fully
-            # translated here. This part assumes a simplified incorrect case.
             self.coe = self.coe_d_correct  # Example assignment
             self.const_coe = self.const_coe_correct  # Example assignment
 
@@ -218,19 +235,19 @@ class TravelingVortex3D(BaseTestCase):
 
         #################################### Grid Configuration ########################################################
         nx = nz = 40
-        ny = 6
+        ny = 3
 
         grid_updates = {
             "ndim": 3,
             "nx": nx,
             "ny": ny,
             "nz": nz,
-            "xmin": -0.5,
-            "xmax": 0.5,
-            "ymin": -0.5,
-            "ymax": 0.5,
-            "zmin": -0.5,
-            "zmax": 0.5,
+            "xmin": -self.boxsize,
+            "xmax": self.boxsize,
+            "ymin": -self.boxsize,
+            "ymax": self.boxsize,
+            "zmin": -self.boxsize,
+            "zmax": self.boxsize,
             "ngx": 2,
             "ngy": 2,
             "ngz": 2,
@@ -243,8 +260,9 @@ class TravelingVortex3D(BaseTestCase):
             "R_gas": 287.4,
             "p_ref": 1.0e5,
             "T_ref": 300.0,
-            "h_ref": 10_000,
-            "t_ref": 100.0,
+            "h_ref": self.h_ref,
+            "t_ref": self.t_ref,
+            "Nsq_ref": 1.0e-4,
             "grav": 10,
         }
         self.set_global_constants(constants_updates)
@@ -273,20 +291,20 @@ class TravelingVortex3D(BaseTestCase):
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
             "CFL": 0.8,
-            "dtfixed": 0.001,
-            "dtfixed0": None,
-            "tout": np.array([0.0, 1.0]),
-            "tmax": 1.0,
-            "stepmax": 10_000,
-            "use_acoustic_cfl": True,
+            "dtfixed": self.dtfixed,
+            "dtfixed0": self.dtfixed0,
+            "tout": np.array([0.0, self.tmax]),
+            "tmax": self.tmax,
+            "stepmax": 100_000,
+            "use_acoustic_cfl": self.acoustic_cfl,
         }
         self.set_temporal(temporal_updates)
 
         #################################### Model Regimes #############################################################
         regime_updates = {
-            "is_nongeostrophic": 1,
-            "is_nonhydrostatic": 1,
-            "is_compressible": 0,
+            "is_nongeostrophic": self.is_nongeostrophic,
+            "is_nonhydrostatic": self.is_nonhydrostatic,
+            "is_compressible": self.is_compressible,
         }
         self.set_model_regimes(regime_updates)
 
@@ -298,7 +316,7 @@ class TravelingVortex3D(BaseTestCase):
             "first_order_advection_routine": AdvectionRoutines.FIRST_ORDER_RK,
             "second_order_advection_routine": AdvectionRoutines.STRANG_SPLIT,
             "linear_solver": LinearSolvers.BICGSTAB,
-            "preconditioner": Preconditioners.COLUMN,
+            "preconditioner": Preconditioners.DIAGONAL,
             "initial_projection": True,
         }
         self.set_numerics(numerics_updates)
@@ -320,7 +338,7 @@ class TravelingVortex3D(BaseTestCase):
             "output_folder": "traveling_vortex_3d",
             "output_base_name": "_traveling_vortex_3d",
             "output_timesteps": True,
-            "output_frequency_steps": 10,
+            "output_frequency_steps": self.output_freq,
         }
         self.set_outputs(output_updates)
 
@@ -495,12 +513,6 @@ class TravelingVortex3D(BaseTestCase):
         else:
             print("Msq is near zero, pressure perturbation dp2c set to zero.")
 
-        # --- Assign to Cell Variables (Inner Domain Only) ---
-        variables.cell_vars[inner_slice + (VI.RHO,)] = rho_total
-        variables.cell_vars[inner_slice + (VI.RHOU,)] = rho_total * u_total
-        variables.cell_vars[inner_slice + (VI.RHOV,)] = rho_total * v_total
-        variables.cell_vars[inner_slice + (VI.RHOW,)] = rho_total * w_total
-
         # --- Handle rhoY (Potential Temperature * Density) ---
         # Get ghost cell info
         ng_g_axis = self.config.spatial_grid.grid.ng[g_axis][0]
@@ -524,13 +536,20 @@ class TravelingVortex3D(BaseTestCase):
         if self.config.model_regimes.is_compressible:
             p_total = self.p0 + Msq * dp2c
             p_total_safe = np.maximum(p_total, 1e-9)
-            variables.cell_vars[inner_slice + (VI.RHOY,)] = p_total_safe**thermo.gamminv
+            rhoY_total = p_total_safe**thermo.gamminv
         else:
-            variables.cell_vars[inner_slice + (VI.RHOY,)] = rhoY0_cells
+            rhoY_total = rhoY0_cells
 
-        if VI.RHOX < variables.num_vars_cell:
-            variables.cell_vars[inner_slice + (VI.RHOX,)] = 0.0
 
+        # --- Assign to Cell Variables (Inner Domain Only) ---
+        variables.cell_vars[inner_slice + (VI.RHO,)] = rho_total
+        variables.cell_vars[inner_slice + (VI.RHOU,)] = rho_total * u_total
+        variables.cell_vars[inner_slice + (VI.RHOV,)] = rho_total * v_total
+        variables.cell_vars[inner_slice + (VI.RHOW,)] = rho_total * w_total
+        variables.cell_vars[inner_slice + (VI.RHOY,)] = rhoY_total
+        variables.cell_vars[inner_slice + (VI.RHOX,)] = 0.0
+########################################################################################################################
+        #############################################################################
         # --- Calculate Nodal Pressure Perturbation p2 (Nodes, Inner Domain Only) ---
         if grid.ndim == 3:
             XN, YN, ZN = np.meshgrid(
@@ -550,8 +569,6 @@ class TravelingVortex3D(BaseTestCase):
         r_node = np.sqrt(dx_node**2 + dz_node**2)  # Radius is in xz-plane
         r_over_R0_node = np.divide(r_node, self.R0, where=self.R0 != 0)
         mask_node = r_node < self.R0
-
-        p2_nodes_unscaled = np.zeros_like(r_node)
 
         # Main term
         term_main_node = np.zeros_like(r_node)
@@ -587,7 +604,7 @@ class TravelingVortex3D(BaseTestCase):
             self.alpha * term_main_node + self.alpha_const * p2n_const_unscaled
         )
 
-        # --- Correctly broadcast the nodal hydrostatic state ---
+        # # --- Correctly broadcast the nodal hydrostatic state ---
         rhoY0_nodes_1d_full = mpv.hydrostate.node_vars[..., HI.RHOY0]
         rhoY0_nodes_1d_inner = rhoY0_nodes_1d_full[inner_slice_1d]
 
@@ -598,8 +615,14 @@ class TravelingVortex3D(BaseTestCase):
         target_shape_3d_nodes = mpv.p2_nodes[inner_slice].shape
         rhoY0_nodes = np.broadcast_to(rhoY0_nodes_reshaped, target_shape_3d_nodes)
 
+        # p_total_nodes = self.p0 + Msq * p2_nodes_unscaled
+        # rhoY0_nodes = p_total_nodes**thermo.gamminv
+
         mpv.p2_nodes[inner_slice] = thermo.Gamma * np.divide(
             p2_nodes_unscaled, rhoY0_nodes, where=rhoY0_nodes != 0
         )
 
         logging.info("3D solution initialization complete.")
+
+
+
