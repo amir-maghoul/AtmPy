@@ -74,9 +74,9 @@ class TravelingVortex3D(BaseTestCase):
         ############################### Vortex Specific Parameters #####################################################
         self.correct_distribution = True
 
-        self.u0: float = 0.0  # Background velocity U
+        self.u0: float = 1.0  # Background velocity U
         self.v0: float = 0.0  # Background velocity V
-        self.w0: float = 0.0  # Background velocity W
+        self.w0: float = 1.0  # Background velocity W
         self.p0: float = 1.0  # Background pressure (dimensionless)
 
         if self.correct_distribution:
@@ -91,8 +91,11 @@ class TravelingVortex3D(BaseTestCase):
             self.alpha_const: float = 3
 
         self.rotdir: float = 1.0  # Rotation direction
-        self.R0: float = 0.4  # Vortex radius scale
-        self.fac: float = 1.0 * 1.0  # Vortex magnitude factor
+        self.h_ref = 10_000.0
+        self.t_ref = 100.0
+        self.boxsize = 100
+        self.R0: float = 100  # Vortex radius scale
+        self.fac: float = 0.1 # Vortex magnitude factor
         self.xc: float = 0.0  # Vortex center x
         self.yc: float = 0.0  # Vortex center y
         self.zc: float = 0.0  # Vortex center z
@@ -100,19 +103,14 @@ class TravelingVortex3D(BaseTestCase):
         self.baroclinic = False
         self.stratified_atmosphere = False
 
-
         self.dtfixed0 = None
         self.dtfixed = self.dtfixed0 if self.dtfixed0 else 0.001
-        self.tmax = 1.0
+        self.tmax = 100.0
         self.acoustic_cfl = True
-        self.output_freq = 10
-        self.boxsize = 0.5
-        self.h_ref = 10_000.0
-        self.t_ref = 100.0
-
+        self.output_freq = 1
 
         self.g = 1.0 if self.stratified_atmosphere else 0.0
-        coriolis_factor = 100000
+        coriolis_factor = 1000.0
         force = 1.0e-4 * self.t_ref * coriolis_factor  # Constant coriolis force
         self.cor_f = [0.0, 0.0, 0.0]
         self.coriolis_axis = 1
@@ -166,7 +164,7 @@ class TravelingVortex3D(BaseTestCase):
         self.const_coe_correct[11] = -12.0 / 23.0
         self.const_coe_correct[12] = 1.0 / 24.0
 
-        # This is as a result of an integral of the rho*u_theta defined in Kadioglu 2008 PLUS the integral of rho_0*u_theta
+        # This is an integral of the rho*u_theta defined in Kadioglu 2008 PLUS the integral of rho_0*u_theta
         # Where rho_0 is mostly set to 0.5 (see above for differences)
         self.coe_cor_correct = np.zeros((19,))
         self.coe_cor_correct[0] = 1.0 / 7.0
@@ -216,6 +214,15 @@ class TravelingVortex3D(BaseTestCase):
         self.coe_d_correct[23] = -12.0 / 35.0
         self.coe_d_correct[24] = 1.0 / 36.0
 
+        self.coe_rho = np.zeros((7,))
+        self.coe_rho[0] = 1.0 / 2.0
+        self.coe_rho[1] = -1.0
+        self.coe_rho[2] = 3.0 / 2.0
+        self.coe_rho[3] = -10.0 / 7.0
+        self.coe_rho[4] = 5.0 / 6.0
+        self.coe_rho[5] = -3.0 / 11.0
+        self.coe_rho[6] = 1.0 / 26.0
+
         # Assign coefficients based on the chosen distribution
         if self.correct_distribution:
             self.coe = self.coe_correct
@@ -234,7 +241,7 @@ class TravelingVortex3D(BaseTestCase):
         print("Setting up 3D Traveling Vortex configuration...")
 
         #################################### Grid Configuration ########################################################
-        nx = nz = 40
+        nx = nz = 80
         ny = 3
 
         grid_updates = {
@@ -317,7 +324,7 @@ class TravelingVortex3D(BaseTestCase):
             "second_order_advection_routine": AdvectionRoutines.STRANG_SPLIT,
             "linear_solver": LinearSolvers.BICGSTAB,
             "preconditioner": Preconditioners.DIAGONAL,
-            "initial_projection": True,
+            "initial_projection": False,
         }
         self.set_numerics(numerics_updates)
 
@@ -461,8 +468,8 @@ class TravelingVortex3D(BaseTestCase):
         # --- Calculate Velocity Components (Perturbations in U and W) ---
         u_pert = np.zeros_like(uth_cell)
         w_pert = np.zeros_like(uth_cell)
-        u_pert[mask_cell] = uth_cell[mask_cell] * (-dz[mask_cell] / r_cell[mask_cell])
-        w_pert[mask_cell] = uth_cell[mask_cell] * (+dx[mask_cell] / r_cell[mask_cell])
+        u_pert[mask_cell] = uth_cell[mask_cell] * (dz[mask_cell] / r_cell[mask_cell])
+        w_pert[mask_cell] = uth_cell[mask_cell] * (-dx[mask_cell] / r_cell[mask_cell])
 
         u_total = self.u0 + u_pert
         w_total = self.w0 + w_pert
