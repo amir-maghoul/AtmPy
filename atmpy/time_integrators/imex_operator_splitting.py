@@ -242,7 +242,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.variables.cell_vars[...] = initial_vars_arr
         if (
             self.is_compressible and self.is_nonhydrostatic
-        ) or not self.is_nonhydrostatic:
+        ) or not self.is_nonhydrostatic or not self.is_nongeostrophic:
             self.mpv.p2_nodes[...] = self.mpv.p2_nodes0
         logging.debug(f"Corrector (step {global_time_step_num}): State reset to t^n")
 
@@ -342,6 +342,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         cellvars[..., self.vertical_momentum_index] = (
             nonhydro * cellvars[..., self.vertical_momentum_index]
         ) - dt * (g / self.Msq) * bouyoncy
+
+        horizontal_momenta_index = self.gravity.horizontal_momentum_indices()
+        if not self.is_nongeostrophic:
+            cellvars[..., horizontal_momenta_index] = 0.0
 
         # Remove background wind
         self.variables.adjust_background_wind(self.wind_speed, scale=-1.0)
@@ -500,6 +504,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         ###############################################################################################################
         # Updates: First the shared terms without regarding which one is in the gravity direction
         # Horizontal momentum in x
+# TODO:
+#         if self.is_nongeostrophic:
         cellvars[..., VI.RHOU] -= dt * (
             rhoYovG * dpdx
             - coriolis[2] * adjusted_momenta[..., 1]
@@ -511,6 +517,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
                 - coriolis[0] * adjusted_momenta[..., 2]
                 + coriolis[2] * adjusted_momenta[..., 0]
             )
+# TODO:
+#         if self.is_nongeostrophic:
         if self.ndim == 3:
             cellvars[..., VI.RHOW] -= dt * (
                 rhoYovG * dpdz
