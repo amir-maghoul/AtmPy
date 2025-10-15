@@ -226,6 +226,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         ##################### Apply Coriolis/Buoyancy transform (M_inv) ################################################
         ##################### Result are the full terms under the divergence in the Helmholtz equation #################
+        apply = True if is_nongeostrophic else False
         self.coriolis.apply_inverse(
             Pu,
             Pv,
@@ -557,14 +558,20 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         dPdpi = coeff * cells_to_nodes_averaging(P**exponent)
 
         # Apply wall correction
-        boundary_operation = [
-            WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5, coeff=True
-            ),
-            WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.REFLECTIVE_GRAVITY, factor=0.5, coeff=True
-            )
-        ]
-        self.boundary_manager.apply_extra_all_sides(dPdpi, boundary_operation)
+        # boundary_operation = [
+        #     WallAdjustment(
+        #         target_side=BdrySide.ALL,
+        #         target_type=BdryType.WALL,
+        #         factor=0.5,
+        #         coeff=True,
+        #     ),
+        #     WallAdjustment(
+        #         target_side=BdrySide.ALL,
+        #         target_type=BdryType.REFLECTIVE_GRAVITY,
+        #         factor=0.5,
+        #         coeff=True,
+        #     ),
+        # ]
+        # self.boundary_manager.apply_extra_all_sides(dPdpi, boundary_operation)
 
         return dPdpi
