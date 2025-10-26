@@ -78,7 +78,7 @@ class CoriolisOperator:
         W: np.ndarray,
         variables: "Variables",
         mpv: "MPV",
-        is_nongeostrophic: bool,
+        is_nongeostrophic: float,
         is_nonhydrostatic: bool,
         Msq: float,
         dt: float,
@@ -94,7 +94,7 @@ class CoriolisOperator:
             The variable container containing the density and temperature variables.
         mpv : MPV
             The MPV object containing the Chi variable and its derivative method.
-        is_nongeostrophic : bool
+        is_nongeostrophic : float
             The switch between geostrophic and non-geostrophic regimes.
         is_nonhydrostatic : bool
             The switch between hydrostatic and non-hydrostatic regimes.
@@ -122,7 +122,7 @@ class CoriolisOperator:
             W,
             dChi_full_term,
             bool(nonhydro),  # Cast to bool for better handling in Numba
-            bool(nongeo),  # Cast to bool for better handling in Numba
+            float(nongeo),  # Cast to bool for better handling in Numba
             float(dt),  # Cast to float for better handling in Numba
             self.strength,
         )

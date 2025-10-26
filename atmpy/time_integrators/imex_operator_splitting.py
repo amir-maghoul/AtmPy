@@ -59,7 +59,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         first_order_advection_routine: AdvectionRoutines,
         second_order_advection_routine: AdvectionRoutines,
         wind_speed: List[float],
-        is_nongeostrophic: bool,
+        is_nongeostrophic: float,
         is_nonhydrostatic: bool,
         is_compressible: bool,
         dt: float,
@@ -89,7 +89,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.th: "Thermodynamics" = self.pressure_solver.th
         self.dt: float = dt
         self.Msq: float = self.pressure_solver.Msq
-        self.is_nongeostrophic: bool = is_nongeostrophic
+        self.is_nongeostrophic: float = is_nongeostrophic
         self.is_nonhydrostatic: bool = is_nonhydrostatic
         self.is_compressible: bool = is_compressible
         self.wind_speed: np.ndarray = np.array(wind_speed)
@@ -242,7 +242,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.variables.cell_vars[...] = initial_vars_arr
         if (
             self.is_compressible and self.is_nonhydrostatic
-        ) or not self.is_nonhydrostatic or not self.is_nongeostrophic:
+        ) or not self.is_nonhydrostatic:
             self.mpv.p2_nodes[...] = self.mpv.p2_nodes0
         logging.debug(f"Corrector (step {global_time_step_num}): State reset to t^n")
 
@@ -343,10 +343,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             nonhydro * cellvars[..., self.vertical_momentum_index]
         ) - dt * (g / self.Msq) * bouyoncy
 
-        horizontal_momenta_index = self.gravity.horizontal_momentum_indices()
-        if not self.is_nongeostrophic:
-            cellvars[..., horizontal_momenta_index] = 0.0
-
         # Remove background wind
         self.variables.adjust_background_wind(self.wind_speed, scale=-1.0)
 
@@ -362,6 +358,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.Msq,
             dt,
         )
+
+        horizontal_momenta_index = self.gravity.horizontal_momentum_indices()
+        cellvars[..., horizontal_momenta_index] = self.is_nongeostrophic * cellvars[..., horizontal_momenta_index]
 
         # Restore background wind
         self.variables.adjust_background_wind(self.wind_speed, scale=1.0)
@@ -497,40 +496,44 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         rhoYovG = self.pressure_solver._calculate_P_over_Gamma(cellvars)
 
         # Calculate the Exner pressure perturbation (Pi^prime) gradiant (RHS of the momenta equations)
-        dpdx, dpdy, dpdz = self.discrete_operator.gradient(p2n)
+        dp_gradient = self.discrete_operator.gradient(p2n)
 
         ###############################################################################################################
         ## UPDATING VARIABLES
         ###############################################################################################################
         # Updates: First the shared terms without regarding which one is in the gravity direction
-        # Horizontal momentum in x
-# TODO:
-#         if self.is_nongeostrophic:
-        cellvars[..., VI.RHOU] -= dt * (
-            rhoYovG * dpdx
-            - coriolis[2] * adjusted_momenta[..., 1]
-            + coriolis[1] * adjusted_momenta[..., 2]
-        )
-        if self.ndim >= 2:
-            cellvars[..., VI.RHOV] -= dt * (
-                rhoYovG * dpdy
-                - coriolis[0] * adjusted_momenta[..., 2]
-                + coriolis[2] * adjusted_momenta[..., 0]
-            )
-# TODO:
-#         if self.is_nongeostrophic:
-        if self.ndim == 3:
-            cellvars[..., VI.RHOW] -= dt * (
-                rhoYovG * dpdz
-                - coriolis[1] * adjusted_momenta[..., 0]
-                + coriolis[0] * adjusted_momenta[..., 1]
+
+        # Define momentum components and their corresponding gradient and coriolis terms
+        momentum_map = {
+            'RHOU': (dp_gradient[0], (coriolis[2], coriolis[1]), (1, 2)),
+            'RHOV': (dp_gradient[1], (coriolis[0], coriolis[2]), (2, 0)),
+            'RHOW': (dp_gradient[2], (coriolis[1], coriolis[0]), (0, 1))
+        }
+
+        for component, (dp, coriolis_terms, momenta_indices) in momentum_map.items():
+            component_index = getattr(VI, component) # Enum, VI.RHOU, VI.RHOV, VI.RHOW
+
+            # Calculate the update for the current momentum component
+            update_raw = dt * (
+                    rhoYovG * dp
+                    - coriolis_terms[0] * adjusted_momenta[..., momenta_indices[0]]
+                    + coriolis_terms[1] * adjusted_momenta[..., momenta_indices[1]]
             )
 
-        # Updates: The momentum in the direction of gravity
-        # Find vertical vs horizontal velocities:
+            # Conditionally apply the update
+            is_horizontal = component_index in self.gravity.horizontal_momentum_indices()
+            if 1e-10 < self.is_nongeostrophic < 1.0 and is_horizontal:
+                update = update_raw / self.is_nongeostrophic
+            elif self.is_nongeostrophic <= 1e-10 and is_horizontal:
+                update = 0.0
+            else:
+                update = update_raw
+            cellvars[..., component_index] -= update
+
+        # Update for the momentum in the direction of gravity (vertical momentum)
         if self.ndim >= 2 and self.vertical_momentum_index < cellvars.shape[-1]:
             cellvars[..., self.vertical_momentum_index] -= dt * (
-                (g / self.Msq) * dbuoy * self.is_nonhydrostatic
+                    (g / self.Msq) * dbuoy * self.is_nonhydrostatic
             )
 
     def _forward_pressure_update(
@@ -619,7 +622,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         parts of the code"""
         Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
         momenta_indices = [VI.RHOU, VI.RHOV, VI.RHOW][: self.ndim]
-        return cellvars[..., momenta_indices] * Y[..., np.newaxis]
+        pressure_weightet_momenta = cellvars[..., momenta_indices] * Y[..., np.newaxis]
+        return pressure_weightet_momenta
 
     def get_dt(self):
         pass
@@ -753,7 +757,7 @@ def example_usage():
             "pressure_solver": pressure,
             "wind_speed": [0.0, 0.0, 0.0],  # optional: override default wind speed
             "is_nonhydrostatic": True,
-            "is_nongeostrophic": True,
+            "is_nongeostrophic": 1,
             "is_compressible": True,
         },
     )

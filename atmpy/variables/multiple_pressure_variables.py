@@ -279,6 +279,49 @@ class MPV:
             self.hydrostate.cell_vars[...] = 1.0
             self.hydrostate.node_vars[...] = 1.0
 
+    def integrate_density_hydrostatically(self, rho_field_3d: np.ndarray, gravity_strength: np.ndarray) -> np.ndarray:
+        """
+        Computes the hydrostatic pressure perturbation field corresponding to a
+        given 3D density perturbation field.
+
+        The integration is performed column-by-column in the direction of gravity.
+        The pressure perturbation is assumed to be zero at the bottom boundary of each column.
+
+        Parameters
+        ----------
+        rho_field_3d : np.ndarray
+            A 3D array (matching the grid's cell shape) containing the density perturbation.
+        gravity_strength : np.ndarray
+            The array of gravity strengths in each direction.
+
+        Returns
+        -------
+        np.ndarray
+            A 3D array of the same shape containing the hydrostatic pressure perturbation.
+        """
+        g_eff = gravity_strength[self.direction]
+        dy = self.grid.dxyz[self.direction]
+        p_hydro_pert = np.zeros_like(rho_field_3d)
+
+        # Get the number of cells in the vertical direction
+        num_vertical_cells = rho_field_3d.shape[self.direction]
+
+        # Define slices for accessing adjacent vertical layers
+        # This is a robust way to write the integration loop without hardcoding the axis index
+        prev_slice = [slice(None)] * self.grid.ndim
+        curr_slice = [slice(None)] * self.grid.ndim
+
+        # Integrate from the "bottom" (index 0) to the "top"
+        for j in range(1, num_vertical_cells):
+            prev_slice[self.direction] = j - 1
+            curr_slice[self.direction] = j
+
+            # Use trapezoidal rule for the integration step
+            p_hydro_pert[tuple(curr_slice)] = p_hydro_pert[tuple(prev_slice)] - 0.5 * g_eff * \
+                                              (rho_field_3d[tuple(curr_slice)] + rho_field_3d[tuple(prev_slice)]) * dy
+
+        return p_hydro_pert
+
     def compute_hydrostate_from_profile(
         self,
         Y_cells_nd: np.ndarray,

@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 def _perform_operator_probing(
     pressure_solver: "ClassicalPressureSolver",
     dt: float,
-    is_nongeostrophic: bool,
+    is_nongeostrophic: float,
     is_nonhydrostatic: bool,
     is_compressible: bool,
     inner_shape: Tuple[int, ...],  # Shape of the inner grid (operator domain)
@@ -133,7 +133,7 @@ def _perform_operator_probing(
 def compute_inverse_analytical_diagonal_components(
     pressure_solver: "ClassicalPressureSolver",
     dt: float,
-    is_nongeostrophic: bool,
+    is_nongeostrophic: float,
     is_nonhydrostatic: bool,
     is_compressible: bool,
 ) -> Dict[str, Any]:
@@ -254,7 +254,7 @@ def apply_inverse_analytical_diagonal(
 def compute_inverse_diagonal_components(
     pressure_solver: "ClassicalPressureSolver",
     dt: float,
-    is_nongeostrophic: bool,
+    is_nongeostrophic: float,
     is_nonhydrostatic: bool,
     is_compressible: bool,
 ) -> Dict[str, Any]:
@@ -320,7 +320,7 @@ def apply_inverse_diagonal(r_flat: np.ndarray, *, diag_inv: np.ndarray) -> np.nd
 def compute_tridiagonal_components(
     pressure_solver: "ClassicalPressureSolver",
     dt: float,
-    is_nongeostrophic: bool,
+    is_nongeostrophic: float,
     is_nonhydrostatic: bool,
     is_compressible: bool,
 ) -> Dict[str, Any]:

@@ -47,6 +47,63 @@ def traveling_vortex_stratification(z: float) -> float:
     """
     return 1.0
 
+def _gradient_3d(
+    p: np.ndarray, dx: float, dy: float, dz: float
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Numba kernel for 3D gradient (cell-centered).
+
+    Parameters
+    ----------
+    p : np.ndarray of shape (nnx, nny, nnz)
+        The input scalar function (mostly pressure or exner pressure perturbation) defined on nodes.
+    dx, dy, dz : float
+        The discretization fineness in each coordinate direction
+
+    Returns
+    -------
+    Dpx, Dpy, Dpz : np.ndarray of shape (nnx-1, nny-1, nnz-1)
+        The derivative in each coordinate direction
+    """
+    nx = p.shape[0] - 1
+    ny = p.shape[1] - 1
+    nz = p.shape[2] - 1
+
+    # Preallocate for derivatives
+    Dpx = np.empty((nx, ny, nz), dtype=p.dtype)
+    Dpy = np.empty((nx, ny, nz), dtype=p.dtype)
+    Dpz = np.empty((nx, ny, nz), dtype=p.dtype)
+
+    inv_dx_quarter = 0.25 / dx
+    inv_dy_quarter = 0.25 / dy
+    inv_dz_quarter = 0.25 / dz
+
+    for i in range(nx):
+        for j in range(ny):
+            for k in range(nz):
+                # Nodal values surrounding the cell (i, j, k) center
+                p000 = p[i, j, k]
+                p100 = p[i + 1, j, k]
+                p010 = p[i, j + 1, k]
+                p001 = p[i, j, k + 1]
+                p110 = p[i + 1, j + 1, k]
+                p101 = p[i + 1, j, k + 1]
+                p011 = p[i, j + 1, k + 1]
+                p111 = p[i + 1, j + 1, k + 1]
+
+                # Average gradient in x across the cell
+                Dpx[i, j, k] = (
+                    (p100 - p000) + (p110 - p010) + (p101 - p001) + (p111 - p011)
+                ) * inv_dx_quarter
+                # Average gradient in y across the cell
+                Dpy[i, j, k] = (
+                    (p010 - p000) + (p110 - p100) + (p011 - p001) + (p111 - p101)
+                ) * inv_dy_quarter
+                # Average gradient in z across the cell
+                Dpz[i, j, k] = (
+                    (p001 - p000) + (p101 - p100) + (p011 - p010) + (p111 - p110)
+                ) * inv_dz_quarter
+    return Dpx, Dpy, Dpz
+
 
 class TravelingVortexQG(BaseTestCase):
     """
@@ -74,9 +131,9 @@ class TravelingVortexQG(BaseTestCase):
         ############################### Vortex Specific Parameters #####################################################
         self.correct_distribution = True
 
-        self.u0: float = 0.1  # Background velocity U
+        self.u0: float = 0.0  # Background velocity U
         self.v0: float = 0.0  # Background velocity V
-        self.w0: float = 0.1  # Background velocity W
+        self.w0: float = 0.0  # Background velocity W
         self.p0: float = 1.0  # Background pressure (dimensionless)
 
         if self.correct_distribution:
@@ -84,34 +141,40 @@ class TravelingVortexQG(BaseTestCase):
             self.del_rho: float = 0.5  # Density deficit at center
             self.alpha = 0
             self.alpha_const = 1
-        else:
-            self.rho0: float = 1  # Background density (dimensionless)
-            self.del_rho: float = -0.5  # Density deficit at center
-            self.alpha: float = -1
-            self.alpha_const: float = 3
 
-        self.rotdir: float = 1.0  # Rotation direction
-        self.R0: float = 0.8  # Vortex radius scale
-        self.fac: float = 1.0 * 1.0  # Vortex magnitude factor
         self.xc: float = 0.0  # Vortex center x
         self.yc: float = 0.0  # Vortex center y
         self.zc: float = 0.0  # Vortex center z
 
-        self.baroclinic = False
-        self.dtfixed = 0.05
-        self.tmax = 20.0
+        self.instability = False
+        self.jet_amplitude: float = 0.5  # Max speed of the jet
+        self.jet_width: float = 0.2     # How sharp the jet is
+        self.rotdir: float = 1.0  # Rotation direction
+        self.R0: float = 0.5  # Vortex radius scale
+        self.fac: float = 1.0 if self.instability else 1.0  # Vortex magnitude factor
 
-        self.boxsize = 1.0
+        self.baroclinic = False
+        self.stratified_atmosphere = False
+        self.constant_rho = False
+        self.eps = 1.0e-3
+        self.vortex_vertical_scale: float = 0.5
+        self.dtfixed0 = 0.0001
+        self.dtfixed = self.dtfixed0 if self.dtfixed0 else 0.1
+        self.tmax = 1.0
+        self.acoustic_cfl = True
+
+        self.output_freq = 1
+        self.boxsize = 0.5
         self.h_ref = 10_000.0
         self.t_ref = 100.0
-        self.g = 0.0
+        self.g = 1.0 if self.stratified_atmosphere else 0.0
         coriolis_factor = 100000
         force = 1.0e-4 * self.t_ref * coriolis_factor  # Constant coriolis force
         self.cor_f = [0.0, 0.0, 0.0]
         self.coriolis_axis = 1
         self.cor_f[self.coriolis_axis] = force
 
-        self.is_nongeostrophic = 1
+        self.is_nongeostrophic = 0
         self.is_nonhydrostatic = 1
         self.is_compressible = 1
 
@@ -207,12 +270,21 @@ class TravelingVortexQG(BaseTestCase):
         self.coe_d_correct[23] = -12.0 / 35.0
         self.coe_d_correct[24] = 1.0 / 36.0
 
+        self.coe_cor_constant_rho = np.zeros((7,))
+        self.coe_cor_constant_rho[0] = 1.0 / 7.0
+        self.coe_cor_constant_rho[1] = -3.0 / 4.0
+        self.coe_cor_constant_rho[2] = 5.0 / 3.0
+        self.coe_cor_constant_rho[3] = -2.0
+        self.coe_cor_constant_rho[4] = -15.0 / 11.0
+        self.coe_cor_constant_rho[5] = -1.0 / 2.0
+        self.coe_cor_constant_rho[6] = 1.0 / 13.0
+
         # Assign coefficients based on the chosen distribution
         if self.correct_distribution:
             self.coe = self.coe_correct
             self.const_coe = self.const_coe_correct
             self.coe_d = self.coe_d_correct
-            self.coe_cor = self.coe_cor_correct
+            self.coe_cor = self.coe_cor_correct if not self.constant_rho else self.coe_cor_constant_rho
         else:
             self.coe = self.coe_d_correct  # Example assignment
             self.const_coe = self.const_coe_correct  # Example assignment
@@ -228,7 +300,8 @@ class TravelingVortexQG(BaseTestCase):
         nx = nz = 40
         ny = 3
 
-        boxsize = 1.0
+        boxsize = self.boxsize # This should be always less than 1.0 otherwise the stratification creates inf due to
+                      # large dx.
 
         grid_updates = {
             "ndim": 3,
@@ -285,11 +358,11 @@ class TravelingVortexQG(BaseTestCase):
         temporal_updates = {
             "CFL": 0.9,
             "dtfixed": self.dtfixed,
-            "dtfixed0": self.dtfixed,
+            "dtfixed0": self.dtfixed0,
             "tout": np.array([0.0, self.tmax]),
             "tmax": self.tmax,
             "stepmax": 100_000,
-            "use_acoustic_cfl": True,
+            "use_acoustic_cfl": self.acoustic_cfl,
         }
         self.set_temporal(temporal_updates)
 
@@ -331,7 +404,7 @@ class TravelingVortexQG(BaseTestCase):
             "output_folder": "traveling_vortex_qg",
             "output_base_name": "_traveling_vortex_qg",
             "output_timesteps": True,
-            "output_frequency_steps": 1,
+            "output_frequency_steps": self.output_freq,
         }
         self.set_outputs(output_updates)
 
@@ -357,6 +430,24 @@ class TravelingVortexQG(BaseTestCase):
         g_eff = self.config.physics.gravity_strength[1] / self.config.model_regimes.Msq
         Nsq_scaled = gl.Nsq_ref * (gl.t_ref**2)
         return np.exp(Nsq_scaled * y / g_eff)
+
+    def jet_stream(self, z: np.ndarray):
+        """ Defining jet stream for barotropic instability
+
+        Parameters
+        ----------
+        z : np.ndarray
+            The second component of the horizontal cells array
+        """
+        u_background = self.jet_amplitude * np.tanh(z / self.jet_width)
+        w_background = np.zeros_like(u_background) # No background meridional flow
+
+        return u_background, w_background
+
+    def vertical_decay_function(self, y:np.ndarray, rho):
+        """ Vertical decay of hydrostatic perturbation"""
+
+        return self.eps * rho[:, np.newaxis] * np.exp(-(y ** 2) / self.vortex_vertical_scale ** 2)
 
     def initialize_solution(self, variables: "Variables", mpv: "MPV"):
         """Initialize density, momentum, potential temperature, and pressure fields for 3D.
@@ -419,6 +510,21 @@ class TravelingVortexQG(BaseTestCase):
 
         # Get slice for the full inner domain
         inner_slice = grid.get_inner_slice()
+        inner_slice_1d = inner_slice[g_axis]
+
+        # --- Calculate broadcasting of 1D stratification profile to 3D --- #
+        # rho0_1d_inner = mpv.hydrostate.cell_vars[inner_slice_1d, HI.RHO0]
+        # rhoY0_1d_inner = mpv.hydrostate.cell_vars[inner_slice_1d, HI.RHOY0]
+        # Y0_1d_inner = rhoY0_1d_inner / rho0_1d_inner
+        #
+        # # Reshape for broadcasting based on the gravity axis
+        # reshape_dims = [1] * grid.ndim
+        # reshape_dims[g_axis] = -1  # e.g., (1, -1, 1) for g_axis=1
+        # target_shape = variables.cell_vars[inner_slice + (VI.RHO,)].shape
+        # rhoY0_reshaped = rhoY0_1d_inner.reshape(tuple(reshape_dims))
+        # rhoY0_3d_inner = np.broadcast_to(rhoY0_reshaped, target_shape)
+        # rho0_3d_inner = np.broadcast_to(rho0_1d_inner.reshape(tuple(reshape_dims)), target_shape)
+        # Y0_3d_inner = np.broadcast_to(Y0_1d_inner.reshape(tuple(reshape_dims)), target_shape)
 
         # --- Get Cell-Centered Coordinates ---
         if grid.ndim == 3:
@@ -444,37 +550,66 @@ class TravelingVortexQG(BaseTestCase):
         dx = dx - Lx * np.round(dx / Lx)
         dz = dz - Lz * np.round(dz / Lz)
 
-        # The vortex is uniform in y, so radius is calculated only in the xz-plane
+        # The vortex is uniform in y, so the radius is calculated only on the xz-plane
         r_cell = np.sqrt(dx**2 + dz**2)
         r_over_R0_cell = np.divide(r_cell, self.R0, where=self.R0 != 0)
 
-        # --- Calculate Tangential Velocity ---
-        uth_cell = np.zeros_like(r_cell)
-        mask_cell = (r_cell < self.R0) & (r_cell > 1e-9)
-        uth_cell[mask_cell] = (
-            self.rotdir
-            * self.fac
-            * (1.0 - r_over_R0_cell[mask_cell]) ** 6
-            * r_over_R0_cell[mask_cell] ** 6
-        )
-
-        # --- Calculate Velocity Components (Perturbations in U and W) ---
-        u_pert = np.zeros_like(uth_cell)
-        w_pert = np.zeros_like(uth_cell)
-        u_pert[mask_cell] = uth_cell[mask_cell] * (-dz[mask_cell] / r_cell[mask_cell])
-        w_pert[mask_cell] = uth_cell[mask_cell] * (+dx[mask_cell] / r_cell[mask_cell])
-
-        u_total = self.u0 + u_pert
-        w_total = self.w0 + w_pert
-        v_total = np.full_like(u_total, self.v0)  # v-velocity is uniform background
-
-        # --- Calculate Density ---
-        rho_total = np.full_like(r_cell, self.rho0)
+        # 0. Define density field
+        rho_pert = np.zeros_like(r_cell)
         mask_rho = r_cell < self.R0
-        rho_total[mask_rho] += self.del_rho * (1.0 - r_over_R0_cell[mask_rho] ** 2) ** 6
+        rho_total = np.full_like(r_cell, self.rho0)
+        rho_pert[mask_rho] = self.del_rho * (1.0 - r_over_R0_cell[mask_rho] ** 2) ** 6
+        rho_total[mask_rho] += rho_pert[mask_rho]
+
+
+        # 1. Define pressure anomaly
+        # p_amplitude = -0.05  # A negative value for a low-pressure center (cyclone)
+        # vortex_radius = self.R0
+        # # This pressure field is the "slow manifold" or the "riverbanks".
+        # dp2c = np.zeros_like(r_cell)
+        # dp2c[mask_rho] = p_amplitude * np.exp(-(r_cell[mask_rho]**2) / (vortex_radius**2))
+        #
+        # # 2. Derive the balanced velocity from pressure field
+        # # The analytical derivative of p_amplitude * exp(-r²/R²) is:
+        # dp_dr = np.zeros_like(r_cell)
+        # dp_dr[mask_rho] = dp2c[mask_rho] * (-2 * r_cell[mask_rho] / (vortex_radius**2))
+        #
+        # # --- Calculate Tangential Velocity ---
+        # uth_cell = np.zeros_like(r_cell)
+        # mask_cell = (r_cell < self.R0) & (r_cell > 1e-9)
+        # # uth_cell[mask_cell] = (
+        # #     self.rotdir
+        # #     * self.fac
+        # #     * (1.0 - r_over_R0_cell[mask_cell]) ** 6
+        # #     * r_over_R0_cell[mask_cell] ** 6
+        # # )
+        # uth_cell[mask_cell] = (1.0 / (rho_total[mask_cell] * coriolis)) * dp_dr[mask_cell]
+        #
+        # # --- Calculate Velocity Components (Perturbations in U and W) ---
+        # u_pert = np.zeros_like(uth_cell)
+        # w_pert = np.zeros_like(uth_cell)
+        # u_pert[mask_cell] = uth_cell[mask_cell] * (-dz[mask_cell] / r_cell[mask_cell])
+        # w_pert[mask_cell] = uth_cell[mask_cell] * (+dx[mask_cell] / r_cell[mask_cell])
+        #
+        # if self.instability and not self.baroclinic:
+        #     u_background, w_background = self.jet_stream(ZC)
+        # else:
+        #     u_background, w_background = self.u0, self.w0
+        #
+        # u_total = u_background + u_pert
+        # w_total = w_background + w_pert
+        # v_total = np.full_like(u_total, self.v0)  # v-velocity is uniform background
+        #
+        # mask_rho = r_cell < self.R0
+
+        # ==================================================================================
+        # ====== RESTRUCTURED AND CORRECTED PERTURBATION CALCULATION =======================
+        # ==================================================================================
+
+        # --- 1. Define Universal Perturbation Fields (Valid for both cases) ---
 
         # --- Calculate Pressure Perturbation (dp2c) ---
-        dp2c = np.zeros_like(r_cell)
+        p_geostrophic_pert = np.zeros_like(r_cell)
         if Msq > 1e-10:
             # Main pressure term
             term_main = np.zeros_like(r_cell)
@@ -509,47 +644,62 @@ class TravelingVortexQG(BaseTestCase):
                     )
                     dp2c_const[mask_rho] += term[mask_rho]
 
+            # dp2c_const *= self.vertical_decay_function(YC, rho0_1d_inner) if self.constant_rho else 1.0
             dp2c = self.alpha * term_main + self.alpha_const * dp2c_const
-        else:
-            print("Msq is near zero, pressure perturbation dp2c set to zero.")
+        # else:
+        #     print("Msq is near zero, pressure perturbation dp2c set to zero.")
 
-        # --- Assign to Cell Variables (Inner Domain Only) ---
-        variables.cell_vars[inner_slice + (VI.RHO,)] = rho_total
-        variables.cell_vars[inner_slice + (VI.RHOU,)] = rho_total * u_total
-        variables.cell_vars[inner_slice + (VI.RHOV,)] = rho_total * v_total
-        variables.cell_vars[inner_slice + (VI.RHOW,)] = rho_total * w_total
+        # Create the vertical decay scale to make the perturbation hydrostatic in case needed.
+        # rho_pert = np.zeros_like(r_cell)
+        # mask_rho = r_cell < self.R0
+        # rho_pert[mask_rho] = self.del_rho * (1.0 - r_over_R0_cell[mask_rho] ** 2) ** 6 \
+        #     if not self.constant_rho else self.vertical_decay_function(YC, rho0_1d_inner)[mask_rho]
 
-        # --- Handle rhoY (Potential Temperature * Density) ---
-        # Get ghost cell info
-        ng_g_axis = self.config.spatial_grid.grid.ng[g_axis][0]
+        # The total dynamic pressure perturbation is the sum of the two balanced components
+        # p_dynamic_pert = p_geostrophic_pert
 
-        # Extract the 1D hydrostatic variable (it includes ghost cells)
-        rhoY0_cells_1d_full = mpv.hydrostate.cell_vars[..., HI.RHOY0]
-
-        # Slice out the inner part of the 1D array to remove ghost cells
-        inner_slice_1d = slice(ng_g_axis, -ng_g_axis if ng_g_axis > 0 else None)
-        rhoY0_cells_1d_inner = rhoY0_cells_1d_full[inner_slice_1d]
-
-        # Reshape for broadcasting based on the gravity axis
-        reshape_dims = [1] * grid.ndim
-        reshape_dims[g_axis] = -1  # e.g., (1, -1, 1) for g_axis=1
-        rhoY0_reshaped = rhoY0_cells_1d_inner.reshape(tuple(reshape_dims))
-
-        # Broadcast to the full 3D inner domain shape
-        target_shape_3d = variables.cell_vars[inner_slice + (VI.RHO,)].shape
-        rhoY0_cells = np.broadcast_to(rhoY0_reshaped, target_shape_3d)
+        # --- Calculate Density and rhoY ---
+        # if self.stratified_atmosphere:
+        #     # The hydrostatic pressure perturbation (vertical balance)
+        #     # p_hydrostatic_pert = mpv.integrate_density_hydrostatically(rho_pert, gravity)
+        #     # p_dynamic_pert += p_hydrostatic_pert
+        #     # p_hydro_3d = rhoY0_3d_inner ** thermo.gamma
+        #     # p_total_3d = p_hydro_3d + Msq * p_dynamic_pert
+        #     # p_total_3d = np.maximum(p_total_3d, 1e-9)
+        #
+        #     # Derive total rhoY and then total rho
+        #     rho_total = rho0_3d_inner + rho_pert
+        #     rhoY_total_3d = rho_total * Y0_3d_inner
+        # else:
+        #     p_jet_pert = -self.rho0 * self.cor_f[self.coriolis_axis] * self.jet_amplitude \
+        #                                * self.jet_width * np.log(np.cosh(ZC / self.jet_width))
+        #     p_vortex_pert = p_dynamic_pert
+        #     p_dynamic_pert = p_vortex_pert + p_jet_pert if self.instability else p_vortex_pert
+        #     rho_total = np.full_like(r_cell, self.rho0)
+        #     rho_total[mask_rho] += rho_pert[mask_rho]
+        #     if self.config.model_regimes.is_compressible:
+        #         p_total = self.p0 + Msq * p_dynamic_pert
+        #         p_total_safe = np.maximum(p_total, 1e-9)
+        #         rhoY_total_3d = p_total_safe ** thermo.gamminv
+        #     else:
+        #         rhoY_total_3d = rhoY0_3d_inner
 
         if self.config.model_regimes.is_compressible:
             p_total = self.p0 + Msq * dp2c
             p_total_safe = np.maximum(p_total, 1e-9)
-            variables.cell_vars[inner_slice + (VI.RHOY,)] = p_total_safe**thermo.gamminv
-        else:
-            variables.cell_vars[inner_slice + (VI.RHOY,)] = rhoY0_cells
+            rhoY_total_3d = p_total_safe ** thermo.gamminv
 
-        if VI.RHOX < variables.num_vars_cell:
-            variables.cell_vars[inner_slice + (VI.RHOX,)] = 0.0
+        # --- Assign to Cell Variables (Inner Domain Only) ---
+        variables.cell_vars[inner_slice + (VI.RHO,)] = rho_total
+        # variables.cell_vars[inner_slice + (VI.RHOU,)] = rho_total * u_total
+        # variables.cell_vars[inner_slice + (VI.RHOV,)] = rho_total * v_total
+        # variables.cell_vars[inner_slice + (VI.RHOW,)] = rho_total * w_total
+        variables.cell_vars[inner_slice + (VI.RHOY,)] = rhoY_total_3d
+        variables.cell_vars[inner_slice + (VI.RHOX,)] = 0.0
 
-        # --- Calculate Nodal Pressure Perturbation p2 (Nodes, Inner Domain Only) ---
+
+########################################################################################################################
+######### --- Calculate Nodal Pressure Perturbation p2 (Nodes, Inner Domain Only) --- ##################################
         if grid.ndim == 3:
             XN, YN, ZN = np.meshgrid(
                 grid.x_nodes[inner_slice[0]],
@@ -568,8 +718,6 @@ class TravelingVortexQG(BaseTestCase):
         r_node = np.sqrt(dx_node**2 + dz_node**2)  # Radius is in xz-plane
         r_over_R0_node = np.divide(r_node, self.R0, where=self.R0 != 0)
         mask_node = r_node < self.R0
-
-        p2_nodes_unscaled = np.zeros_like(r_node)
 
         # Main term
         term_main_node = np.zeros_like(r_node)
@@ -601,30 +749,84 @@ class TravelingVortexQG(BaseTestCase):
                 )
                 p2n_const_unscaled[mask_node] += term[mask_node]
 
-        p2_nodes_unscaled = (
+        # p2n_const_unscaled *= self.vertical_decay_function(YN, rho0_1d_inner) if self.constant_rho else 1.0
+        dp2c_n = (
             self.alpha * term_main_node + self.alpha_const * p2n_const_unscaled
         )
 
-        p_total_nodes = self.p0 + Msq * p2_nodes_unscaled
-        rhoY0_nodes = p_total_nodes**thermo.gamminv
+        rho_pert = np.zeros_like(r_node)
+        mask_rho = r_node < self.R0
+        rho_pert[mask_rho] = self.del_rho * (1.0 - r_over_R0_node[mask_rho] ** 2) ** 6
+
+        # The total dynamic pressure perturbation is the sum of the two balanced components
+        # p_dynamic_pert_n = p_geostrophic_pert_n
+        #
+        # if self.stratified_atmosphere:
+        #     # The hydrostatic pressure perturbation (vertical balance)
+        #     p_hydrostatic_pert_n = mpv.integrate_density_hydrostatically(rho_pert, gravity)
+        #     p_dynamic_pert_n += p_hydrostatic_pert_n
+        #     rhoY0_nodes_1d_inner = mpv.hydrostate.node_vars[inner_slice_1d, HI.RHOY0]
+        #     rhoY0_nodes_reshaped = rhoY0_nodes_1d_inner.reshape(tuple(reshape_dims))
+        #     target_shape = mpv.p2_nodes[inner_slice].shape
+        #     rhoY0_3d_nodes = np.broadcast_to(rhoY0_nodes_reshaped, target_shape)
+        #
+        #     # p_hydro_nodes = rhoY0_3d_nodes ** thermo.gamma
+        #     # p_total_nodes = p_hydro_nodes + Msq * p_dynamic_pert_n
+        #     # p_total_nodes = np.maximum(p_total_nodes, 1e-9)
+        #     # rhoY_total_nodes = p_total_nodes ** (1.0 / thermo.gamma)
+        #     #
+        #     # # The relationship is π = P^(gamma-1)
+        #     # pi_total_nodes = thermo.Gamma * (rhoY_total_nodes ** thermo.gm1)
+        #     # pi_hydro_nodes = thermo.Gamma * (rhoY0_3d_nodes ** thermo.gm1)
+        #     # pi_pert_nodes = pi_total_nodes - pi_hydro_nodes
+        #
+        #     mpv.p2_nodes[inner_slice] = thermo.Gamma * np.divide(
+        #         p_dynamic_pert_n, rhoY0_3d_nodes, where=rhoY0_3d_nodes != 0
+        #     )
+        #
+        #     # mpv.p2_nodes[inner_slice] = pi_pert_nodes
+        # else:
+        #     p_jet_pert = -self.rho0 * self.cor_f[self.coriolis_axis] * self.jet_amplitude \
+        #                                * self.jet_width * np.log(np.cosh(ZN / self.jet_width))
+        #     p_vortex_pert = p_dynamic_pert_n
+        #     p_dynamic_pert = p_vortex_pert + p_jet_pert if self.instability else p_vortex_pert
+        #     background_p = self.p0
+        #     p_total_nodes = background_p + Msq * p_dynamic_pert_n
+        #     rhoY0_nodes = p_total_nodes**thermo.gamminv
+        #
+        #     mpv.p2_nodes[inner_slice] = thermo.Gamma * np.divide(
+        #         p_dynamic_pert_n, rhoY0_nodes, where=rhoY0_nodes != 0
+        #     )
 
         # # --- Correctly broadcast the nodal hydrostatic state ---
-        # rhoY0_nodes_1d_full = mpv.hydrostate.node_vars[..., HI.RHOY0]
-        # rhoY0_nodes_1d_inner = rhoY0_nodes_1d_full[inner_slice_1d]
-        #
-        # reshape_dims_nodes = [1] * grid.ndim
-        # reshape_dims_nodes[g_axis] = -1
-        # rhoY0_nodes_reshaped = rhoY0_nodes_1d_inner.reshape(tuple(reshape_dims_nodes))
-        #
-        # target_shape_3d_nodes = mpv.p2_nodes[inner_slice].shape
-        # rhoY0_nodes = np.broadcast_to(rhoY0_nodes_reshaped, target_shape_3d_nodes)
+        rhoY0_nodes_1d_full = mpv.hydrostate.node_vars[..., HI.RHOY0]
+        rhoY0_nodes_1d_inner = rhoY0_nodes_1d_full[inner_slice_1d]
+
+        reshape_dims_nodes = [1] * grid.ndim
+        reshape_dims_nodes[g_axis] = -1
+        rhoY0_nodes_reshaped = rhoY0_nodes_1d_inner.reshape(tuple(reshape_dims_nodes))
+
+        target_shape_3d_nodes = mpv.p2_nodes[inner_slice].shape
+        rhoY0_nodes = np.broadcast_to(rhoY0_nodes_reshaped, target_shape_3d_nodes)
+
 
         mpv.p2_nodes[inner_slice] = thermo.Gamma * np.divide(
-            p2_nodes_unscaled, rhoY0_nodes, where=rhoY0_nodes != 0
-        )
+                    dp2c_n, rhoY0_nodes, where=rhoY0_nodes != 0
+                )
 
+        Dpx, Dpy, Dpz = _gradient_3d(mpv.p2_nodes[inner_slice], grid.dx, grid.dy, grid.dz)
+        Theta_c = np.divide(rhoY_total_3d, rho_total, where=rho_total != 0.0)
+        u_c = - (Theta_c / (thermo.Gamma * coriolis)) * Dpz
+        w_c = + (Theta_c / (thermo.Gamma * coriolis)) * Dpx
 
+        variables.cell_vars[inner_slice + (VI.RHOU,)] = rho_total * u_c
+        variables.cell_vars[inner_slice + (VI.RHOV,)] = 0.0  # unchanged in this 2D-xz vortex
+        variables.cell_vars[inner_slice + (VI.RHOW,)] = rho_total * w_c
 
-
+        p = np.zeros_like(r_node)
+        R0 = 0.2
+        p[mask_rho] = np.exp(-(dx_node[mask_rho]**2 + dz_node[mask_rho]**2) / (2 * R0**2))
+        print("khar")
+        mpv.p2_nodes[inner_slice] = p
 
         logging.info("3D solution initialization complete.")

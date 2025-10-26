@@ -93,9 +93,11 @@ class TravelingVortex3D(BaseTestCase):
         self.rotdir: float = 1.0  # Rotation direction
         self.h_ref = 10_000.0
         self.t_ref = 100.0
-        self.boxsize = 100
-        self.R0: float = 100  # Vortex radius scale
-        self.fac: float = 0.1 # Vortex magnitude factor
+        self.size = 200
+        self.tmax = 1.0*self.size
+        self.boxsize = 0.5*self.size
+        self.R0: float = 0.5*self.size  # Vortex radius scale
+        self.fac: float = 1 # Vortex magnitude factor
         self.xc: float = 0.0  # Vortex center x
         self.yc: float = 0.0  # Vortex center y
         self.zc: float = 0.0  # Vortex center z
@@ -104,19 +106,18 @@ class TravelingVortex3D(BaseTestCase):
         self.stratified_atmosphere = False
 
         self.dtfixed0 = None
-        self.dtfixed = self.dtfixed0 if self.dtfixed0 else 0.001
-        self.tmax = 100.0
+        self.dtfixed = self.dtfixed0 if self.dtfixed0 else 0.0001
         self.acoustic_cfl = True
         self.output_freq = 1
 
         self.g = 1.0 if self.stratified_atmosphere else 0.0
-        coriolis_factor = 1000.0
+        coriolis_factor = 100.0
         force = 1.0e-4 * self.t_ref * coriolis_factor  # Constant coriolis force
         self.cor_f = [0.0, 0.0, 0.0]
         self.coriolis_axis = 1
         self.cor_f[self.coriolis_axis] = force
 
-        self.is_nongeostrophic = 1
+        self.is_nongeostrophic = 0.01
         self.is_nonhydrostatic = 1
         self.is_compressible = 1
 
@@ -465,11 +466,18 @@ class TravelingVortex3D(BaseTestCase):
             * r_over_R0_cell[mask_cell] ** 6
         )
 
+        # Calculate components of the tangential basis:
+        e_th_1 = dz[mask_cell] / r_cell[mask_cell]
+        e_th_2 = -dx[mask_cell] / r_cell[mask_cell]
+
         # --- Calculate Velocity Components (Perturbations in U and W) ---
         u_pert = np.zeros_like(uth_cell)
         w_pert = np.zeros_like(uth_cell)
-        u_pert[mask_cell] = uth_cell[mask_cell] * (dz[mask_cell] / r_cell[mask_cell])
-        w_pert[mask_cell] = uth_cell[mask_cell] * (-dx[mask_cell] / r_cell[mask_cell])
+        u_pert[mask_cell] = uth_cell[mask_cell] * e_th_1
+        w_pert[mask_cell] = uth_cell[mask_cell] * e_th_2
+
+        u_background_tangential = np.zeros_like(uth_cell)
+        u_background_tangential[mask_cell] = self.u0*e_th_1 + self.v0*e_th_2
 
         u_total = self.u0 + u_pert
         w_total = self.w0 + w_pert
@@ -540,8 +548,12 @@ class TravelingVortex3D(BaseTestCase):
         target_shape_3d = variables.cell_vars[inner_slice + (VI.RHO,)].shape
         rhoY0_cells = np.broadcast_to(rhoY0_reshaped, target_shape_3d)
 
+        # p0 = np.zeros_like(r_cell)
+        # p0 = self.p0 + self.rho0 * coriolis * (self.w0 * dx - self.u0 * dz)
+        p0 = self.p0
+
         if self.config.model_regimes.is_compressible:
-            p_total = self.p0 + Msq * dp2c
+            p_total = p0 + Msq * dp2c
             p_total_safe = np.maximum(p_total, 1e-9)
             rhoY_total = p_total_safe**thermo.gamminv
         else:
@@ -622,8 +634,19 @@ class TravelingVortex3D(BaseTestCase):
         target_shape_3d_nodes = mpv.p2_nodes[inner_slice].shape
         rhoY0_nodes = np.broadcast_to(rhoY0_nodes_reshaped, target_shape_3d_nodes)
 
-        # p_total_nodes = self.p0 + Msq * p2_nodes_unscaled
-        # rhoY0_nodes = p_total_nodes**thermo.gamminv
+        # e_th_1 = dz_node[mask_node] / r_node[mask_node]
+        # e_th_2 = -dx_node[mask_node] / r_node[mask_node]
+        #
+        # u_background_tangential_node = np.zeros_like(r_node)
+        # u_background_tangential_node[mask_node] = self.u0*e_th_1 + self.v0*e_th_2
+        #
+        # p0 = np.zeros_like(r_node)
+        # p0 = np.zeros_like(r_cell)
+        # p0 = self.p0 + self.rho0 * coriolis * (self.w0 * dx_node - self.u0 * dz_node)
+        p0 = self.p0
+
+        p_total_nodes = p0 + Msq * p2_nodes_unscaled
+        rhoY0_nodes = p_total_nodes**thermo.gamminv
 
         mpv.p2_nodes[inner_slice] = thermo.Gamma * np.divide(
             p2_nodes_unscaled, rhoY0_nodes, where=rhoY0_nodes != 0

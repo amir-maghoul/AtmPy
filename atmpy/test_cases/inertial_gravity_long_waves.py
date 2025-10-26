@@ -44,12 +44,14 @@ class InertialGravityLongWaves(BaseTestCase):
         super().__init__(name="InertialGravityLongWaves", config=_effective_config)
 
         ########################### Test Case Specific Parameters ####################################################
-        self.u0: float = 0.0  # Background velocity U
+        self.u0: float = 0.2  # Background velocity U
         self.v0: float = 0.0  # Background velocity V
         self.w0: float = 0.0  # Background velocity W
 
-        self.scale_factor = 20.0
-        self.xc: float = -0.0
+        self.scale_factor = 1.0
+        self.xc: float = 10.0 * self.scale_factor
+        self.href = 10000.0
+        self.tref = 100.0
 
         if run_setup_method:
             self.setup()
@@ -67,8 +69,8 @@ class InertialGravityLongWaves(BaseTestCase):
             "nx": nx,
             "ny": ny,
             "nz": 0,
-            "xmin": -15.0 * self.scale_factor,
-            "xmax": 15.0 * self.scale_factor,
+            "xmin": 0.0 * self.scale_factor,
+            "xmax": 30.0 * self.scale_factor,
             "ymin": 0.0,
             "ymax": 1.0,
             "ngx": 2,
@@ -107,11 +109,14 @@ class InertialGravityLongWaves(BaseTestCase):
 
         #################################### Temporal Setting ##########################################################
         # Match Project 1 tout calculation
+        cfl = 0.9
+        u = 0.02 * self.tref / self.href # (km/s converted nondimensional)
         tout_val = self.scale_factor * 1.0 * 3000.0 / self.config.global_constants.t_ref
+        dt = (cfl/u) * self.scale_factor * 30 / 300 / self.tref
         temporal_updates = {
             "CFL": 0.9,
-            "dtfixed": 10,
-            "dtfixed0": 10,
+            "dtfixed": dt,
+            "dtfixed0": dt,
             "tout": np.array([tout_val]),
             "tmax": tout_val + 1.0,  # Ensure it runs at least one tout
             "stepmax": 50000,
@@ -124,7 +129,7 @@ class InertialGravityLongWaves(BaseTestCase):
         regime_updates = {
             "is_nongeostrophic": 1,
             "is_nonhydrostatic": 1,
-            "is_compressible": 0,
+            "is_compressible": 1,
         }
         self.set_model_regimes(regime_updates)
 
@@ -205,7 +210,7 @@ class InertialGravityLongWaves(BaseTestCase):
 
         # 1. Define perturbation parameters, matching Project 1
         delth = 0.01 / gl.T_ref
-        a = self.scale_factor * 5.0e3 / gl.h_ref
+        a = self.scale_factor * 6.0e3 / gl.h_ref
 
         gravity = self.config.physics.gravity_strength
         mpv.state(gravity, Msq)
