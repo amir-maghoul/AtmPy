@@ -9,9 +9,9 @@ DEFAULT_RUN_CASE = "TravelingVortex"
 CASE_CHOICES = [
     "TravelingVortex",
     "TravelingVortex3D",
+    "TravelingVortexQG",
     "RisingBubble",
     "SineWaveAdvection1D",
-    "TravelingVortexHS",
     "InertialGravityWaves",
     "InertialGravityLongWaves",
 ]

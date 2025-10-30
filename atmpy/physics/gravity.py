@@ -67,3 +67,9 @@ class Gravity:
         Given a grid object, return the coordinate cells along the gravity axis.
         """
         return grid.get_cell_coordinates(self.axis)
+
+    def horizontal_momentum_indices(self):
+        """ Returns the indices of the horizontal momentum """
+        momentum_indices = [VI.RHOU, VI.RHOV, VI.RHOW]
+        horizontal_indices = [val for val in momentum_indices if val != self.vertical_momentum_index]
+        return horizontal_indices

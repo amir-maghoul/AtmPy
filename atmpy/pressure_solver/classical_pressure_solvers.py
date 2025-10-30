@@ -115,7 +115,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
     def _compute_and_store_precondition_data(
         self,
         dt: float,
-        is_nongeostrophic: bool,
+        is_nongeostrophic: float,
         is_nonhydrostatic: bool,
         is_compressible: bool,
     ) -> None:
@@ -188,7 +188,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self.mpv.wcenter[inner_slice] = dPdpi
 
     def calculate_enthalpy_weighted_pressure_gradient(
-        self, p: np.ndarray, dt: float, is_nongeostrophic: bool, is_nonhydrostatic: bool
+        self, p: np.ndarray, dt: float, is_nongeostrophic: float, is_nonhydrostatic: bool
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Calculate the M^(-1)*dt*pTheta*grad(pi), where M is the extended coriolis matrix. The divergence of this term
@@ -200,7 +200,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             The nodal pressure vector (or perturbation). The gradient bring this to cells.
         dt : float
             The time step
-        is_nongeostrophic : bool
+        is_nongeostrophic : float
             The switch between geostrophic and non-geostrophic regimes
         is_nonhydrostatic : bool
             The switch between hydrostatic and non-hydrostatic regimes
@@ -245,7 +245,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         p: np.ndarray,
         updt_chi: Union[np.ndarray, float],
         dt: float,
-        is_nongeostrophic: bool,
+        is_nongeostrophic: float,
         is_nonhydrostatic: bool,
     ):
         """Update the momenta and Chi variables using the pressure term with their coefficients on the RHS of the
@@ -259,7 +259,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             The new updated value for Chi
         dt : float
             The time step
-        is_nongeostrophic : bool
+        is_nongeostrophic : float
             The switch between geostrophic and non-geostrophic regimes
         is_nonhydrostatic : bool
             The switch between hydrostatic and non-hydrostatic regimes
@@ -291,7 +291,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self,
         p: np.ndarray,
         dt: float,
-        is_nongeostrophic: bool,
+        is_nongeostrophic: float,
         is_nonhydrostatic: bool,
     ):
         """Compute the isentropic laplacian operator:  -∇⋅( M_inv ⋅ ( dt * (PΘ)° * ∇p ) )
@@ -302,7 +302,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             The input Exner pressure perturbation. This is the scalar field on which the laplacian is computed.
         dt : float
             The time step
-        is_nongeostrophic : bool
+        is_nongeostrophic : float
             The switch between geostrophic and non-geostrophic regimes
         is_nonhydrostatic : bool
             The switch between hydrostatic and non-hydrostatic regimes
@@ -340,7 +340,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self,
         p: np.ndarray,
         dt: float,
-        is_nongeostrophic: bool,
+        is_nongeostrophic: float,
         is_nonhydrostatic: bool,
         is_compressible: bool,
     ):
@@ -353,7 +353,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
             The input Exner pressure perturbation. This is the scalar field on which the laplacian is computed.
         dt : float
             The time step
-        is_nongeostrophic : bool
+        is_nongeostrophic : float
             The switch between geostrophic and non-geostrophic regimes
         is_nonhydrostatic : bool
             The switch between hydrostatic and non-hydrostatic regimes
@@ -394,7 +394,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
     def helmholtz_operator_linear_wrapper(
         self,
         dt: float,
-        is_nongeostrophic: bool,
+        is_nongeostrophic: float,
         is_nonhydrostatic: bool,
         is_compressible: bool,
     ) -> sp.sparse.linalg.LinearOperator:
@@ -429,7 +429,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         self,
         rhs_flat: np.ndarray,
         dt: float,
-        is_nongeostrophic: bool,
+        is_nongeostrophic: float,
         is_nonhydrostatic: bool,
         is_compressible: bool,
         rtol: float = 1e-6,
@@ -446,7 +446,7 @@ class ClassicalPressureSolver(AbstractPressureSolver):
 
         dt : float
             The time step
-        is_nongeostrophic : bool
+        is_nongeostrophic : float
             The switch between geostrophic and non-geostrophic regimes
         is_nonhydrostatic : bool
             The switch between hydrostatic and non-hydrostatic regimes
@@ -557,14 +557,20 @@ class ClassicalPressureSolver(AbstractPressureSolver):
         dPdpi = coeff * cells_to_nodes_averaging(P**exponent)
 
         # Apply wall correction
-        boundary_operation = [
-            WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=0.5, coeff=True
-            ),
-            WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.REFLECTIVE_GRAVITY, factor=0.5, coeff=True
-            )
-        ]
-        self.boundary_manager.apply_extra_all_sides(dPdpi, boundary_operation)
+        # boundary_operation = [
+        #     WallAdjustment(
+        #         target_side=BdrySide.ALL,
+        #         target_type=BdryType.WALL,
+        #         factor=0.5,
+        #         coeff=True,
+        #     ),
+        #     WallAdjustment(
+        #         target_side=BdrySide.ALL,
+        #         target_type=BdryType.REFLECTIVE_GRAVITY,
+        #         factor=0.5,
+        #         coeff=True,
+        #     ),
+        # ]
+        # self.boundary_manager.apply_extra_all_sides(dPdpi, boundary_operation)
 
         return dPdpi

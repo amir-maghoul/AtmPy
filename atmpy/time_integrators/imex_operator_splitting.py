@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import numpy as np
+from jinja2.sandbox import UNSAFE_ASYNC_GENERATOR_ATTRIBUTES
 
 np.seterr(all="raise")
 from typing import TYPE_CHECKING, Union, List, Any, Callable
@@ -59,9 +60,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         first_order_advection_routine: AdvectionRoutines,
         second_order_advection_routine: AdvectionRoutines,
         wind_speed: List[float],
-        is_nongeostrophic: bool,
+        is_nongeostrophic: float,
         is_nonhydrostatic: bool,
         is_compressible: bool,
+        qg_filter: bool,
         dt: float,
     ):
         # Inject dependencies
@@ -89,9 +91,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.th: "Thermodynamics" = self.pressure_solver.th
         self.dt: float = dt
         self.Msq: float = self.pressure_solver.Msq
-        self.is_nongeostrophic: bool = is_nongeostrophic
+        self.is_nongeostrophic: float = is_nongeostrophic
         self.is_nonhydrostatic: bool = is_nonhydrostatic
         self.is_compressible: bool = is_compressible
+        self.qg_filter = qg_filter
         self.wind_speed: np.ndarray = np.array(wind_speed)
         self.ndim = self.grid.ndim
         self.vertical_momentum_index = self.coriolis.gravity.vertical_momentum_index
@@ -100,6 +103,19 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # That is setting the flag is_nodal for all dimensions and all sides (therefore ndim*2) to True
         # since p2_nodes is nodal.
         self._nodal_bc_contexts = [BCApplicationContext(is_nodal=True)] * self.ndim * 2
+
+        # Cached state for the quasi-geostrophic filter. This gets filled at the
+        # *start* of backward_update_implicit (before pressure solve) and consumed
+        # at the *end* (after pressure solve).
+        #
+        # Meaning of the fields (all are 3D arrays over the grid):
+        #   "geo": geostrophic horizontal component U_g and V_g at t^n    (balanced part)
+        #   "ageo": ageostrophic horizontal component U_a, V_a at t^n   (unbalanced residual)
+        #
+        # See _prepare_qg_filter_state() / geostrophic_filter() for details.
+        # NOTE: The naming is a convention and does not consider the correct dimensions, i.e.
+        #       when the gravity is on y-axis, V_g and V_a are basically W_g and W_a.
+        self._qg_cache: dict[str, tuple[np.ndarray, np.ndarray]] | None = None
 
     def _get_advection_routine(
         self,
@@ -359,6 +375,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             dt,
         )
 
+        horizontal_momenta_index = self.gravity.horizontal_momentum_indices()
+        cellvars[..., horizontal_momenta_index] = self.is_nongeostrophic * cellvars[..., horizontal_momenta_index]
+
         # Restore background wind
         self.variables.adjust_background_wind(self.wind_speed, scale=1.0)
 
@@ -379,7 +398,11 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         """
         cellvars = self.variables.cell_vars if initial_vars is None else initial_vars
 
-        ################################ 1. Preparation ################################################################
+        ############################### 0. Prepare the QG state before solve ###########################################
+        if self.qg_filter:
+            self._prepare_qg_filter_state()
+
+        ########################## 1. Preparation coefficients of the solver ###########################################
         # Update the boundary value from current variables/initial variable and compute the pressure coefficients
         # The coefficient values depend on the current values in the variables. Therefore, they are pre update coefficients
         self.boundary_manager.apply_boundary_on_all_sides(cellvars)
@@ -465,6 +488,101 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         ############################ 10. Update The Main Exner Pressure ################################################
         self.mpv.p2_nodes += p2_full
 
+        ##################### 11. QG post-stage: Apply a QG filter on the horizontal momenta ###########################
+        if self.qg_filter:
+            self.geostrophic_filter(dt)
+
+    def geostrophic_filter(self, dt:float):
+        """Filter the *ageostrophic* horizontal components of the fast oscillating waves.
+
+        This is the classic inertial filtering step:
+        we want to damp fast oscillations (ageostrophic / unbalanced motions)
+        while keeping the balanced (geostrophic) part tied to the updated pressure.
+
+        Naming convention:
+        ------------------
+        All symbols are 3D arrays over the grid.
+
+        From _prepare_qg_filter_state() (time level "prev" / t^n):
+          U_g, V_g : geostrophic horizontal components at t^n
+          U_a, V_a : ageostrophic horizontal components at t^n (in momentum units)
+
+        Recomputed here using the *new* pressure p^{n+1}:
+          U_g_next, V_g_next : geostrophic horizontal components at t^{n+1}
+
+        Filtered output:
+          U_a_next, V_a_next : ageostrophic components after applying a
+                               damped inertial oscillation model
+          U_qg, V_qg         : total filtered horizontal components
+                               U_qg = U_g_next + U_a_next,
+                               V_qg = V_g_next + V_a_next
+
+        Finally, we overwrite the prognostic horizontal momenta with
+        (U_qg / Y, V_qg / Y) and then re-add the background wind.
+
+        Parameters
+        ----------
+        dt : float
+            The timestep length used in this implicit stage.
+        """
+        self._assert_qg_supported()
+
+        if self._qg_cache is None:
+            raise RuntimeError(
+                "QG filter cache is empty. "
+                "Did you call geostrophic_filter() without _prepare_qg_filter_state()?"
+            )
+
+        cellvars = self.variables.cell_vars
+
+        # Extract cached 'previous' balanced/unbalanced pieces (t^n)
+        U_g_prev, V_g_prev = self._qg_cache["geo"]
+        U_a_prev, V_a_prev = self._qg_cache["ageo"]
+
+        # Recompute geostrophic components from the *updated* pressure p^{n+1}
+        U_g_next, V_g_next = self._compute_geostrophic_wind(
+            cellvars, self.mpv.p2_nodes
+        )
+
+        # Local thermodynamic ratio Y at the *updated* state
+        Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
+
+        # Inertial frequency (f) and filter strength
+        f = self.coriolis.strength[self.gravity.axis]
+        freq = dt * f
+        damping = 1.0 / (1.0 + freq ** 2)
+
+        # Ageostrophic update:
+        U_a_next = damping * (
+                (U_a_prev - freq * V_a_prev)
+                - (U_g_next - freq * V_g_next)
+                + (U_g_prev - freq * V_g_prev)
+        )
+        V_a_next = damping * (
+                (V_a_prev + freq * U_a_prev)
+                - (V_g_next + freq * U_g_next)
+                + (V_g_prev + freq * U_g_prev)
+        )
+
+        # Combine balanced + filtered-unbalanced
+        U_qg = U_g_next + U_a_next
+        V_qg = V_g_next + V_a_next
+
+        # Write them back into the prognostic horizontal momenta, converting
+        # from 'velocity-like' to momentum units by dividing by Y.
+        # For y as gravity direction, this is VI.RHOU and VI.RHOW.
+        h0_idx, h1_idx = self.gravity.horizontal_momentum_indices()
+        cellvars[..., h0_idx] = U_qg / Y
+        cellvars[..., h1_idx] = V_qg / Y
+
+        # Put the mean background wind back in
+        self.variables.adjust_background_wind(self.wind_speed, scale=+1.0)
+
+        # Clear cache so we don't accidentally reuse stale arrays next step
+        self._qg_cache = None
+
+        return
+
     def _forward_momenta_update(
         self,
         cellvars: np.ndarray,
@@ -493,36 +611,44 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         rhoYovG = self.pressure_solver._calculate_P_over_Gamma(cellvars)
 
         # Calculate the Exner pressure perturbation (Pi^prime) gradiant (RHS of the momenta equations)
-        dpdx, dpdy, dpdz = self.discrete_operator.gradient(p2n)
+        dp_gradient = self.discrete_operator.gradient(p2n)
 
         ###############################################################################################################
         ## UPDATING VARIABLES
         ###############################################################################################################
         # Updates: First the shared terms without regarding which one is in the gravity direction
-        # Horizontal momentum in x
-        cellvars[..., VI.RHOU] -= dt * (
-            rhoYovG * dpdx
-            - coriolis[2] * adjusted_momenta[..., 1]
-            + coriolis[1] * adjusted_momenta[..., 2]
-        )
-        if self.ndim >= 2:
-            cellvars[..., VI.RHOV] -= dt * (
-                rhoYovG * dpdy
-                - coriolis[0] * adjusted_momenta[..., 2]
-                + coriolis[2] * adjusted_momenta[..., 0]
-            )
-        if self.ndim == 3:
-            cellvars[..., VI.RHOW] -= dt * (
-                rhoYovG * dpdz
-                - coriolis[1] * adjusted_momenta[..., 0]
-                + coriolis[0] * adjusted_momenta[..., 1]
+
+        # Define momentum components and their corresponding gradient and coriolis terms
+        momentum_map = {
+            'RHOU': (dp_gradient[0], (coriolis[2], coriolis[1]), (1, 2)),
+            'RHOV': (dp_gradient[1], (coriolis[0], coriolis[2]), (2, 0)),
+            'RHOW': (dp_gradient[2], (coriolis[1], coriolis[0]), (0, 1))
+        }
+
+        for component, (dp, coriolis_terms, momenta_indices) in momentum_map.items():
+            component_index = getattr(VI, component) # Enum, VI.RHOU, VI.RHOV, VI.RHOW
+
+            # Calculate the update for the current momentum component
+            update_raw = dt * (
+                    rhoYovG * dp
+                    - coriolis_terms[0] * adjusted_momenta[..., momenta_indices[0]]
+                    + coriolis_terms[1] * adjusted_momenta[..., momenta_indices[1]]
             )
 
-        # Updates: The momentum in the direction of gravity
-        # Find vertical vs horizontal velocities:
+            # Conditionally apply the update
+            is_horizontal = component_index in self.gravity.horizontal_momentum_indices()
+            if 1e-10 < self.is_nongeostrophic < 1.0 and is_horizontal:
+                update = update_raw / self.is_nongeostrophic
+            elif self.is_nongeostrophic <= 1e-10 and is_horizontal:
+                update = 0.0
+            else:
+                update = update_raw
+            cellvars[..., component_index] -= update
+
+        # Update for the momentum in the direction of gravity (vertical momentum)
         if self.ndim >= 2 and self.vertical_momentum_index < cellvars.shape[-1]:
             cellvars[..., self.vertical_momentum_index] -= dt * (
-                (g / self.Msq) * dbuoy * self.is_nonhydrostatic
+                    (g / self.Msq) * dbuoy * self.is_nonhydrostatic
             )
 
     def _forward_pressure_update(
@@ -552,11 +678,17 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # This will apply the 'extra' method whenever the boundary is defined to be WALL.
         boundary_operation = [
             WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.WALL, factor=2.0, coeff=False
+                target_side=BdrySide.ALL,
+                target_type=BdryType.WALL,
+                factor=2.0,
+                coeff=True,
             ),
             WallAdjustment(
-                target_side=BdrySide.ALL, target_type=BdryType.REFLECTIVE_GRAVITY, factor=2.0, coeff=False
-            )
+                target_side=BdrySide.ALL,
+                target_type=BdryType.REFLECTIVE_GRAVITY,
+                factor=2.0,
+                coeff=True,
+            ),
         ]
         self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.rhs)
         self.boundary_manager.apply_extra_all_sides(self.mpv.rhs, boundary_operation)
@@ -605,11 +737,152 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         parts of the code"""
         Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
         momenta_indices = [VI.RHOU, VI.RHOV, VI.RHOW][: self.ndim]
-        return cellvars[..., momenta_indices] * Y[..., np.newaxis]
+        pressure_weightet_momenta = cellvars[..., momenta_indices] * Y[..., np.newaxis]
+        return pressure_weightet_momenta
+
+    def _prepare_qg_filter_state(self) -> None:
+        """
+        Snapshot the geostrophic and ageostrophic horizontal components *before*
+        we solve for the new pressure.
+
+        Naming convention (all arrays over the grid):
+        - U_g, V_g:
+            Geostrophic (balanced) horizontal components computed from the
+            *current* Exner pressure field p^{n} = self.mpv.p2_nodes.
+            These are velocity-like.
+        - U_a, V_a:
+            Ageostrophic (unbalanced) residuals at the same time level.
+            These are in *momentum units* (rho*u minus rho*u_g).
+
+        NOTE: The naming is a convention and does not consider the correct dimensions, i.e.
+              when the gravity is on y-axis, V_g and V_a are basically W_g and W_a.
+
+        We remove the background wind before computing the residual so that
+        U_a/V_a measure only the perturbation flow.
+        We add it back immediately to leave the global state unchanged.
+
+        After this call, we stash {U_g, V_g, U_a, V_a} in self._qg_cache
+        for use in geostrophic_filter() at the end of the implicit step.
+        """
+        self._assert_qg_supported()
+
+        cellvars = self.variables.cell_vars
+
+        # Potential temperature-like ratio Y = (rho*Theta)/rho
+        Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
+
+        # Geostrophic components from *current* pressure p^{n}
+        U_g, W_g = self._compute_geostrophic_wind(
+            cellvars, self.mpv.p2_nodes
+        )
+
+        # We'll need the two horizontal momentum indices (x and z when gravity is y)
+        h0_idx, h1_idx = self.gravity.horizontal_momentum_indices()
+
+        # Temporarily remove the background wind so we isolate perturbation flow
+        self.variables.adjust_background_wind(self.wind_speed, scale=-1.0)
+
+        # Ageostrophic residual (in momentum units):
+        #   U_a = (rho*u_actual) - (rho*u_geostrophic)
+        #       = RHOU - U_g / Y
+        #   W_a = RHOW - W_g / Y
+        U_a = cellvars[..., h0_idx] - U_g / Y
+        W_a = cellvars[..., h1_idx] - W_g / Y
+
+        # Restore background wind so the global state is unchanged
+        self.variables.adjust_background_wind(self.wind_speed, scale=+1.0)
+
+        # Cache for use after the pressure solve
+        self._qg_cache = {
+            "geo": (U_g, W_g),
+            "ageo": (U_a, W_a)
+        }
+
+
+    def _compute_geostrophic_wind(
+        self,
+        cellvars: np.ndarray,
+        p_nodes: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the 'balanced' (geostrophic) horizontal components from the
+        Exner pressure field.
+
+        Returns
+        -------
+        (U_g, W_g)
+            Arrays shaped like the grid. These correspond to the two horizontal
+            components in the plane perpendicular to gravity.
+
+        Notes
+        -----
+        - We assume gravity is vertical in y (axis == 1). That means the two
+          horizontal directions are x and z.
+        - Under that assumption, geostrophic balance gives:
+
+              U_g =  (PΘ / f) * ∂p/∂z
+              W_g = -(PΘ / f) * ∂p/∂x
+
+          where:
+            * p is Exner pressure,
+            * f is the Coriolis parameter aligned with the vertical,
+            * PΘ is the coefficient `pTheta` = self.pressure_solver._calculate_coefficient_pTheta(cellvars)
+
+        - U_g, W_g here are Pu and Pw.
+          We'll convert them to momenta using Y later.
+        """
+        self._assert_qg_supported()
+
+        # Coriolis parameter for the vertical direction
+        f = self.coriolis.strength[self.gravity.axis]
+
+        # Thermodynamic prefactor "PΘ"
+        pTheta = self.pressure_solver._calculate_coefficient_pTheta(cellvars)
+
+        # Pressure gradients: gradient returns (∂p/∂x, ∂p/∂y, ∂p/∂z)
+        dpdx, _, dpdz = self.discrete_operator.gradient(p_nodes)
+
+        # Balanced (geostrophic) horizontal components in x/z plane
+        U_g = (pTheta / f) * dpdz
+        W_g = -(pTheta / f) * dpdx
+
+        return U_g, W_g
+
+
+    def _assert_qg_supported(self) -> None:
+        """
+        Ensures that the quasi-geostrophic filter is being applied in a configuration
+        we actually support.
+
+        Right now we only support:
+        - 3D runs
+        - gravity pointing along the 'y' axis (axis == 1)
+        - so that the two horizontal directions are x and z
+
+        Raises
+        ------
+        NotImplementedError
+            If the current configuration is not supported by the QG filter.
+        """
+
+        if self.ndim != 3:
+            raise NotImplementedError(
+                "QG filter is only implemented for 3D configurations."
+            )
+
+        if self.gravity.axis != 1:
+            raise NotImplementedError(
+                "QG filter is only implemented for vertical direction 'y' (axis=1)."
+            )
+
+        horiz_indices = self.gravity.horizontal_momentum_indices()
+        if len(horiz_indices) != 2:
+            raise NotImplementedError(
+                "QG filter expects exactly two horizontal momentum components."
+            )
 
     def get_dt(self):
         pass
-
 
 def example_usage():
     from atmpy.physics.thermodynamics import Thermodynamics
@@ -739,7 +1012,7 @@ def example_usage():
             "pressure_solver": pressure,
             "wind_speed": [0.0, 0.0, 0.0],  # optional: override default wind speed
             "is_nonhydrostatic": True,
-            "is_nongeostrophic": True,
+            "is_nongeostrophic": 1,
             "is_compressible": True,
         },
     )

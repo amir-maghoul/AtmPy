@@ -10,7 +10,7 @@ _JIT_OPTIONS = {"nopython": True, "nogil": True, "cache": True}
 @nb.jit(**_JIT_OPTIONS)
 def _calculate_determinant_y_direction_nb(
     nonhydro: bool,
-    nongeo: bool,
+    nongeo: float,
     coriolis_dt: np.ndarray,  # Renamed for clarity (dt * strength)
     dChi_full_term: np.ndarray,
 ) -> np.ndarray:
@@ -20,7 +20,7 @@ def _calculate_determinant_y_direction_nb(
     ----------
     nonhydro : bool
         The switch between hydrostatic and nonhydrostatic regimes
-    nongeo : bool
+    nongeo : float
         The switch between geostrophic and nongeostrophic regimes
     coriolis_dt : np.ndarray
         The coriolis matrix times dt.
@@ -37,7 +37,7 @@ def _calculate_determinant_y_direction_nb(
 def _inverse_matrix_rows_y_direction_nb(
     determinant: np.ndarray,
     nonhydro: bool,
-    nongeo: bool,
+    nongeo: float,
     coriolis_dt: np.ndarray,
     dChi_full_term: np.ndarray,
 ) -> Tuple[
@@ -81,7 +81,7 @@ def apply_coriolis_transform_nb_y(
     W_in: np.ndarray,
     dChi_full_term: np.ndarray,
     nonhydro: bool,
-    nongeo: bool,
+    nongeo: float,
     dt: float,
     coriolis_strength: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
