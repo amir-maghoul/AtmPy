@@ -33,8 +33,10 @@ from atmpy.test_cases.inertial_gravity_waves import InertialGravityWaves
 from atmpy.test_cases.sine_advection_1d import SineWaveAdvection1D
 from atmpy.test_cases.traveling_vortex import TravelingVortex
 from atmpy.test_cases.traveling_vortexQG import TravelingVortexQG
+from atmpy.test_cases.zonal_jet_stream import ZonalJetStream
 from atmpy.test_cases.rising_bubble import RisingBubble
 from atmpy.test_cases.travelling_vortex3D import TravelingVortex3D
+from atmpy.test_cases.zonal_jet_stream import ZonalJetStream
 from atmpy.time_integrators.contexts import TimeIntegratorContext
 from atmpy.variables.multiple_pressure_variables import MPV
 from atmpy.variables.variables import Variables
@@ -64,6 +66,8 @@ def get_base_config_for_case(case_name: str) -> SimulationConfig:
         case_instance = TravelingVortexQG()
     elif case_name == "InertialGravityWaves":
         case_instance = InertialGravityWaves()
+    elif case_name == "ZonalJetStream":
+        case_instance = ZonalJetStream()
     elif case_name == "InertialGravityLongWaves":
         case_instance = InertialGravityLongWaves()
     elif case_name == "RisingBubble":
@@ -129,6 +133,8 @@ if args.mode in ["run", "debug"]:
         case = TravelingVortex3D(config_override=loaded_config_override)
     elif args.case == "TravelingVortexQG":
         case = TravelingVortexQG(config_override=loaded_config_override)
+    elif args.case == "ZonalJetStream":
+        case = ZonalJetStream(config_override=loaded_config_override)
     elif args.case == "InertialGravityWaves":
         case = InertialGravityWaves(config_override=loaded_config_override)
     elif args.case == "InertialGravityLongWaves":
@@ -144,8 +150,9 @@ if args.mode in ["run", "debug"]:
     # case = RisingBubble()
     # case = InertialGravityWaves()
     # case = InertialGravityLongWaves()
-    # case = TravelingVortex3D()
+    case = TravelingVortex3D()
     # case = TravelingVortexQG()
+    # case = ZonalJetStream()
 
     config = case.config  # This 'config' has the definitive grid for THIS run.
 
@@ -231,6 +238,7 @@ if args.mode in ["run", "debug"]:
             "is_nonhydrostatic": config.model_regimes.is_nonhydrostatic,
             "is_nongeostrophic": config.model_regimes.is_nongeostrophic,
             "is_compressible": config.model_regimes.is_compressible,
+            "qg_filter":config.model_regimes.qg_filter,
         },
     )
     time_integrator = ti_context.instantiate()
