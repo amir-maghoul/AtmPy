@@ -178,9 +178,10 @@ class ModelRegimes:
     """The data class for model regimes information."""
 
     is_ArakawaKonor: int = 0
-    is_nongeostrophic: int = 1
+    is_nongeostrophic: float = 1
     is_nonhydrostatic: int = 1
     is_compressible: int = 1
+    qg_filter: bool = False
     Msq: float = 0.115
 
     def update_derived_fields(self, constants: GlobalConstants):

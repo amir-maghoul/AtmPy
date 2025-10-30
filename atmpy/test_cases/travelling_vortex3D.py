@@ -93,7 +93,7 @@ class TravelingVortex3D(BaseTestCase):
         self.rotdir: float = 1.0  # Rotation direction
         self.h_ref = 10_000.0
         self.t_ref = 100.0
-        self.size = 200
+        self.size = 1000
         self.tmax = 1.0*self.size
         self.boxsize = 0.5*self.size
         self.R0: float = 0.5*self.size  # Vortex radius scale
@@ -111,15 +111,16 @@ class TravelingVortex3D(BaseTestCase):
         self.output_freq = 1
 
         self.g = 1.0 if self.stratified_atmosphere else 0.0
-        coriolis_factor = 100.0
+        coriolis_factor = 1000.0
         force = 1.0e-4 * self.t_ref * coriolis_factor  # Constant coriolis force
         self.cor_f = [0.0, 0.0, 0.0]
         self.coriolis_axis = 1
         self.cor_f[self.coriolis_axis] = force
 
-        self.is_nongeostrophic = 0.01
+        self.is_nongeostrophic = 1
         self.is_nonhydrostatic = 1
         self.is_compressible = 1
+        self.qg_filter = True
 
         ####################### Polynomial coefficients for pressure perturbation ######################################
         # Coefficients remain the same as they are based on a 2D radial profile.
@@ -313,6 +314,7 @@ class TravelingVortex3D(BaseTestCase):
             "is_nongeostrophic": self.is_nongeostrophic,
             "is_nonhydrostatic": self.is_nonhydrostatic,
             "is_compressible": self.is_compressible,
+            "qg_filter": self.qg_filter,
         }
         self.set_model_regimes(regime_updates)
 
