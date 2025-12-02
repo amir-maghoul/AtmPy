@@ -340,6 +340,8 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
                 "Reflective gravity is not implemented for 1 dimensional problem."
             )
         self.th: "Thermodynamics" = inst_opts.thermodynamics
+        if inst_opts.mpv is None:
+            raise ValueError("MPV must be provided for ReflectiveGravityBoundary.")
         self.mpv: "MPV" = inst_opts.mpv
         self.gravity: Gravity = Gravity(inst_opts.gravity, self.ndim)
         if self.gravity.strength == 0.0:

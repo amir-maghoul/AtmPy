@@ -38,7 +38,7 @@ def stable_stratification_for_qg(z: float) -> float:
 
 class ZonalJetStream(BaseTestCase):
     """
-    A test case for a geostrophically balanced zonal jet stream on a doubly periodic domain (xz)
+    A test case for a geostrophically balanced zonal jet stream on a periodic/wall domain (xz)
     with wall boundaries in y. The jet flows in the x-direction and varies in the z-direction (u = u(z)).
     This flow is balanced by a pressure gradient in the z-direction (∂p/∂z).
     """
@@ -56,16 +56,16 @@ class ZonalJetStream(BaseTestCase):
         super().__init__(name="ZonalJetStream", config=_effective_config)
 
         ############################### Jet Specific Parameters ########################################################
-        self.jet_U_max: float = 20.0  # Maximum velocity of the jet in m/s (dimensional)
-        self.jet_width: float = 2.0  # Characteristic width of the jet
+        self.size = 1
+        self.jet_U_max: float = 10  # Maximum velocity of the jet in m/s (dimensional)
+        self.jet_width: float = 1.  # Characteristic width of the jet
         self.jet_center_z: float = 0.0  # The z-location of the jet core
 
         ############################### Physical & Domain Parameters ###################################################
         self.rho0: float = 1.0  # Background density (dimensionless)
-        self.p0: float = 1.0  # Background pressure (dimensionless)
-        self.size = 20
-        self.boxsize = 0.5 * self.size
-        self.tmax = 5.0
+        self.p0: float = 1.0 * self.size  # Background pressure (dimensionless)
+        self.boxsize = 10 * self.size
+        self.tmax = 10.0 * self.size
 
         self.stratification = False
 
@@ -86,9 +86,11 @@ class ZonalJetStream(BaseTestCase):
 
         # --- Model Regimes ---
         # For a pure geostrophic test, nongeostrophic should be 0.
-        self.is_nongeostrophic = 1
+        self.is_nongeostrophic = 0
         self.is_nonhydrostatic = 1
-        self.is_compressible = 1
+        self.is_compressible = 0
+        self.qg_filter = 0.0
+        self.qg_filter_number = 1
 
         if run_setup_method:
             self.setup()
@@ -98,8 +100,9 @@ class ZonalJetStream(BaseTestCase):
         print("Setting up Zonal Jet Stream configuration...")
 
         #################################### Grid Configuration ########################################################
+        size = 60
         grid_updates = {
-            "ndim": 3, "nx": 40, "ny": 3, "nz": 40,
+            "ndim": 3, "nx": size, "ny": 3, "nz": size,
             "xmin": -self.boxsize, "xmax": self.boxsize,
             "ymin": -self.boxsize, "ymax": self.boxsize,
             "zmin": -self.boxsize, "zmax": self.boxsize,
@@ -130,10 +133,10 @@ class ZonalJetStream(BaseTestCase):
             BoundarySide.TOP, BdryType.WALL, mpv_type=BdryType.WALL
         )
         self.set_boundary_condition(
-            BoundarySide.FRONT, BdryType.WALL, mpv_type=BdryType.WALL
+            BoundarySide.FRONT, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
         )
         self.set_boundary_condition(
-            BoundarySide.BACK, BdryType.WALL, mpv_type=BdryType.WALL
+            BoundarySide.BACK, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
         )
 
         #################################### Temporal Setting ##########################################################
@@ -153,6 +156,8 @@ class ZonalJetStream(BaseTestCase):
             "is_nongeostrophic": self.is_nongeostrophic,
             "is_nonhydrostatic": self.is_nonhydrostatic,
             "is_compressible": self.is_compressible,
+            "qg_filter": self.qg_filter,
+            "qg_filter_number": self.qg_filter_number,
         }
         self.set_model_regimes(regime_updates)
 
@@ -183,7 +188,7 @@ class ZonalJetStream(BaseTestCase):
             "output_type": "test",
             "output_folder": "zonal_jet_stream",
             "output_base_name": "_zonal_jet_stream",
-            "output_frequency_steps": 10,
+            "output_frequency_steps": self.output_freq,
         }
         self.set_outputs(output_updates)
 
@@ -194,82 +199,111 @@ class ZonalJetStream(BaseTestCase):
 
     def initialize_solution(self, variables: "Variables", mpv: "MPV"):
         """
-        Initializes a geostrophically balanced zonal jet u(z).
-        The balance equation ∂p/∂z = ρ₀ * f * u(z) is solved numerically to find the
-        corresponding pressure field p(z).
+        Initializes a geostrophically balanced zonal jet u(z) in a domain that
+        is periodic in the z-direction (horizontal).
+        The balance equation ∂p/∂z = ρ₀ * f * u(z) is solved. Since the jet
+        profile u(z) is not periodic, the resulting integrated pressure p(z) will
+        have a jump at the periodic boundary. This is corrected by subtracting a
+        linear pressure ramp, which makes the pressure field periodic without
+        altering the local gradients required for geostrophic balance.
         """
-        print("Initializing solution for 3D Zonal Jet Stream...")
+        print("Initializing solution for 3D Zonal Jet Stream with periodic z-BCs...")
 
         grid = self.config.spatial_grid.grid
         thermo = Thermodynamics()
         thermo.update(self.config.global_constants.gamma)
         Msq = self.config.model_regimes.Msq
-        coriolis = self.config.physics.coriolis_strength[self.coriolis_axis]
+        # With y as vertical, the Coriolis force now acts in the z-direction (horizontal)
+        # The relevant Coriolis parameter is f_y, which is self.cor_f[1]
+        coriolis = self.config.physics.coriolis_strength[self.coriolis_axis]  # self.coriolis_axis is 1
 
         inner_slice = grid.get_inner_slice()
 
-        # --- Get Cell-Centered Coordinates ---
-        ZC = np.meshgrid(
-            grid.x_cells[inner_slice[0]],
-            grid.y_cells[inner_slice[1]],
-            grid.z_cells[inner_slice[2]],
-            indexing="ij",
-        )[2]  # We only need the Z coordinates for this setup
+        # --- Get Cell-Centered and Nodal Coordinates ---
+        x_cells = grid.x_cells[inner_slice[0]]
+        y_cells = grid.y_cells[inner_slice[1]]
+        z_cells = grid.z_cells[inner_slice[2]]
+        z_nodes = grid.z_nodes[inner_slice[2]]  # Assuming 3D, z is the 4th index in grid tuples
 
-        # --- 1. Define the Jet Velocity Profile u(z) ---
+        _, _, ZC = np.meshgrid(x_cells, y_cells, z_cells, indexing="ij")
+
+        # Domain width in z-direction
+        Lz = grid.z_cells[-1] - grid.z_cells[0]
+
+        # --- 1. Define the Gaussian Jet Velocity Profile u(z) ---
+        # This profile is centered in the domain but is not periodic.
         u_jet_profile = self.jet_U_max * np.exp(
             -(((ZC - self.jet_center_z) / self.jet_width) ** 2)
         )
 
         # --- 2. Calculate the Geostrophically Balanced Pressure p(z) ---
-        z_cells_1d = grid.z_cells[inner_slice[2]]
+        # Create the 1D profile for integration
         u_jet_1d = self.jet_U_max * np.exp(
-            -(((z_cells_1d - self.jet_center_z) / self.jet_width) ** 2)
+            -(((z_cells - self.jet_center_z) / self.jet_width) ** 2)
         )
+
         # The integrand for geostrophic balance: dp/dz = rho * f * u
         integrand = self.rho0 * coriolis * u_jet_1d
 
-        # Integrate numerically to find the pressure perturbation
-        p_jet_perturbation_1d = cumulative_trapezoid(integrand, z_cells_1d, initial=0)
+        # Integrate numerically. The result p_raw is NOT periodic.
+        p_jet_perturbation_raw_1d = cumulative_trapezoid(integrand, z_cells, initial=0)
+
+        # --- 3. Enforce Periodicity on the Pressure Field ---
+        # Calculate the pressure "jump" across the periodic domain.
+        # We need the value at the end of the integration domain.
+        p_end = p_jet_perturbation_raw_1d[-1]
+        p_start = p_jet_perturbation_raw_1d[0]
+        pressure_jump = p_end - p_start
+
+        # Define a linear ramp to subtract. The slope is the total jump divided by the domain length.
+        # This ramp has a constant gradient that will be subtracted from the pressure gradient field.
+        linear_ramp = (pressure_jump / Lz) * (z_cells - grid.z_cells[0])
+
+        # Subtract the ramp to get a periodic pressure perturbation field
+        p_jet_perturbation_1d = p_jet_perturbation_raw_1d - linear_ramp
+
+        # Add the background and Msq scaling
         p_jet_base_1d = self.p0 + Msq * p_jet_perturbation_1d
 
-        # Broadcast the 1D pressure array p(z) to the full 3D grid
+        # Broadcast the 1D periodic pressure array p(z) to the full 3D grid
         p_total_cells = p_jet_base_1d.reshape(1, 1, -1)
 
-        # --- 3. Set Total State Variables ---
+        # --- 4. Set Total State Variables ---
         rho_total = np.full_like(u_jet_profile, self.rho0)
         u_total = u_jet_profile
-        v_total = np.zeros_like(u_total)
-        w_total = np.zeros_like(u_total)
+        v_total = np.zeros_like(u_total)  # Vertical velocity is zero
+        w_total = np.zeros_like(u_total)  # Other horizontal velocity is zero
 
-        # Calculate potential temperature field
         if self.config.model_regimes.is_compressible:
             p_total_safe = np.maximum(p_total_cells, 1e-9)
             rhoY_total = p_total_safe ** thermo.gamminv
         else:
-            rhoY_total = np.ones_like(rho_total)  # Isentropic for incompressible case
+            rhoY_total = np.ones_like(rho_total)
 
-        # --- 4. Assign to Cell Variables (Inner Domain Only) ---
+        # --- 5. Assign to Cell Variables (Inner Domain Only) ---
         variables.cell_vars[inner_slice + (VI.RHO,)] = rho_total
         variables.cell_vars[inner_slice + (VI.RHOU,)] = rho_total * u_total
         variables.cell_vars[inner_slice + (VI.RHOV,)] = rho_total * v_total
         variables.cell_vars[inner_slice + (VI.RHOW,)] = rho_total * w_total
         variables.cell_vars[inner_slice + (VI.RHOY,)] = rhoY_total
 
-        # --- 5. Handle Nodal Pressure Perturbation (p2) ---
-        # The solver uses p2, the perturbation from the hydrostatic state.
-        # Here, the entire geostrophic pressure gradient is the perturbation.
-        z_nodes_1d = grid.z_nodes[inner_slice[2]]
+        # --- 6. Handle Nodal Pressure Perturbation (p2) with the same method ---
+        # The entire process must be repeated on the nodal grid for the pressure solver.
         u_jet_nodes_1d = self.jet_U_max * np.exp(
-            -(((z_nodes_1d - self.jet_center_z) / self.jet_width) ** 2)
+            -(((z_nodes - self.jet_center_z) / self.jet_width) ** 2)
         )
         integrand_nodes = self.rho0 * coriolis * u_jet_nodes_1d
-        p_pert_nodes_1d = cumulative_trapezoid(integrand_nodes, z_nodes_1d, initial=0)
+        p_pert_nodes_raw_1d = cumulative_trapezoid(integrand_nodes, z_nodes, initial=0)
 
-        # The model solves for the dynamic pressure p2. We set it directly.
+        # Calculate jump and ramp for the nodal grid
+        p_jump_nodes = p_pert_nodes_raw_1d[-1] - p_pert_nodes_raw_1d[0]
+        ramp_nodes = (p_jump_nodes / Lz) * (z_nodes - grid.z_nodes[0])
+
+        # Subtract ramp to get periodic nodal pressure
+        p_pert_nodes_1d = p_pert_nodes_raw_1d - ramp_nodes
+
         p2_nodes_unscaled = p_pert_nodes_1d.reshape(1, 1, -1)
 
-        # We need rhoY at the nodes to convert the pressure perturbation to the solver's variable
         p_total_nodes = self.p0 + Msq * p2_nodes_unscaled
         rhoY_nodes = p_total_nodes ** thermo.gamminv
 
@@ -277,4 +311,4 @@ class ZonalJetStream(BaseTestCase):
             p2_nodes_unscaled, rhoY_nodes, where=rhoY_nodes != 0
         )
 
-        logging.info("3D Zonal Jet Stream initialization complete.")
+        logging.info("3D Zonal Jet Stream initialization with periodic correction complete.")

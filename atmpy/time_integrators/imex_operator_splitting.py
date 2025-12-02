@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
 from atmpy.infrastructure.enums import AdvectionRoutines
 from atmpy.pressure_solver.classical_pressure_solvers import ClassicalPressureSolver
-
+from atmpy.time_integrators.coriolis import CoriolisUse
 from atmpy.time_integrators.abstract_time_integrator import AbstractTimeIntegrator
 from atmpy.time_integrators.utility import *
 
@@ -60,10 +60,11 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         first_order_advection_routine: AdvectionRoutines,
         second_order_advection_routine: AdvectionRoutines,
         wind_speed: List[float],
-        is_nongeostrophic: float,
+        is_nongeostrophic: bool,
         is_nonhydrostatic: bool,
         is_compressible: bool,
         qg_filter: bool,
+        qg_filter_number: int,
         dt: float,
     ):
         # Inject dependencies
@@ -91,10 +92,11 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.th: "Thermodynamics" = self.pressure_solver.th
         self.dt: float = dt
         self.Msq: float = self.pressure_solver.Msq
-        self.is_nongeostrophic: float = is_nongeostrophic
+        self.is_nongeostrophic: bool = is_nongeostrophic
         self.is_nonhydrostatic: bool = is_nonhydrostatic
         self.is_compressible: bool = is_compressible
-        self.qg_filter = qg_filter
+        self.qg_filter: float = qg_filter
+        self.qg_filter_number: int = qg_filter_number
         self.wind_speed: np.ndarray = np.array(wind_speed)
         self.ndim = self.grid.ndim
         self.vertical_momentum_index = self.coriolis.gravity.vertical_momentum_index
@@ -179,6 +181,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         half_dt = 0.5 * dt
         self.variables.cell_vars[...] = initial_vars_arr_for_coeffs
+        self.mpv.p2_nodes0[...] = self.mpv.p2_nodes
+
 
         # Current state (Sol^n, p^n) is in self.variables, self.mpv ###
         ################################ 1. Apply BCs to current state (t^n) ###########################################
@@ -210,7 +214,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         )
 
         #################################### 3.b Save the value of pressure after advection ############################
-        self.mpv.p2_nodes0[...] = self.mpv.p2_nodes
 
         ###################### 4. Non-Advective Implicit Euler Substep for dt/2 ########################################
         #################################### (Eq. 15 of BK19) ##########################################################
@@ -258,7 +261,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.variables.cell_vars[...] = initial_vars_arr
         if (
             self.is_compressible and self.is_nonhydrostatic
-        ) or not self.is_nonhydrostatic:
+        ) or not self.is_nonhydrostatic or not self.is_nongeostrophic:
             self.mpv.p2_nodes[...] = self.mpv.p2_nodes0
         logging.debug(f"Corrector (step {global_time_step_num}): State reset to t^n")
 
@@ -314,9 +317,14 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         """Integrates the problem on time step using the explicit euler in the NON-ADVECTIVE stage. This means
         that the algorithm does not use the half-time advective values to compute the updates. Rather, we compute
         directly from the full-variables in the main euler equation."""
+
         cellvars = self.variables.cell_vars  # Temp variable for cell variables
+        rhoY = cellvars[..., VI.RHOY]
+        Y = (rhoY / cellvars[..., VI.RHO]).copy()
         p2n = np.copy(self.mpv.p2_nodes)  # Temp allocation for p2_nodes
 
+        if self.qg_filter > 0.0 and self.qg_filter_number == 2:
+            self._prepare_qg_filter_state(p2n=p2n)
         # Calculate the buoyancy PX'
         dbuoy = cellvars[..., VI.RHOY] * cellvars[..., VI.RHOX] / cellvars[..., VI.RHO]
         vertical_velocity = (
@@ -325,6 +333,10 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ###################### Update variables
         self._forward_pressure_update(cellvars, dt, p2n)
+        if self.qg_filter > 0.0 and self.qg_filter_number == 2:
+            nudge_u, nudge_v = self.geostrophic_nudge(dt, Y)
+            cellvars[..., VI.RHOU] += nudge_u
+            cellvars[..., VI.RHOW] += nudge_v
         self._forward_momenta_update(cellvars, dt, p2n, dbuoy)
         self._forward_buoyancy_update(cellvars, dt, vertical_velocity)
         ####################### Update boundary values
@@ -363,7 +375,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.variables.adjust_background_wind(self.wind_speed, scale=-1.0)
 
         # Apply the solver inverse matrix (Matrix combining the switches, the coriolis force and the singular buoyancy term)
-        self.coriolis.apply_inverse(
+        self.coriolis.apply_inverse_for_momentum_state(
             cellvars[..., VI.RHOU],
             cellvars[..., VI.RHOV],
             cellvars[..., VI.RHOW],
@@ -374,9 +386,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             self.Msq,
             dt,
         )
-
-        horizontal_momenta_index = self.gravity.horizontal_momentum_indices()
-        cellvars[..., horizontal_momenta_index] = self.is_nongeostrophic * cellvars[..., horizontal_momenta_index]
 
         # Restore background wind
         self.variables.adjust_background_wind(self.wind_speed, scale=1.0)
@@ -399,8 +408,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         cellvars = self.variables.cell_vars if initial_vars is None else initial_vars
 
         ############################### 0. Prepare the QG state before solve ###########################################
-        if self.qg_filter:
-            self._prepare_qg_filter_state()
 
         ########################## 1. Preparation coefficients of the solver ###########################################
         # Update the boundary value from current variables/initial variable and compute the pressure coefficients
@@ -411,7 +418,6 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         ################################ 2. Apply boundary conditions on pi' ###########################################
         # Update the boundary nodes for pressure variable
         self.boundary_manager.apply_pressure_boundary_on_all_sides(self.mpv.p2_nodes)
-
         cellvars = self.variables.cell_vars
         ################################ 3. "Pre-Correction" using Current Pressure p^k ################################
         # This method will put M_inv⋅(dt*CΘ*∇p₂)/Θ in the momenta container, where M is extended coriolis inverse.
@@ -424,6 +430,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             dt=dt,
             is_nongeostrophic=self.is_nongeostrophic,
             is_nonhydrostatic=self.is_nonhydrostatic,
+            use=CoriolisUse.HELMHOLTZ_OPERATOR
         )
 
         ############################# 4. Apply BCs to Pre-Corrected State ##############################################
@@ -441,6 +448,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # is basically ∇⋅(M_inv⋅(dt*(PΘ)*∇p₂)) where M is extended coriolis inverse
         divergence_inner = self.discrete_operator.divergence(pressure_weighted_momenta)
         laplacian_inner_node_slice = laplacian_inner_slice(self.grid.ng)
+
         # Final RHS for A * delta_p = rhs
         rhs_flat = divergence_inner[laplacian_inner_node_slice].flatten()
 
@@ -476,6 +484,24 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         ############################ 9. Final Correction using Pressure Increment delta_p ##############################
         # Apply the update using the *solved increment*.
         # The buoyancy *is* adjusted now (updt_chi=1.0).
+        horizontal_momenta_index = self.gravity.horizontal_momentum_indices()
+        if not self.is_nongeostrophic:
+            self.variables.cell_vars[..., horizontal_momenta_index] = 0.0
+            self.variables.adjust_background_wind(self.wind_speed, scale=1.0)
+
+            CHI_UPDT_VALUE = 0.0
+            self.pressure_solver.apply_pressure_gradient_update(
+                p=self.mpv.p2_nodes,  # Use solved increment
+                updt_chi=CHI_UPDT_VALUE,  # Adjust buoyancy now
+                dt=dt,
+                is_nongeostrophic=self.is_nongeostrophic,
+                is_nonhydrostatic=self.is_nonhydrostatic,
+                use=CoriolisUse.MOMENTUM_UPDATE,
+                vertical_update=False,
+            )
+            # self.boundary_manager.apply_boundary_on_all_sides(cellvars)
+
+
         CHI_UPDT_VALUE = 1.0
         self.pressure_solver.apply_pressure_gradient_update(
             p=p2_full,  # Use solved increment
@@ -483,105 +509,39 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             dt=dt,
             is_nongeostrophic=self.is_nongeostrophic,
             is_nonhydrostatic=self.is_nonhydrostatic,
+            use=CoriolisUse.MOMENTUM_UPDATE,
         )
 
         ############################ 10. Update The Main Exner Pressure ################################################
         self.mpv.p2_nodes += p2_full
 
-        ##################### 11. QG post-stage: Apply a QG filter on the horizontal momenta ###########################
-        if self.qg_filter:
-            self.geostrophic_filter(dt)
+        if self.qg_filter > 0.0 and self.qg_filter_number == 2:
+            self._prepare_qg_filter_state()
+            cellvars = self.variables.cell_vars
+            rhoY = cellvars[..., VI.RHOY]
+            Y = (rhoY / cellvars[..., VI.RHO]).copy()
+            nudge_u, nudge_v = self.geostrophic_nudge(dt, Y)
+            cellvars[..., VI.RHOU] += nudge_u
+            cellvars[..., VI.RHOW] += nudge_v
 
-    def geostrophic_filter(self, dt:float):
-        """Filter the *ageostrophic* horizontal components of the fast oscillating waves.
-
-        This is the classic inertial filtering step:
-        we want to damp fast oscillations (ageostrophic / unbalanced motions)
-        while keeping the balanced (geostrophic) part tied to the updated pressure.
-
-        Naming convention:
-        ------------------
-        All symbols are 3D arrays over the grid.
-
-        From _prepare_qg_filter_state() (time level "prev" / t^n):
-          U_g, V_g : geostrophic horizontal components at t^n
-          U_a, V_a : ageostrophic horizontal components at t^n (in momentum units)
-
-        Recomputed here using the *new* pressure p^{n+1}:
-          U_g_next, V_g_next : geostrophic horizontal components at t^{n+1}
-
-        Filtered output:
-          U_a_next, V_a_next : ageostrophic components after applying a
-                               damped inertial oscillation model
-          U_qg, V_qg         : total filtered horizontal components
-                               U_qg = U_g_next + U_a_next,
-                               V_qg = V_g_next + V_a_next
-
-        Finally, we overwrite the prognostic horizontal momenta with
-        (U_qg / Y, V_qg / Y) and then re-add the background wind.
-
-        Parameters
-        ----------
-        dt : float
-            The timestep length used in this implicit stage.
+    def geostrophic_nudge(self, dt: float, Y:np.ndarray):
+        """This method is used for the QG filter. It is used to nudge the QG filter state to the next time step.
+        This is done by the QG filter in the backward step.
         """
-        self._assert_qg_supported()
 
-        if self._qg_cache is None:
-            raise RuntimeError(
-                "QG filter cache is empty. "
-                "Did you call geostrophic_filter() without _prepare_qg_filter_state()?"
-            )
-
-        cellvars = self.variables.cell_vars
-
-        # Extract cached 'previous' balanced/unbalanced pieces (t^n)
+        # 1. Get the previous ageostrophic state from the cache.
         U_g_prev, V_g_prev = self._qg_cache["geo"]
-        U_a_prev, V_a_prev = self._qg_cache["ageo"]
+        U_a_prev, V_a_prev = self._qg_cache["ageo"]  # These are momentum-like
 
-        # Recompute geostrophic components from the *updated* pressure p^{n+1}
-        U_g_next, V_g_next = self._compute_geostrophic_wind(
-            cellvars, self.mpv.p2_nodes
-        )
+        # 2. Define the nudge
+        # epsilon = 130.
+        # nudge_u = -np.exp(-epsilon * (dt)) * U_a_prev / Y
+        # nudge_v = -np.exp(-epsilon * (dt)) * V_a_prev / Y
+        epsilon = 0.05
+        nudge_u = -epsilon * dt * U_a_prev / Y
+        nudge_v = -epsilon * dt * V_a_prev / Y
 
-        # Local thermodynamic ratio Y at the *updated* state
-        Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
-
-        # Inertial frequency (f) and filter strength
-        f = self.coriolis.strength[self.gravity.axis]
-        freq = dt * f
-        damping = 1.0 / (1.0 + freq ** 2)
-
-        # Ageostrophic update:
-        U_a_next = damping * (
-                (U_a_prev - freq * V_a_prev)
-                - (U_g_next - freq * V_g_next)
-                + (U_g_prev - freq * V_g_prev)
-        )
-        V_a_next = damping * (
-                (V_a_prev + freq * U_a_prev)
-                - (V_g_next + freq * U_g_next)
-                + (V_g_prev + freq * U_g_prev)
-        )
-
-        # Combine balanced + filtered-unbalanced
-        U_qg = U_g_next + U_a_next
-        V_qg = V_g_next + V_a_next
-
-        # Write them back into the prognostic horizontal momenta, converting
-        # from 'velocity-like' to momentum units by dividing by Y.
-        # For y as gravity direction, this is VI.RHOU and VI.RHOW.
-        h0_idx, h1_idx = self.gravity.horizontal_momentum_indices()
-        cellvars[..., h0_idx] = U_qg / Y
-        cellvars[..., h1_idx] = V_qg / Y
-
-        # Put the mean background wind back in
-        self.variables.adjust_background_wind(self.wind_speed, scale=+1.0)
-
-        # Clear cache so we don't accidentally reuse stale arrays next step
-        self._qg_cache = None
-
-        return
+        return nudge_u, nudge_v
 
     def _forward_momenta_update(
         self,
@@ -637,12 +597,12 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
             # Conditionally apply the update
             is_horizontal = component_index in self.gravity.horizontal_momentum_indices()
-            if 1e-10 < self.is_nongeostrophic < 1.0 and is_horizontal:
-                update = update_raw / self.is_nongeostrophic
-            elif self.is_nongeostrophic <= 1e-10 and is_horizontal:
+            if not self.is_nongeostrophic and is_horizontal:
                 update = 0.0
+                # update = update_raw
             else:
                 update = update_raw
+
             cellvars[..., component_index] -= update
 
         # Update for the momentum in the direction of gravity (vertical momentum)
@@ -668,10 +628,11 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ################################################################################################################
         # Divergence
-        inner_slice = one_element_inner_slice(self.ndim, full=False)
-        self.mpv.rhs[inner_slice] = self.discrete_operator.divergence(
+        divergence_inner = self.discrete_operator.divergence(
             pressure_weighted_momenta,
         )
+        inner_slice = one_element_inner_slice(self.ndim, full=False)
+        self.mpv.rhs[inner_slice] = divergence_inner
 
         ################################################################################################################
         # Adjust wall boundary nodes (scale). Notice the side is set to be BdrySide.ALL.
@@ -740,7 +701,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         pressure_weightet_momenta = cellvars[..., momenta_indices] * Y[..., np.newaxis]
         return pressure_weightet_momenta
 
-    def _prepare_qg_filter_state(self) -> None:
+    def _prepare_qg_filter_state(self, p2n=None) -> None:
         """
         Snapshot the geostrophic and ageostrophic horizontal components *before*
         we solve for the new pressure.
@@ -771,9 +732,11 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # Potential temperature-like ratio Y = (rho*Theta)/rho
         Y = cellvars[..., VI.RHOY] / cellvars[..., VI.RHO]
 
+        p2 = p2n if p2n is not None else self.mpv.p2_nodes
+
         # Geostrophic components from *current* pressure p^{n}
         U_g, W_g = self._compute_geostrophic_wind(
-            cellvars, self.mpv.p2_nodes
+            cellvars, p2
         )
 
         # We'll need the two horizontal momentum indices (x and z when gravity is y)
@@ -783,11 +746,11 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.variables.adjust_background_wind(self.wind_speed, scale=-1.0)
 
         # Ageostrophic residual (in momentum units):
-        #   U_a = (rho*u_actual) - (rho*u_geostrophic)
-        #       = RHOU - U_g / Y
-        #   W_a = RHOW - W_g / Y
-        U_a = cellvars[..., h0_idx] - U_g / Y
-        W_a = cellvars[..., h1_idx] - W_g / Y
+        #   U_a = (rhoY*u_actual) - (rhoY*u_geostrophic)
+        #       = RHOU - U_g
+        #   W_a = RHOW - W_g
+        U_a = cellvars[..., h0_idx]*Y - U_g
+        W_a = cellvars[..., h1_idx]*Y - W_g
 
         # Restore background wind so the global state is unchanged
         self.variables.adjust_background_wind(self.wind_speed, scale=+1.0)
@@ -843,11 +806,12 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         dpdx, _, dpdz = self.discrete_operator.gradient(p_nodes)
 
         # Balanced (geostrophic) horizontal components in x/z plane
+        # NOTE:
+        # The sign of geostrophic balance is flipped when the axes are x-z instead of x-y.
         U_g = (pTheta / f) * dpdz
         W_g = -(pTheta / f) * dpdx
 
         return U_g, W_g
-
 
     def _assert_qg_supported(self) -> None:
         """

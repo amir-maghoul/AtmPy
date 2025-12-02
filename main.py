@@ -28,6 +28,7 @@ from atmpy.pressure_solver.contexts import (
 )
 from atmpy.scripts import parse_arguments
 from atmpy.solver.solver import Solver
+from atmpy.test_cases.baroclinic_qg_vortex3D import BaroclinicQGVortex
 from atmpy.test_cases.inertial_gravity_long_waves import InertialGravityLongWaves
 from atmpy.test_cases.inertial_gravity_waves import InertialGravityWaves
 from atmpy.test_cases.sine_advection_1d import SineWaveAdvection1D
@@ -64,6 +65,8 @@ def get_base_config_for_case(case_name: str) -> SimulationConfig:
         case_instance = TravelingVortex3D()
     elif case_name == "TravelingVortexQG":
         case_instance = TravelingVortexQG()
+    elif case_name == "BaroclinicQGVortex":
+        case_instance = BaroclinicQGVortex()
     elif case_name == "InertialGravityWaves":
         case_instance = InertialGravityWaves()
     elif case_name == "ZonalJetStream":
@@ -133,6 +136,8 @@ if args.mode in ["run", "debug"]:
         case = TravelingVortex3D(config_override=loaded_config_override)
     elif args.case == "TravelingVortexQG":
         case = TravelingVortexQG(config_override=loaded_config_override)
+    elif args.case == "BaroclinicQGVortex":
+        case = BaroclinicQGVortex(config_override=loaded_config_override)
     elif args.case == "ZonalJetStream":
         case = ZonalJetStream(config_override=loaded_config_override)
     elif args.case == "InertialGravityWaves":
@@ -150,9 +155,10 @@ if args.mode in ["run", "debug"]:
     # case = RisingBubble()
     # case = InertialGravityWaves()
     # case = InertialGravityLongWaves()
-    case = TravelingVortex3D()
+    # case = TravelingVortex3D()
     # case = TravelingVortexQG()
     # case = ZonalJetStream()
+    # case = BaroclinicQGVortex()
 
     config = case.config  # This 'config' has the definitive grid for THIS run.
 
@@ -239,6 +245,7 @@ if args.mode in ["run", "debug"]:
             "is_nongeostrophic": config.model_regimes.is_nongeostrophic,
             "is_compressible": config.model_regimes.is_compressible,
             "qg_filter":config.model_regimes.qg_filter,
+            "qg_filter_number":config.model_regimes.qg_filter_number,
         },
     )
     time_integrator = ti_context.instantiate()

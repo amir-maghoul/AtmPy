@@ -113,6 +113,7 @@ class InertialGravityLongWaves(BaseTestCase):
         u = 0.02 * self.tref / self.href # (km/s converted nondimensional)
         tout_val = self.scale_factor * 1.0 * 3000.0 / self.config.global_constants.t_ref
         dt = (cfl/u) * self.scale_factor * 30 / 300 / self.tref
+        dt = self.scale_factor
         temporal_updates = {
             "CFL": 0.9,
             "dtfixed": dt,
@@ -128,8 +129,8 @@ class InertialGravityLongWaves(BaseTestCase):
         # Match Project 1: is_compressible = 1
         regime_updates = {
             "is_nongeostrophic": 1,
-            "is_nonhydrostatic": 1,
-            "is_compressible": 1,
+            "is_nonhydrostatic": 0,
+            "is_compressible": 0,
         }
         self.set_model_regimes(regime_updates)
 

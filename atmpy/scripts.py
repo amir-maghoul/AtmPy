@@ -10,6 +10,7 @@ CASE_CHOICES = [
     "TravelingVortex",
     "TravelingVortex3D",
     "TravelingVortexQG",
+    "BaroclinicQGVortex",
     "ZonalJetStream",
     "RisingBubble",
     "SineWaveAdvection1D",

@@ -10,7 +10,7 @@ _JIT_OPTIONS = {"nopython": True, "nogil": True, "cache": True}
 @nb.jit(**_JIT_OPTIONS)
 def _calculate_determinant_y_direction_nb(
     nonhydro: bool,
-    nongeo: float,
+    nongeo: bool,
     coriolis_dt: np.ndarray,  # Renamed for clarity (dt * strength)
     dChi_full_term: np.ndarray,
 ) -> np.ndarray:
@@ -20,7 +20,7 @@ def _calculate_determinant_y_direction_nb(
     ----------
     nonhydro : bool
         The switch between hydrostatic and nonhydrostatic regimes
-    nongeo : float
+    nongeo : bool
         The switch between geostrophic and nongeostrophic regimes
     coriolis_dt : np.ndarray
         The coriolis matrix times dt.
@@ -32,14 +32,55 @@ def _calculate_determinant_y_direction_nb(
     term2 = nongeo * (o1**2 + o3**2)
     return term1 + term2
 
+# @nb.jit(**_JIT_OPTIONS)
+# def _inverse_matrix_rows_y_direction_nb(
+#     determinant: np.ndarray,
+#     nonhydro: bool,
+#     nongeo: bool,
+#     coriolis_dt: np.ndarray,
+#     dChi_full_term: np.ndarray,
+# ) -> Tuple[
+#     np.ndarray, ...
+# ]:  # Return tuple of 9 arrays (uu, uv, uw, vu, vv, vw, wu, wv, ww)
+#     """Numba-jitted version: Calculate the inverse extended coriolis matrix when gravity is on 'y' axis.
+#     The is matrix in the form (A + Omega + S)
+#         The components are as follows:
+#         - A = diag([a_g, a_w, a_g]): The 3x3 diagonal matrix of the switches. This is due to the LHS.
+#         - Omega: The usual Coriolis matrix
+#         - S: The singular matrix as a resulting effect of the buoyancy equation 24d. It only affects on the momentum
+#              in the direction of the gravity. For y-direction equal to diag([0, -dt*g*X_y*Theta, 0])
+#     """
+#
+#     o1, o2, o3 = coriolis_dt[0], coriolis_dt[1], coriolis_dt[2]
+#     inv_det = 1.0 / determinant
+#
+#     ############################################## Row 1:
+#     term_nh_dchi = nonhydro - dChi_full_term
+#     uu = (nongeo * term_nh_dchi + o1**2) * inv_det
+#     uv = (nongeo * o3 + o1 * o2) * inv_det
+#     uw = (o1 * o3 - o2 * term_nh_dchi) * inv_det
+#
+#     ############################################## Row 2:
+#     vu = (o1 * o2 - nongeo * o3) * inv_det
+#     vv = (nongeo**2 + o2**2) * inv_det
+#     vw = (nongeo * o1 + o2 * o3) * inv_det
+#
+#     ############################################## Row 3:
+#     wu = (o1 * o3 + o2 * term_nh_dchi) * inv_det
+#     wv = (o2 * o3 - nongeo * o1) * inv_det
+#     ww = (nongeo * term_nh_dchi + o3**2) * inv_det
+#
+#     return uu, uv, uw, vu, vv, vw, wu, wv, ww
+
 
 @nb.jit(**_JIT_OPTIONS)
 def _inverse_matrix_rows_y_direction_nb(
     determinant: np.ndarray,
     nonhydro: bool,
-    nongeo: float,
+    nongeo: bool,
     coriolis_dt: np.ndarray,
-    dChi_full_term: np.ndarray,
+    dt_N_sq: np.ndarray,
+    is_pressure_calling: bool = False,
 ) -> Tuple[
     np.ndarray, ...
 ]:  # Return tuple of 9 arrays (uu, uv, uw, vu, vv, vw, wu, wv, ww)
@@ -55,35 +96,37 @@ def _inverse_matrix_rows_y_direction_nb(
     o1, o2, o3 = coriolis_dt[0], coriolis_dt[1], coriolis_dt[2]
     inv_det = 1.0 / determinant
 
+    flag = 1 if is_pressure_calling else 0
+
     ############################################## Row 1:
-    term_nh_dchi = nonhydro - dChi_full_term
-    uu = (nongeo * term_nh_dchi + o1**2) * inv_det
+    term_nh_dchi = nonhydro - dt_N_sq
+    uu = (flag * term_nh_dchi + o1**2) * inv_det
     uv = (nongeo * o3 + o1 * o2) * inv_det
     uw = (o1 * o3 - o2 * term_nh_dchi) * inv_det
 
     ############################################## Row 2:
-    vu = (o1 * o2 - nongeo * o3) * inv_det
+    vu = (o1 * o2 - flag * o3) * inv_det
     vv = (nongeo**2 + o2**2) * inv_det
-    vw = (nongeo * o1 + o2 * o3) * inv_det
+    vw = (flag * o1 + o2 * o3) * inv_det
 
     ############################################## Row 3:
     wu = (o1 * o3 + o2 * term_nh_dchi) * inv_det
     wv = (o2 * o3 - nongeo * o1) * inv_det
-    ww = (nongeo * term_nh_dchi + o3**2) * inv_det
+    ww = (flag * term_nh_dchi + o3**2) * inv_det
 
     return uu, uv, uw, vu, vv, vw, wu, wv, ww
-
 
 @nb.jit(**_JIT_OPTIONS)
 def apply_coriolis_transform_nb_y(
     U_in: np.ndarray,
     V_in: np.ndarray,
     W_in: np.ndarray,
-    dChi_full_term: np.ndarray,
+    dt_N_sq: np.ndarray,
     nonhydro: bool,
-    nongeo: float,
+    nongeo: bool,
     dt: float,
     coriolis_strength: np.ndarray,
+    is_pressure_calling: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Numba-jitted core function to apply the inverse Coriolis transform when the gravity direction in 'y' axis.
@@ -94,10 +137,10 @@ def apply_coriolis_transform_nb_y(
 
     # --- Calculate Inverse Matrix Elements ---
     determinant = _calculate_determinant_y_direction_nb(
-        nonhydro, nongeo, coriolis_dt, dChi_full_term
+        nonhydro, nongeo, coriolis_dt, dt_N_sq
     )
     uu, uv, uw, vu, vv, vw, wu, wv, ww = _inverse_matrix_rows_y_direction_nb(
-        determinant, nonhydro, nongeo, coriolis_dt, dChi_full_term
+        determinant, nonhydro, nongeo, coriolis_dt, dt_N_sq, is_pressure_calling
     )
 
     # --- Apply Transform (Matrix-Vector Product) ---

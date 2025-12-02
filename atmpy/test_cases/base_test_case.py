@@ -101,7 +101,8 @@ class BaseTestCase(ABC):
             else:
                 print(f"Warning: Model regime '{key}' not found in config.")
         # Recalculate Msq if necessary after updating refs
-        self._update_Msq()
+        if "Msq" not in model_regime_updates:
+            self._update_Msq()
 
     def set_numerics(self, numerics_updates: dict):
         """Update the numerics configuration."""

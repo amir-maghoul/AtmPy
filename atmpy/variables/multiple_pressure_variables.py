@@ -151,41 +151,6 @@ class MPV:
 
         return dS_full
 
-    # def compute_dS_on_nodes(self):
-    #     """Compute the derivative of S with respect to the direction of gravity. The S variable is assumed to be
-    #     defined on the nodes.
-    #
-    #     Returns
-    #     -------
-    #     ndarray of shape grid.cshape
-    #         The derivative of S with respect to the direction of gravity.
-    #     """
-    #     dr: float = self.grid.dxyz[self.direction]
-    #     S0: np.ndarray = self.hydrostate.node_vars[..., HI.S0]
-    #     dS: np.ndarray = np.diff(S0) / dr
-    #
-    #     if self.grid.ndim == 1:
-    #         return dS
-    #
-    #     tile_shape: list = self._get_tile_shape()
-    #     dS = np.tile(dS, tile_shape)
-    #     return dS
-
-    # def get_S0c_on_cells(self):
-    #     """Get method to get the S0c attribute. The S0 variable is assumed to be defined on the cells."""
-    #     S0c: np.ndarray = self.hydrostate.cell_vars[..., HI.S0]
-    #     if self.grid.ndim == 1:
-    #         return S0c
-    #
-    #     tile_shape: list = self._get_tile_shape()
-    #     S0c = np.tile(S0c, tile_shape)
-    #     return S0c
-    #
-    # def _get_tile_shape(self):
-    #     tile_shape = list(self.grid.cshape)
-    #     tile_shape[self.direction] = 1
-    #     return tile_shape
-
     def get_S0c_on_cells(self):
         """
         Gets the 1D stratification array S0c and broadcasts it to the full
@@ -279,25 +244,56 @@ class MPV:
             self.hydrostate.cell_vars[...] = 1.0
             self.hydrostate.node_vars[...] = 1.0
 
+    # def integrate_density_hydrostatically(self, rho_field_3d: np.ndarray, gravity_strength: np.ndarray) -> np.ndarray:
+    #     """
+    #     Computes the hydrostatic pressure perturbation field corresponding to a
+    #     given 3D density perturbation field.
+    #
+    #     The integration is performed column-by-column in the direction of gravity.
+    #     The pressure perturbation is assumed to be zero at the bottom boundary of each column.
+    #
+    #     Parameters
+    #     ----------
+    #     rho_field_3d : np.ndarray
+    #         A 3D array (matching the grid's cell shape) containing the density perturbation.
+    #     gravity_strength : np.ndarray
+    #         The array of gravity strengths in each direction.
+    #
+    #     Returns
+    #     -------
+    #     np.ndarray
+    #         A 3D array of the same shape containing the hydrostatic pressure perturbation.
+    #     """
+    #     g_eff = gravity_strength[self.direction]
+    #     dy = self.grid.dxyz[self.direction]
+    #     p_hydro_pert = np.zeros_like(rho_field_3d)
+    #
+    #     # Get the number of cells in the vertical direction
+    #     num_vertical_cells = rho_field_3d.shape[self.direction]
+    #
+    #     # Define slices for accessing adjacent vertical layers
+    #     # This is a robust way to write the integration loop without hardcoding the axis index
+    #     prev_slice = [slice(None)] * self.grid.ndim
+    #     curr_slice = [slice(None)] * self.grid.ndim
+    #
+    #     # Integrate from the "bottom" (index 0) to the "top"
+    #     for j in range(1, num_vertical_cells):
+    #         prev_slice[self.direction] = j - 1
+    #         curr_slice[self.direction] = j
+    #
+    #         # Use trapezoidal rule for the integration step
+    #         p_hydro_pert[tuple(curr_slice)] = p_hydro_pert[tuple(prev_slice)] - 0.5 * g_eff * \
+    #                                           (rho_field_3d[tuple(curr_slice)] + rho_field_3d[tuple(prev_slice)]) * dy
+    #
+    #     return p_hydro_pert
+
     def integrate_density_hydrostatically(self, rho_field_3d: np.ndarray, gravity_strength: np.ndarray) -> np.ndarray:
         """
         Computes the hydrostatic pressure perturbation field corresponding to a
         given 3D density perturbation field.
 
         The integration is performed column-by-column in the direction of gravity.
-        The pressure perturbation is assumed to be zero at the bottom boundary of each column.
-
-        Parameters
-        ----------
-        rho_field_3d : np.ndarray
-            A 3D array (matching the grid's cell shape) containing the density perturbation.
-        gravity_strength : np.ndarray
-            The array of gravity strengths in each direction.
-
-        Returns
-        -------
-        np.ndarray
-            A 3D array of the same shape containing the hydrostatic pressure perturbation.
+        The pressure perturbation is assumed to be zero at the top boundary of each column.
         """
         g_eff = gravity_strength[self.direction]
         dy = self.grid.dxyz[self.direction]
@@ -306,19 +302,23 @@ class MPV:
         # Get the number of cells in the vertical direction
         num_vertical_cells = rho_field_3d.shape[self.direction]
 
+        # Set p=0 at the top (last index)
+        top_slice = [slice(None)] * self.grid.ndim
+        top_slice[self.direction] = num_vertical_cells - 1
+        p_hydro_pert[tuple(top_slice)] = 0.0
+
         # Define slices for accessing adjacent vertical layers
-        # This is a robust way to write the integration loop without hardcoding the axis index
-        prev_slice = [slice(None)] * self.grid.ndim
+        next_slice = [slice(None)] * self.grid.ndim
         curr_slice = [slice(None)] * self.grid.ndim
 
-        # Integrate from the "bottom" (index 0) to the "top"
-        for j in range(1, num_vertical_cells):
-            prev_slice[self.direction] = j - 1
-            curr_slice[self.direction] = j
+        # Integrate downward from the top to the bottom
+        for j in range(num_vertical_cells - 2, -1, -1):
+            next_slice[self.direction] = j + 1  # Higher level
+            curr_slice[self.direction] = j  # Current (lower) level
 
-            # Use trapezoidal rule for the integration step
-            p_hydro_pert[tuple(curr_slice)] = p_hydro_pert[tuple(prev_slice)] - 0.5 * g_eff * \
-                                              (rho_field_3d[tuple(curr_slice)] + rho_field_3d[tuple(prev_slice)]) * dy
+            # Use trapezoidal rule: p_lower = p_higher + avg_rho * g * dy (pressure increases downward)
+            p_hydro_pert[tuple(curr_slice)] = p_hydro_pert[tuple(next_slice)] + 0.5 * g_eff * \
+                                              (rho_field_3d[tuple(curr_slice)] + rho_field_3d[tuple(next_slice)]) * dy
 
         return p_hydro_pert
 
@@ -620,301 +620,202 @@ class MPV:
 
     def compute_hydrostate_from_profile3D(
         self,
-        Y_cells_nd: np.ndarray,
-        Y_nodes_nd: np.ndarray,
-        gravity_strength: Union[np.ndarray, list, tuple],
+        Y_cells: np.ndarray,
+        Y_nodes: np.ndarray,
+        gravity_strength: tuple,
         Msq: float,
-    ):
+    ) -> HydrostaticStateND:
         """
-        Computes an N-D hydrostatically balanced state by performing a 1D
-        vertical integration for each horizontal column. This is a robust,
-        correct implementation based on the PyBella/C reference logic.
-        NOTE: This function expects input arrays defined on the FULL grid (incl. ghosts)
-              and returns state arrays defined on the INNER grid.
+        Compute exact hydrostatic balance for an arbitrary 3D potential temperature field.
+        This is the 3D generalization of the 2D version used in InertialGravityLongWaves.
+
+        Parameters
+        ----------
+        Y_cells : np.ndarray
+            Full-grid cell-centered potential temperature θ (shape = grid.cshape_total)
+        Y_nodes : np.ndarray
+            Full-grid node-centered potential temperature θ (shape = grid.nshape_total)
+        gravity_strength : tuple[float, float, float]
+        Msq : float
+
+        Returns
+        -------
+        HydrostaticStateND containing rhoY0, p20 on cells and p20_nodes
         """
+        grid = self.grid
         thermo = Thermodynamics()
         Gamma = thermo.Gamma
-        gm1_inv = thermo.gm1inv
-        Gamma_inv = thermo.Gammainv
+        gm1inv = 1.0 / (thermo.gamma - 1.0)
 
         g_axis = self.direction
         g = gravity_strength[g_axis]
+        dy = grid.dxyz[g_axis]
 
-        # Get grid parameters for the INNER domain for the output arrays
-        icshape = self.grid.icshape
-        inshape = self.grid.inshape
+        # Containers (only inner parts will be used later)
+        HySt = HydrostaticStateND(grid.cshape, grid.nshape)
 
-        # Vertical grid parameters
-        ny_total = self.grid.ncy_total
-        ny_inner = icshape[g_axis]
-        ngy = self.grid.ng[g_axis][0]
-        dy = self.grid.dxyz[g_axis]
+        if abs(g) < 1e-12:
+            # No gravity → uniform reference state
+            HySt.rhoY0[...] = 1.0
+            HySt.p20[...] = 1.0 / Msq
+            HySt.p20_nodes[...] = 1.0 / Msq
+            return HySt
 
-        # Initialize the output HydrostaticStateND object with inner shapes
-        HySt = HydrostaticStateND(icshape, inshape)
+        # Reference Exner pressure at the very first inner cell/node in gravity direction
+        pi_ref = 1.0
 
-        # Initial conditions at the reference level (p=1.0 at the lowest inner cell)
-        pi0 = self.p0**thermo.gm1
+        # ------------------------------------------------------------------
+        # 1. Iterate over every horizontal column (x-z plane when g_axis=1)
+        # ------------------------------------------------------------------
+        # Shape of one horizontal slice
+        horiz_shape = list(grid.cshape)
+        horiz_shape[g_axis] = 1
 
-        # --- Loop over all horizontal columns to perform 1D vertical integration ---
-        horiz_dims = [d for d in range(self.grid.ndim) if d != g_axis]
-        # Use the FULL grid shape for the iterator bounds
-        iter_shape = [self.grid.cshape[d] for d in horiz_dims]
+        # Indices for horizontal directions
+        horiz_axes = [0, 1, 2]
+        horiz_axes.remove(g_axis)
 
-        horizontal_iterator = np.ndindex(*iter_shape)
+        for idx_x in range(grid.ncx_total if 0 != g_axis else 1):
+            for idx_z in range(grid.ncz_total if 2 != g_axis else 1):
+                # Build full column index tuple
+                col_idx = [slice(None)] * 3
+                if 0 != g_axis:
+                    col_idx[0] = idx_x
+                if 2 != g_axis:
+                    col_idx[2] = idx_z
 
-        for horiz_idx_tuple in horizontal_iterator:
-            col_idx_full = [slice(None)] * self.grid.ndim
-            idx_counter = 0
-            for d in range(self.grid.ndim):
-                if d != g_axis:
-                    col_idx_full[d] = horiz_idx_tuple[idx_counter]
-                    idx_counter += 1
+                col_tuple = tuple(col_idx)
 
-            # Extract the 1D vertical profiles for this column from the FULL input arrays
-            Y_col_cells = Y_cells_nd[tuple(col_idx_full)]
+                # Extract 1D profiles for this column
+                Y_col_cells = Y_cells[col_tuple].flatten()      # length = ny_total
+                Y_col_nodes = Y_nodes[col_tuple].flatten()      # length = ny_total + 1
 
-            # --- Cell-centered pressure integration for the current column ---
-            pi_hydro_col = np.zeros(ny_total)
-            pi_hydro_col[ngy] = pi0  # Set reference pressure at the first inner cell
+                ny = len(Y_col_cells)
 
-            # Integrate downwards from reference level into lower ghost cells
-            for j in range(ngy - 1, -1, -1):
-                Y_interface = 0.5 * (Y_col_cells[j] + Y_col_cells[j + 1])
-                d_pi = (Gamma * g / Y_interface) * dy  # Pressure increases downwards
-                pi_hydro_col[j] = pi_hydro_col[j + 1] + d_pi
+                # ------------------- Cell-centered integration -------------------
+                pi_col = np.zeros(ny)
+                pi_col[grid.ng[g_axis][0]] = pi_ref
 
-            # Integrate upwards from reference level
-            for j in range(ngy, ny_total - 1):
-                Y_interface = 0.5 * (Y_col_cells[j] + Y_col_cells[j + 1])
-                d_pi = -(Gamma * g / Y_interface) * dy  # Pressure decreases upwards
-                pi_hydro_col[j + 1] = pi_hydro_col[j] + d_pi
+                # Upward
+                for j in range(grid.ng[g_axis][0], ny - 1):
+                    Y_avg = 0.5 * (Y_col_cells[j] + Y_col_cells[j + 1])
+                    dpi = -Gamma * g * dy / Y_avg
+                    pi_col[j + 1] = pi_col[j] + dpi
 
-            # Slice out the INNER part of the result and place it in the output array
-            inner_col_idx = tuple(col_idx_full[d] for d in horiz_dims)
-            HySt.rhoY0[inner_col_idx] = (pi_hydro_col[ngy:-ngy]) ** gm1_inv
-            HySt.p20[inner_col_idx] = pi_hydro_col[ngy:-ngy] / Msq
+                # Downward (into ghosts)
+                for j in range(grid.ng[g_axis][0] - 1, -1, -1):
+                    Y_avg = 0.5 * (Y_col_cells[j] + Y_col_cells[j + 1])
+                    dpi = Gamma * g * dy / Y_avg
+                    pi_col[j] = pi_col[j + 1] + dpi
 
-            # --- Node-centered pressure integration for the current column ---
-            pi_hydro_n_col = np.zeros(self.grid.nny_total)
-            pi_hydro_n_col[ngy] = pi0  # Reference at the first inner node
+                rhoY_col = pi_col ** gm1inv
+                p2_col = pi_col / Msq
 
-            # Integrate upwards from the reference node
-            for j in range(ngy, self.grid.nny_total - 1):
-                # Use the potential temperature from cell j
-                Y_cell_center = Y_col_cells[j]
-                d_pi = -(Gamma * g / Y_cell_center) * dy
-                pi_hydro_n_col[j + 1] = pi_hydro_n_col[j] + d_pi
+                # Write back into 3D arrays
+                HySt.rhoY0[col_tuple] = rhoY_col
+                HySt.p20[col_tuple] = p2_col
 
-            # Integrate downwards from reference node
-            for j in range(ngy - 1, -1, -1):
-                Y_cell_center = Y_col_cells[j]
-                d_pi = (Gamma * g / Y_cell_center) * dy
-                pi_hydro_n_col[j] = pi_hydro_n_col[j + 1] + d_pi
+                # ------------------- Node-centered integration -------------------
+                pi_node_col = np.zeros(len(Y_col_nodes))
+                pi_node_col[grid.ng[g_axis][0]] = pi_ref
 
-            HySt.p20_nodes[inner_col_idx] = pi_hydro_n_col[ngy:-ngy] / Msq
+                # Upward (use cell value to the "left")
+                for j in range(grid.ng[g_axis][0], len(Y_col_nodes) - 1):
+                    dpi = -Gamma * g * dy / Y_col_cells[j]
+                    pi_node_col[j + 1] = pi_node_col[j] + dpi
+
+                # Downward
+                for j in range(grid.ng[g_axis][0] - 1, -1, -1):
+                    dpi = Gamma * g * dy / Y_col_cells[j]
+                    pi_node_col[j] = pi_node_col[j + 1] + dpi
+
+                HySt.p20_nodes[col_tuple] = pi_node_col / Msq
 
         return HySt
 
+    def correct_initial_pressure3D(self, variables: "Variables", Msq: float, g):
+        """
+        Removes the tiny hydrostatic imbalance that appears from round-off
+        when the initial condition is built from an analytic potential-temperature field.
+        This is the exact 3D generalization of the 2D version used in all PyBella/atmpy tests.
 
-# """This module handles multiple pressure variables. It is used to calculate the hydrostate pressure.
-# The code is the modified version of what appears in PyBella project.
-# """
-#
-# import scipy as sp
-# import numpy as np
-# from typing import List, Union, TYPE_CHECKING
-#
-# if TYPE_CHECKING:
-#     from atmpy.grid.kgrid import Grid
-# from atmpy.infrastructure.utility import direction_axis
-# from atmpy.grid.utility import DimensionSpec, create_grid
-# from atmpy.infrastructure.enums import HydrostateIndices as HI
-# from atmpy.variables.variables import Variables
-# from atmpy.physics.thermodynamics import Thermodynamics
-#
-#
-# class MPV:
-#     """Container for 'Multiple Pressure Variables'
-#
-#     Attributes
-#     ----------
-#     grid : Grid
-#         the Grid object
-#     grid1D : Grid
-#         the 1D version of the self.grid in the direction of hydrostacity
-#     """
-#
-#     def __init__(self, grid: "Grid", num_vars: int = 6, direction: str = "y"):
-#         """Initialize the container for pressure variables.
-#
-#         Parameters
-#         ----------
-#         grid : Grid
-#             the Grid object
-#         num_vars : int (default=6)
-#             the number of pressure variables for the hydrostate container
-#         direction : str (default="y")
-#             the direction of hydrostacity. Values can be "x", "y" or "z".
-#         """
-#         self.grid: "Grid" = grid
-#         self.direction_str: str = direction
-#         self.direction: int = direction_axis(direction)
-#         self.grid1D: Grid = self._create_1D_grid_in_direction()
-#         self.p0: float = 1.0
-#         self.p00: float = 1.0
-#
-#         self.p2_cells: np.ndarray = np.zeros(grid.cshape)
-#         self.dp2_cells: np.ndarray = np.zeros(grid.cshape)
-#         self.p2_nodes: np.ndarray = np.zeros(grid.nshape)
-#         self.p2_nodes0: np.ndarray = np.zeros(grid.nshape)
-#         self.dp2_nodes: np.ndarray = np.zeros(grid.nshape)
-#
-#         self.Pu: np.ndarray = np.zeros(grid.cshape)
-#         self.Pv: np.ndarray = np.zeros(grid.cshape)
-#         self.Pw: np.ndarray = np.zeros(grid.cshape)
-#
-#         # Containers for the pressure equation
-#         self.rhs: np.ndarray = np.zeros(
-#             grid.nshape
-#         )  # Container for the divergence of momenta
-#         self.wcenter: np.ndarray = np.zeros(
-#             grid.nshape
-#         )  # Container for the dP/dpi in the Helmholtz eq.
-#         self.wplus: np.ndarray = np.zeros(
-#             (grid.ndim,) + grid.cshape
-#         )  # Container for the (P*Theta) in momenta eq.
-#
-#         # The variable container for hydrostate
-#         self.hydrostate: Variables = Variables(
-#             self.grid1D, num_vars_cell=num_vars, num_vars_node=num_vars
-#         )
-#
-#     def _create_1D_grid_in_direction(self):
-#         """Reduce the dimension of the Grid object and create a new one in the given direction"""
-#         if self.grid.ndim == 1:
-#             return self.grid
-#         start: float = getattr(self.grid, self.direction_str + "_start")
-#         end: float = getattr(self.grid, self.direction_str + "_end")
-#         ncells: int = getattr(self.grid, "n" + self.direction_str)
-#         nghosts: int = getattr(self.grid, "ng" + self.direction_str)
-#
-#         dims: List[DimensionSpec] = [DimensionSpec(ncells, start, end, nghosts)]
-#         grid: "Grid" = create_grid(dims)
-#
-#         return grid
-#
-#     def compute_dS_on_nodes(self):
-#         """Compute the derivative of S with respect to the direction of gravity. The S variable is assumed to be
-#         defined on the nodes.
-#
-#         Returns
-#         -------
-#         ndarray of shape grid.cshape
-#             The derivative of S with respect to the direction of gravity.
-#
-#         Notes
-#         -----
-#         This function computes the nodal derivative in the direction of gravity. Number of nodes in each direction are
-#         equal to the number of cells plus one. The derivative reduces this shape in the direction of gravity to equal to
-#         the number of cells. After that the resulting 1D array gets tiled to be of the same shape as the grid.cshape.
-#         """
-#
-#         dr: float = self.grid.dxyz[self.direction]
-#
-#         # Since variables in self.hydrostate are 1D, it suffices to calculate the convolution in their only direction
-#         # and then divide the result be the correct dx, dy or dz to get the derivative.
-#         S0: np.ndarray = self.hydrostate.node_vars[..., HI.S0]
-#         dS: np.ndarray = np.diff(S0) / dr
-#
-#         if self.grid.ndim == 1:
-#             return dS
-#
-#         # Expand and repeat along even axes so that the result matches the cell array shape.
-#         tile_shape: list = self._get_tile_shape()
-#         dS = np.tile(dS, tile_shape)
-#         return dS
-#
-#     def get_S0c_on_cells(self):
-#         """Get method to get the S0c attribute. The S0 variable is assumed to be defined on the cells."""
-#         S0c: np.ndarray = self.hydrostate.cell_vars[..., HI.S0]
-#
-#         if self.grid.ndim == 1:
-#             return S0c
-#
-#         # Expand and repeat along even axes so that the result matches the cell array shape.
-#         tile_shape: list = self._get_tile_shape()
-#         S0c = np.tile(S0c, tile_shape)
-#         return S0c
-#
-#     def _get_tile_shape(self):
-#         tile_shape = list(self.grid.cshape)
-#         tile_shape[self.direction] = 1
-#         return tile_shape
-#
-#     def set_rhs_to_zero(self):
-#         self.rhs[...] = 0.0
-#
-#     def state(self, gravity_strength: Union[np.ndarray, list, tuple], Msq: float):
-#         """Computes the initial values for the multiple pressure variables
-#
-#         Parameters
-#         ----------
-#         gravity_strength : np.ndarray, List or tuple of shape (3,)
-#             the array of gravity strengths in each direction
-#
-#         Msq : float
-#             Mach number squared
-#         """
-#         thermo: Thermodynamics = Thermodynamics()
-#         g: float = gravity_strength[self.direction]
-#
-#         if g != 0.0:
-#             Gamma: float = thermo.Gamma
-#             Hex: float = 1.0 / (Gamma * g)
-#             dr: float = self.grid.dxyz[self.direction]
-#             nodes: np.ndarray = self.grid.get_node_coordinates(self.direction)
-#             cells: np.ndarray = self.grid.get_cell_coordinates(self.direction)
-#
-#             pi_np: np.ndarray = np.exp(-(nodes + 0.5 * dr) / Hex)
-#             pi_nm: np.ndarray = np.exp(-(nodes - 0.5 * dr) / Hex)
-#             pi_n: np.ndarray = np.exp(-(nodes) / Hex)
-#
-#             Y_n: np.ndarray = -Gamma * g * dr / (pi_np - pi_nm)
-#             P_n: np.ndarray = pi_n**thermo.gm1inv
-#             p_n: np.ndarray = pi_n**thermo.Gammainv
-#             rho_n: np.ndarray = P_n / Y_n
-#
-#             self.hydrostate.node_vars[..., HI.P2_0] = pi_n / Msq
-#             self.hydrostate.node_vars[..., HI.P0] = p_n
-#             self.hydrostate.node_vars[..., HI.RHO0] = rho_n
-#             self.hydrostate.node_vars[..., HI.RHOY0] = P_n
-#             self.hydrostate.node_vars[..., HI.Y0] = Y_n
-#             self.hydrostate.node_vars[..., HI.S0] = 1.0 / Y_n
-#
-#             pi_cp: np.ndarray = np.exp(-(cells + 0.5 * dr) / Hex)
-#             pi_cm: np.ndarray = np.exp(-(cells - 0.5 * dr) / Hex)
-#             pi_c: np.ndarray = np.exp(-(cells) / Hex)
-#
-#             # Y_c: np.ndarray = -Gamma * g * dr / (pi_c - pi_cm)
-#             # P_c: np.ndarray = (1.0 / Y_c)**thermo.gm1inv
-#             # p_c: np.ndarray = pi_c**thermo.Gammainv
-#             # rho_c: np.ndarray = P_c / Y_c
-#             #
-#             # self.hydrostate.cell_vars[..., HI.P2_0] = 1.0 / Y_c / Msq
-#             Y_c: np.ndarray = -Gamma * g * dr / (pi_cp - pi_cm)
-#             P_c: np.ndarray = pi_c**thermo.gm1inv
-#             p_c: np.ndarray = pi_c**thermo.Gammainv
-#             rho_c: np.ndarray = P_c / Y_c
-#
-#             self.hydrostate.cell_vars[..., HI.P2_0] = pi_c / Msq
-#             self.hydrostate.cell_vars[..., HI.P0] = p_c
-#             self.hydrostate.cell_vars[..., HI.RHO0] = rho_c
-#             self.hydrostate.cell_vars[..., HI.RHOY0] = P_c
-#             self.hydrostate.cell_vars[..., HI.Y0] = Y_c
-#             self.hydrostate.cell_vars[..., HI.S0] = 1.0 / Y_c
-#
-#         else:
-#             # In the absence of gravity, we set every pressure to 1.
-#             self.hydrostate.cell_vars[...] = 1.0
-#             self.hydrostate.node_vars[...] = 1.0
+        Works for any gravity direction (x, y, or z) and for 2D or 3D grids.
+        """
+        grid = self.grid
+        thermo = Thermodynamics()
+        Gamma = thermo.Gamma
+        gm1inv = 1.0 / (thermo.gamma - 1.0)
+
+        g_axis = self.direction                # 0=x, 1=y, 2=z
+
+        dy = grid.dxyz[g_axis]
+        inner = grid.get_inner_slice()
+
+        # ------------------------------------------------------------------
+        # 1. Reconstruct total Exner pressure π from current prognostic variables
+        # ------------------------------------------------------------------
+        rho = variables.cell_vars[inner + (VI.RHO,)]
+        rhoY = variables.cell_vars[inner + (VI.RHOY,)]
+        Y = rhoY / rho                              # potential temperature θ
+        pi_total = (rhoY ** gm1inv)                 # π = (ρ θ)^{γ/(γ-1)}  (non-dimensional)
+
+        # ------------------------------------------------------------------
+        # 2. Average π to nodes (simple arithmetic average in gravity direction)
+        # ------------------------------------------------------------------
+        # Shape of inner node array in gravity direction is ny+1 (or nx+1, nz+1)
+        pi_node = np.zeros(grid.nshape)
+        s = [slice(None)] * 3
+
+        # Lower part (from cell j to node j)
+        s[g_axis] = slice(None, -1)
+        pi_node = pi_total
+
+        # Upper part (from cell j to node j+1)
+        s[g_axis] = slice(1, None)
+        pi_node += pi_total
+
+        # Average (2 contributions except at domain edges → exactly what we want)
+        s[g_axis] = slice(1, -1)
+        pi_node *= 0.5
+
+        # ------------------------------------------------------------------
+        # 3. Compute hydrostatic correction by integrating dπ/dn = -Γ g / Y
+        # ------------------------------------------------------------------
+        # Reference π at first inner node (same as in compute_hydrostate_from_profile)
+        pi_ref = pi_node
+        pi_ref = pi_ref.flatten()[grid.ng[g_axis][0]]   # scalar
+
+        # Integrate upward
+        for j in range(grid.ng[g_axis][0] + 1, grid.nshape[g_axis]):
+            idx = [slice(None)] * 3
+            idx[g_axis] = j - 1
+            Y_cell = Y[tuple(idx)] if g_axis == 1 else np.take(Y, j - 1, axis=g_axis)
+            dpi = -Gamma * g * dy / Y_cell
+            idx[g_axis] = j
+            pi_node[tuple(idx)] = pi_node[tuple(idx[:-1] + [j-1])] + dpi
+
+        # Integrate downward (ghosts + lower domain)
+        for j in range(grid.ng[g_axis][0] - 1, -1, -1):
+            idx = [slice(None)] * 3
+            idx[g_axis] = j + 1
+            Y_cell = Y[tuple(idx)] if g_axis == 1 else np.take(Y, j, axis=g_axis)
+            dpi = Gamma * g * dy / Y_cell
+            idx[g_axis] = j
+            pi_node[tuple(idx)] = pi_node[tuple(idx[:-1] + [j+1])] + dpi
+
+        # ------------------------------------------------------------------
+        # 4. Overwrite p2 with the corrected hydrostatic part
+        # ------------------------------------------------------------------
+        # p2 = (π_hydro - π_ref) / Msq   (the reference π_ref is already in hydrostate)
+        self.p2_nodes[:] = (pi_node - pi_ref) / Msq
+
+        # Also correct cell-centered p2 (average from nodes)
+        s = [slice(None)] * 3
+        s[g_axis] = slice(None, -1)
+        p2_cells = self.p2_nodes[tuple(s)]
+        s[g_axis] = slice(1, None)
+        p2_cells += self.p2_nodes[tuple(s)]
+        s[g_axis] = slice(1, -1)
+        self.p2_cells[tuple(s)] = p2_cells[tuple(s)] * 0.5 / Msq
+
+        print("correct_initial_pressure applied (3D) – hydrostatic imbalance removed.")

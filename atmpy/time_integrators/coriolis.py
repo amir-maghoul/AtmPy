@@ -10,6 +10,12 @@ if TYPE_CHECKING:
     from atmpy.variables.multiple_pressure_variables import MPV
 from atmpy.infrastructure.enums import VariableIndices as VI
 from atmpy.time_integrators.coriolis_numba_kernels import apply_coriolis_transform_nb_y
+from enum import Enum, auto
+
+class CoriolisUse(Enum):
+    """How the extended Coriolis inverse is being used."""
+    MOMENTUM_UPDATE = auto()        # momentum state update
+    HELMHOLTZ_OPERATOR = auto()    # building Helmholtz Operator
 
 
 class CoriolisOperator:
@@ -71,63 +77,99 @@ class CoriolisOperator:
             print(f"Error during pre-compilation: {e}")
             print(f"Execution might be slower on the first call.\n")
 
-    def apply_inverse(
-        self,
-        U: np.ndarray,
-        V: np.ndarray,
-        W: np.ndarray,
-        variables: "Variables",
-        mpv: "MPV",
-        is_nongeostrophic: float,
-        is_nonhydrostatic: bool,
-        Msq: float,
-        dt: float,
+    def apply_inverse_for_momentum_state(
+            self,
+            U: np.ndarray,
+            V: np.ndarray,
+            W: np.ndarray,
+            variables: "Variables",
+            mpv: "MPV",
+            is_nongeostrophic: bool,
+            is_nonhydrostatic: bool,
+            Msq: float,
+            dt: float,
     ) -> None:
-        """Apply correction to momenta due to the coriolis effect. If there are no coriolis forces in any direction,
-        do nothing.
-
-        Parameters
-        ----------
-        u, v, w: np.ndarray
-            momenta components to be updated
-        variables : Variables
-            The variable container containing the density and temperature variables.
-        mpv : MPV
-            The MPV object containing the Chi variable and its derivative method.
-        is_nongeostrophic : float
-            The switch between geostrophic and non-geostrophic regimes.
-        is_nonhydrostatic : bool
-            The switch between hydrostatic and non-hydrostatic regimes.
-        Msq : float
-            The mach number squared.
-        dt : float
-            The time step.
-        """
-
-        # Prepare scalar values
-        nonhydro = is_nonhydrostatic
-        nongeo = is_nongeostrophic
-        g: float = self.gravity.strength
-
-        # Calculate dChi (the buoyancy in the momentum equation in the direction of the gravity)
-        dChi = mpv.compute_dS_on_nodes()
-        Theta = variables.cell_vars[..., VI.RHOY] / variables.cell_vars[..., VI.RHO]
-        dChi_full_term = (dt**2) * (g / Msq) * dChi * Theta
-
-        # Get elements of the inverse combined matrix (combination of switches, coriolis matrix and the buoyancy term)
-        # See docstrings for more details.
-        u_new, v_new, w_new = self.coriolis_inverse_kernel(
-            U,
-            V,
-            W,
-            dChi_full_term,
-            bool(nonhydro),  # Cast to bool for better handling in Numba
-            float(nongeo),  # Cast to bool for better handling in Numba
-            float(dt),  # Cast to float for better handling in Numba
-            self.strength,
+        """M^{-1} acting on the *current momenta*, used in backward_explicit."""
+        self._apply_inverse_core(
+            U, V, W,
+            variables, mpv,
+            is_nongeostrophic,
+            is_nonhydrostatic,
+            Msq,
+            dt,
+            use=CoriolisUse.MOMENTUM_UPDATE,
         )
 
-        # Update the given variables.
+    def apply_inverse_for_helmholtz_operator(
+            self,
+            Pu: np.ndarray,
+            Pv: np.ndarray,
+            Pw: np.ndarray,
+            variables: "Variables",
+            mpv: "MPV",
+            is_nongeostrophic: bool,
+            is_nonhydrostatic: bool,
+            Msq: float,
+            dt: float,
+    ) -> None:
+        """M^{-1} acting on dt * (PΘ) ∇p, used for building the Helmholtz RHS."""
+        self._apply_inverse_core(
+            Pu, Pv, Pw,
+            variables, mpv,
+            is_nongeostrophic,
+            is_nonhydrostatic,
+            Msq,
+            dt,
+            use=CoriolisUse.HELMHOLTZ_OPERATOR,
+        )
+
+    def _apply_inverse_core(
+            self,
+            U: np.ndarray,
+            V: np.ndarray,
+            W: np.ndarray,
+            variables: "Variables",
+            mpv: "MPV",
+            is_nongeostrophic: bool,
+            is_nonhydrostatic: bool,
+            Msq: float,
+            dt: float,
+            use: CoriolisUse,
+    ) -> None:
+        """
+        The only place where we actually call the numba kernel.
+
+        - Decides how to use the physical switches (is_nongeostrophic, is_nonhydrostatic)
+        - Decides whether this is a 'pressure call' (is_pressure_calling)
+        - Documents what each combination means.
+        """
+        nonhydro = is_nonhydrostatic
+        nongeo = is_nongeostrophic
+
+        g: float = self.gravity.strength
+        dChi = mpv.compute_dS_on_nodes()
+        Theta = variables.cell_vars[..., VI.RHOY] / variables.cell_vars[..., VI.RHO]
+        dt_N_sq = (dt ** 2) * (g / Msq) * dChi * Theta
+
+        # Algorithmic mapping: decide when the kernel should treat this as a
+        # 'pressure-related' transform.
+        if use is CoriolisUse.MOMENTUM_UPDATE:
+            is_pressure_calling = is_nongeostrophic  # "pure" state update
+        elif use is CoriolisUse.HELMHOLTZ_OPERATOR:
+            is_pressure_calling = True  # building Helmholtz operator
+        else:
+            raise ValueError(f"Unsupported CoriolisUse: {use}")
+
+        u_new, v_new, w_new = self.coriolis_inverse_kernel(
+            U, V, W,
+            dt_N_sq,
+            bool(nonhydro),
+            bool(nongeo),
+            float(dt),
+            self.strength,
+            is_pressure_calling,
+        )
+
         U[...] = u_new
         V[...] = v_new
         W[...] = w_new

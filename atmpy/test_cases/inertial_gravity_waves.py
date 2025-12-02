@@ -131,8 +131,8 @@ class InertialGravityWaves(BaseTestCase):
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
             "CFL": 0.9,
-            "dtfixed": 5.0 * (12.5 / 15.0) * 0.5 * self.scale_factor * 30.0 / 100,
-            "dtfixed0": None,
+            "dtfixed": 1.0, #5.0 * (12.5 / 15.0) * 0.5 * self.scale_factor * 30.0 / 100,
+            "dtfixed0": 1.0,
             "tout": np.array([0.0, 10.0]),
             "tmax": 30 * self.scale_factor,
             "stepmax": 50_000,
