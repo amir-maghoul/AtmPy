@@ -7,6 +7,8 @@ from atmpy.physics.thermodynamics import Thermodynamics
 if TYPE_CHECKING:
     from atmpy.grid.kgrid import Grid
     from atmpy.variables.multiple_pressure_variables import MPV
+    from atmpy.configuration.simulation_data import SpongeLayerConfig
+
 from atmpy.infrastructure.enums import (
     BoundarySide as BdrySide,
     BoundaryConditions as BdryType,
@@ -46,3 +48,4 @@ class BoundaryConditionsConfiguration:
     """Data class of containing the context objects of all boundary conditions of all sides"""
 
     options: List[BCInstantiationOptions]
+    sponge_config: Optional["SpongeLayerConfig"] = None

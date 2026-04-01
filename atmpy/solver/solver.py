@@ -46,6 +46,7 @@ class Solver:
         time_integrator: "AbstractTimeIntegrator",
         initial_t: float = 0.0,
         initial_step: int = 0,
+        reset_output: bool = False,
     ):
         self.config = config
         self.grid = grid
@@ -56,6 +57,7 @@ class Solver:
         self.current_t: float = initial_t
         self.current_step: int = initial_step
         self.start_time_wall: float = 0.0
+
 
         self.dt: float = config.temporal.dtfixed
         if self.dt <= 0:
@@ -72,6 +74,8 @@ class Solver:
 
         self.output_frequency_steps: int = config.outputs.output_frequency_steps
         self.output_filename: str = self.config.outputs.output_filename
+        self.reset_output = reset_output
+        self._initial_save_completed = False
 
         self.enable_checkpointing: bool = getattr(
             config.outputs, "enable_checkpointing", True
@@ -107,6 +111,19 @@ class Solver:
 
         # --- Initial Output/Checkpoint (at initial state) ---
         solver_saver.handle_saving(self)
+        self._initial_save_completed = True
+
+        if self.config.numerics.initial_projection:
+            compressibility = self.time_integrator.is_compressible
+            geostrophic = self.time_integrator.is_nongeostrophic
+            hydrostatic = self.time_integrator.is_nonhydrostatic
+            self.time_integrator.is_compressible = False
+            self.time_integrator.is_nongeostrophic = True
+            self.time_integrator.is_nonhydrostatic = True
+            self.time_integrator.step(global_step=self.current_step)
+            self.time_integrator.is_compressible = compressibility
+            self.time_integrator.is_nongeostrophic = geostrophic
+            self.time_integrator.is_nonhydrostatic = hydrostatic
 
         ######################################### BEGIN OF THE SOLVER LOOP #####################################################
         while True:

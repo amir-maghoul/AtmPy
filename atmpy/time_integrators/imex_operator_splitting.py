@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Union, List, Any, Callable
 from atmpy.boundary_conditions.bc_extra_operations import (
     WallAdjustment,
     WallFluxCorrection,
+    SpongeLayer
 )
 from atmpy.boundary_conditions.contexts import BCApplicationContext
 from atmpy.infrastructure.utility import (
@@ -168,6 +169,9 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         ######################### Corrector Stage: Advance state from t^n to t^{n+1} ###################################
         self._corrector_step(self.dt, initial_vars_arr, global_time_step_num)
         # After this, self.variables contains Sol^{n+1} and self.mpv.p2_nodes contains p^{n+1}
+
+        ######################### Apply sponge layer to the final state ################################################
+        self.boundary_manager.apply_sponge_layer(self.variables.cell_vars)
 
         logging.info(f"--- Finished time step {global_time_step_num} ---")
 
@@ -456,7 +460,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self.mpv.wcenter *= self.is_compressible
 
         ############################ 6. Solve the elliptic helmholtz equation ##########################################
-        rtol = 1.0e-6
+        rtol = 1.0e-8
         max_iter = 1000
         p2_inner_flat, solver_info = self.pressure_solver.solve_helmholtz(
             rhs_flat,
@@ -486,9 +490,12 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         # The buoyancy *is* adjusted now (updt_chi=1.0).
         horizontal_momenta_index = self.gravity.horizontal_momentum_indices()
         if not self.is_nongeostrophic:
+            # Zero out the horizontal velocities since the update is not prognostic but diagnostic from the pressure
             self.variables.cell_vars[..., horizontal_momenta_index] = 0.0
             self.variables.adjust_background_wind(self.wind_speed, scale=1.0)
 
+            # Reset the horizontal momenta from the pressure perturbation WITHOUT the increment (output of poisson solve)
+            # This way the ONLY value that exists in the momenta container is the pressure gradient update.
             CHI_UPDT_VALUE = 0.0
             self.pressure_solver.apply_pressure_gradient_update(
                 p=self.mpv.p2_nodes,  # Use solved increment
@@ -502,6 +509,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
             # self.boundary_manager.apply_boundary_on_all_sides(cellvars)
 
 
+        # Update the momenta using the pressure perturbation increment.
         CHI_UPDT_VALUE = 1.0
         self.pressure_solver.apply_pressure_gradient_update(
             p=p2_full,  # Use solved increment

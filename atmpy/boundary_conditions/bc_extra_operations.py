@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
+from typing import List
 from atmpy.infrastructure.enums import (
     BoundarySide as BdrySide,
     BoundaryConditions as BdryType,
@@ -104,3 +105,22 @@ class InletMassFlowCorrection(ExtraBCOperation):
 
     def get_identifier(self) -> str:
         return f"InletMassFlowCorrection(target={self.target_mass_flow}, relax={self.relaxation}, target={self.get_target_description()})"
+
+#################################################
+# Operation for Sponge Layers
+#################################################
+# atmpy/boundary_conditions/bc_extra_operations.py
+
+class SpongeLayer(ExtraBCOperation):
+    """
+    The executable operation for applying a sponge layer.
+    """
+    def __init__(self, width: int, amplitude: float, power: int, apply_on_axes: List[int], **kwargs):
+        super().__init__(**kwargs)
+        self.width = width
+        self.amplitude = amplitude
+        self.power = power
+        self.apply_on_axes = apply_on_axes # Store the axes
+
+    def get_identifier(self) -> str:
+        return f"SpongeLayer(width={self.width}, amp={self.amplitude}, axes={self.apply_on_axes})"

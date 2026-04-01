@@ -1,3 +1,314 @@
+# """ This module contains the function for different preconditioning functions"""
+#
+# import numpy as np
+# from typing import TYPE_CHECKING, Dict, Any, Tuple, List
+#
+# if TYPE_CHECKING:
+#     from atmpy.pressure_solver.classical_pressure_solvers import ClassicalPressureSolver
+#     from atmpy.grid.kgrid import Grid
+#
+# # ==============================================================================
+# # Helper: Vectorized Solver (Batch TDMA)
+# # ==============================================================================
+#
+# def solve_tridiagonal_batched(
+#     a: np.ndarray,
+#     b: np.ndarray,
+#     c: np.ndarray,
+#     d: np.ndarray
+# ) -> np.ndarray:
+#     """
+#     Solves many tridiagonal systems Ax = d simultaneously using a vectorized Thomas algorithm.
+#     This eliminates the slow Python loop over columns.
+#
+#     Inputs are shape (N_systems, N_levels).
+#     We solve along the last axis (N_levels).
+#
+#     a: Lower diagonal (a[:, 0] is unused)
+#     b: Main diagonal
+#     c: Upper diagonal (c[:, -1] is unused)
+#     d: RHS
+#     """
+#     n_levels = d.shape[-1]
+#
+#     # Work on copies to avoid modifying inputs
+#     # c_prime and d_prime are modified in place during forward sweep
+#     c_prime = c.copy()
+#     d_prime = d.copy()
+#     b_work = b.copy()
+#
+#     # 1. Forward Elimination
+#     # This loop runs N_levels times (e.g., 50), which is fast.
+#     # The operations inside are vectorized over N_systems (e.g., 10,000).
+#     for k in range(1, n_levels):
+#         w = a[:, k] / b_work[:, k-1]
+#         b_work[:, k] = b_work[:, k] - w * c_prime[:, k-1]
+#         d_prime[:, k] = d_prime[:, k] - w * d_prime[:, k-1]
+#
+#     # 2. Backward Substitution
+#     x = np.zeros_like(d)
+#     x[:, -1] = d_prime[:, -1] / b_work[:, -1]
+#
+#     for k in range(n_levels - 2, -1, -1):
+#         x[:, k] = (d_prime[:, k] - c_prime[:, k] * x[:, k+1]) / b_work[:, k]
+#
+#     return x
+#
+#
+# # ==============================================================================
+# # Helper: Optimized Slicing
+# # ==============================================================================
+#
+# def _get_coeff_slices_for_axis(
+#     inner_slice: Tuple[slice, ...],
+#     axis: int,
+#     node_shape: Tuple[int, ...]
+# ) -> Tuple[Tuple[slice, ...], Tuple[slice, ...]]:
+#     """
+#     Generates the slice tuples for the Cell-centered array corresponding to
+#     the Left (i-1) and Right (i) neighbors of the nodes in inner_slice.
+#     """
+#     sl_left = []
+#     sl_right = []
+#
+#     for d, s_node in enumerate(inner_slice):
+#         # Resolve node start/stop
+#         start_n = s_node.start if s_node.start is not None else 0
+#         stop_n = s_node.stop if s_node.stop is not None else node_shape[d]
+#
+#         # Handle negative indices
+#         if start_n < 0: start_n += node_shape[d]
+#         if stop_n < 0: stop_n += node_shape[d]
+#
+#         if d == axis:
+#             # Active Axis:
+#             # Node i uses Flux from Cell i-1 (Left) and Cell i (Right)
+#             sl_left.append(slice(start_n - 1, stop_n - 1))
+#             sl_right.append(slice(start_n, stop_n))
+#         else:
+#             # Transverse Axis:
+#             # Cell index aligns with Node index
+#             sl_left.append(slice(start_n, stop_n))
+#             sl_right.append(slice(start_n, stop_n))
+#
+#     return tuple(sl_left), tuple(sl_right)
+#
+#
+# # =============================================================================
+# # Diagonal Preconditioners
+# # =============================================================================
+#
+# def compute_inverse_diagonal_components(
+#     pressure_solver: "ClassicalPressureSolver",
+#     dt: float,
+#     is_nongeostrophic: bool,
+#     is_nonhydrostatic: bool,
+#     is_compressible: bool,
+# ) -> Dict[str, Any]:
+#     """
+#     Computes the inverse diagonal of the Helmholtz operator.
+#     Optimized to slice arrays *before* arithmetic to save memory bandwidth.
+#     """
+#     grid = pressure_solver.grid
+#     mpv = pressure_solver.mpv
+#     inner_slice = grid.get_inner_slice()
+#     node_shape = grid.nshape
+#     gravity_axis = pressure_solver.coriolis.gravity.axis
+#
+#     # Pre-calculate scalar coefficients
+#     f_z = pressure_solver.coriolis.strength[2]
+#     m_inv_horiz = 1.0 / (1.0 + (dt * f_z) ** 2)
+#     m_inv_vert = 1.0
+#
+#     # 1. Start with Pressure Term (wcenter)
+#     # This creates the accumulator array 'full_diag'
+#     full_diag = mpv.wcenter[inner_slice].copy()
+#
+#     # 2. Add Horizontal Diffusion (X)
+#     # Kx = (dt * pTheta * M_inv) / dx^2
+#     # We slice pTheta first, then multiply.
+#     factor_x = (dt * m_inv_horiz) / (grid.dxyz[0] ** 2)
+#     sl_l, sl_r = _get_coeff_slices_for_axis(inner_slice, 0, node_shape)
+#
+#     # In-place addition to minimize allocation
+#     # D += (pTheta_L + pTheta_R) * factor
+#     pTheta_sum = mpv.wplus[0][sl_l] + mpv.wplus[0][sl_r]
+#     full_diag += pTheta_sum * factor_x
+#
+#     # 3. Add Horizontal Diffusion (Y)
+#     if grid.ndim >= 2:
+#         factor_y = (dt * m_inv_horiz) / (grid.dxyz[1] ** 2)
+#         sl_l, sl_r = _get_coeff_slices_for_axis(inner_slice, 1, node_shape)
+#
+#         pTheta_sum = mpv.wplus[0][sl_l] + mpv.wplus[0][sl_r]
+#         full_diag += pTheta_sum * factor_y
+#
+#     # 4. Add Vertical Diffusion (Z) with Boundary Checks
+#     if grid.ndim == 3:
+#         factor_z = (dt * m_inv_vert) / (grid.dxyz[2] ** 2)
+#         sl_l, sl_r = _get_coeff_slices_for_axis(inner_slice, gravity_axis, node_shape)
+#
+#         # Get raw slices
+#         pt_l = mpv.wplus[0][sl_l]
+#         pt_r = mpv.wplus[0][sl_r]
+#
+#         # Handle Wall Boundaries for Diagonal (Zero Flux from outside)
+#         # If we are at the bottom boundary, the 'Left' flux comes from ghost cell. Zero it.
+#         # If we are at the top boundary, the 'Right' flux comes from ghost cell. Zero it.
+#
+#         # We perform the multiplication first to get K
+#         k_l = pt_l * factor_z
+#         k_r = pt_r * factor_z
+#
+#         # Zero out ghost fluxes
+#         # Note: We are modifying local copies k_l, k_r
+#         slice_bottom = [slice(None)] * grid.ndim
+#         slice_bottom[gravity_axis] = 0
+#         k_l[tuple(slice_bottom)] = 0.0
+#
+#         slice_top = [slice(None)] * grid.ndim
+#         slice_top[gravity_axis] = -1
+#         k_r[tuple(slice_top)] = 0.0
+#
+#         full_diag += (k_l + k_r)
+#
+#     # 5. Invert
+#     diag_inv = np.zeros_like(full_diag)
+#     mask = np.abs(full_diag) > 1e-25
+#     diag_inv[mask] = 1.0 / full_diag[mask]
+#
+#     return {"diag_inv": diag_inv}
+#
+#
+# def apply_inverse_diagonal(r_flat: np.ndarray, *, diag_inv: np.ndarray) -> np.ndarray:
+#     if r_flat.size != diag_inv.size:
+#         raise ValueError(f"Size mismatch: RHS {r_flat.size} vs Diag {diag_inv.size}.")
+#     return (r_flat.reshape(diag_inv.shape) * diag_inv).flatten()
+#
+# compute_inverse_analytical_diagonal_components = compute_inverse_diagonal_components
+# apply_inverse_analytical_diagonal = apply_inverse_diagonal
+#
+#
+# # =============================================================================
+# # Column (Tridiagonal) Preconditioner
+# # =============================================================================
+#
+# def compute_tridiagonal_components(
+#     pressure_solver: "ClassicalPressureSolver",
+#     dt: float,
+#     is_nongeostrophic: bool,
+#     is_nonhydrostatic: bool,
+#     is_compressible: bool,
+# ) -> Dict[str, Any]:
+#     """Computes the vertical tridiagonal bands explicitly."""
+#     grid = pressure_solver.grid
+#     mpv = pressure_solver.mpv
+#     inner_slice = grid.get_inner_slice()
+#     node_shape = grid.nshape
+#     gravity_axis = pressure_solver.coriolis.gravity.axis
+#
+#     # Pre-calculate scalars
+#     f_z = pressure_solver.coriolis.strength[2]
+#     m_inv_horiz = 1.0 / (1.0 + (dt * f_z) ** 2)
+#     m_inv_vert = 1.0
+#
+#     # --- 1. Compute Full Diagonal ---
+#     # Initialize with wcenter
+#     diag_band = mpv.wcenter[inner_slice].copy()
+#
+#     # Add X
+#     factor_x = (dt * m_inv_horiz) / (grid.dxyz[0] ** 2)
+#     sl_l, sl_r = _get_coeff_slices_for_axis(inner_slice, 0, node_shape)
+#     diag_band += (mpv.wplus[0][sl_l] + mpv.wplus[0][sl_r]) * factor_x
+#
+#     # Add Y
+#     if grid.ndim >= 2:
+#         factor_y = (dt * m_inv_horiz) / (grid.dxyz[1] ** 2)
+#         sl_l, sl_r = _get_coeff_slices_for_axis(inner_slice, 1, node_shape)
+#         diag_band += (mpv.wplus[0][sl_l] + mpv.wplus[0][sl_r]) * factor_y
+#
+#     # --- 2. Vertical Contributions (Diagonal & Off-Diagonal) ---
+#     factor_z = (dt * m_inv_vert) / (grid.dxyz[2] ** 2)
+#     sl_l_z, sl_r_z = _get_coeff_slices_for_axis(inner_slice, gravity_axis, node_shape)
+#
+#     # Calculate Vertical Coefficients (Kz)
+#     kz_l = mpv.wplus[0][sl_l_z] * factor_z
+#     kz_r = mpv.wplus[0][sl_r_z] * factor_z
+#
+#     # -- Diagonal Update --
+#     # Enforce Zero Flux on boundaries for the diagonal summation
+#     # (Ghost coefficients do not contribute to the self-term in Neumann/Wall)
+#     kz_l_diag = kz_l.copy()
+#     kz_r_diag = kz_r.copy()
+#
+#     slice_bottom = [slice(None)] * grid.ndim
+#     slice_bottom[gravity_axis] = 0
+#     kz_l_diag[tuple(slice_bottom)] = 0.0
+#
+#     slice_top = [slice(None)] * grid.ndim
+#     slice_top[gravity_axis] = -1
+#     kz_r_diag[tuple(slice_top)] = 0.0
+#
+#     diag_band += (kz_l_diag + kz_r_diag)
+#
+#     # -- Off-Diagonal Update --
+#     # Upper Band (coeff of p_{k+1}) = -Conductance_Right = -kz_r
+#     # Lower Band (coeff of p_{k-1}) = -Conductance_Left  = -kz_l
+#     upper_band = -1.0 * kz_r
+#     lower_band = -1.0 * kz_l
+#
+#     return {
+#         "lower": lower_band,
+#         "diag": diag_band,
+#         "upper": upper_band,
+#         "grid": grid,
+#         "gravity_axis": gravity_axis,
+#     }
+#
+#
+# def apply_inverse_tridiagonal(
+#     r_flat: np.ndarray,
+#     *,
+#     lower: np.ndarray,
+#     diag: np.ndarray,
+#     upper: np.ndarray,
+#     grid: "Grid",
+#     gravity_axis: int,
+# ) -> np.ndarray:
+#     """
+#     Solves the tridiagonal system for each vertical column using vectorized TDMA.
+#     """
+#     inner_shape = grid.inshape
+#     r = r_flat.reshape(inner_shape)
+#
+#     # 1. Permute axes to put gravity axis LAST: (..., N_vertical)
+#     # This prepares the data for batch processing
+#     r_t = np.moveaxis(r, gravity_axis, -1)
+#     l_t = np.moveaxis(lower, gravity_axis, -1)
+#     d_t = np.moveaxis(diag, gravity_axis, -1)
+#     u_t = np.moveaxis(upper, gravity_axis, -1)
+#
+#     permuted_shape = r_t.shape
+#     n_vertical = permuted_shape[-1]
+#
+#     # 2. Flatten all horizontal dimensions into a single 'system' dimension
+#     # Shape becomes (N_systems, N_levels)
+#     # This allows us to solve ~10,000 systems in one go using numpy arrays
+#     r_batch = r_t.reshape(-1, n_vertical)
+#     l_batch = l_t.reshape(-1, n_vertical)
+#     d_batch = d_t.reshape(-1, n_vertical)
+#     u_batch = u_t.reshape(-1, n_vertical)
+#
+#     # 3. Solve using Batch TDMA
+#     x_batch = solve_tridiagonal_batched(l_batch, d_batch, u_batch, r_batch)
+#
+#     # 4. Reshape back and restore axis order
+#     x_t = x_batch.reshape(permuted_shape)
+#     x = np.moveaxis(x_t, -1, gravity_axis)
+#
+#     return x.flatten()
+
+
 """ This module contains the function for different preconditioning functions"""
 
 import numpy as np
@@ -492,7 +803,7 @@ def apply_inverse_tridiagonal(
         except np.linalg.LinAlgError:
             # Fallback for singular columns
             z_unflat[col_slice] = r_col / (
-                d_col + 1e-15
+                # d_col + 1e-15
             )  # Simple diagonal scaling as fallback
 
     return z_unflat.flatten()

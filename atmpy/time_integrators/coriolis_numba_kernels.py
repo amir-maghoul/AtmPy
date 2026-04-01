@@ -7,12 +7,12 @@ from typing import Tuple, Any
 _JIT_OPTIONS = {"nopython": True, "nogil": True, "cache": True}
 
 
-@nb.jit(**_JIT_OPTIONS)
+# @nb.jit(**_JIT_OPTIONS)
 def _calculate_determinant_y_direction_nb(
     nonhydro: bool,
     nongeo: bool,
     coriolis_dt: np.ndarray,  # Renamed for clarity (dt * strength)
-    dChi_full_term: np.ndarray,
+    dt_N_sq: np.ndarray,
 ) -> np.ndarray:
     """Numba-jitted version: Calculate the determinant.
 
@@ -24,11 +24,11 @@ def _calculate_determinant_y_direction_nb(
         The switch between geostrophic and nongeostrophic regimes
     coriolis_dt : np.ndarray
         The coriolis matrix times dt.
-    dChi_full_term : np.ndarray
-        The derivative of the \bar{Chi} (The mean value of the inverse potential temperature)
+    dt_Nsq : np.ndarray
+        The time weighted Brunt Vaisala frequency squared.
     """
     o1, o2, o3 = coriolis_dt[0], coriolis_dt[1], coriolis_dt[2]
-    term1 = (nonhydro - dChi_full_term) * (nongeo**2 + o2**2)
+    term1 = (nonhydro - dt_N_sq) * (nongeo**2 + o2**2)
     term2 = nongeo * (o1**2 + o3**2)
     return term1 + term2
 
@@ -73,7 +73,7 @@ def _calculate_determinant_y_direction_nb(
 #     return uu, uv, uw, vu, vv, vw, wu, wv, ww
 
 
-@nb.jit(**_JIT_OPTIONS)
+# @nb.jit(**_JIT_OPTIONS)
 def _inverse_matrix_rows_y_direction_nb(
     determinant: np.ndarray,
     nonhydro: bool,
@@ -116,7 +116,7 @@ def _inverse_matrix_rows_y_direction_nb(
 
     return uu, uv, uw, vu, vv, vw, wu, wv, ww
 
-@nb.jit(**_JIT_OPTIONS)
+# @nb.jit(**_JIT_OPTIONS)
 def apply_coriolis_transform_nb_y(
     U_in: np.ndarray,
     V_in: np.ndarray,

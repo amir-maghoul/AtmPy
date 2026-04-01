@@ -58,6 +58,11 @@ def parse_arguments():
         "--restart", type=str, help="Path to checkpoint file to restart from."
     )
     run_group.add_argument(
+        "--reset-output",
+        action="store_true",
+        help="If set, overwrite the existing output file and start writing from index 0 (even if restarting).",
+    )
+    run_group.add_argument(
         "--config-pickle-path",
         type=str,
         default=None,

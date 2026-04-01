@@ -124,13 +124,23 @@ def save_analysis_output(solver_instance: "Solver", reason: str) -> None:
         f"Saving analysis output to {solver_instance.output_filename} (Reason: {reason}) at t={solver_instance.current_t:.4f}, step={solver_instance.current_step}"
     )
 
+    force_reset = solver_instance.reset_output and not solver_instance._initial_save_completed
+
     file_exists = os.path.exists(solver_instance.output_filename)
-    mode = (
-        "a"
-        if file_exists
-        and (solver_instance.current_t > 1e-9 or solver_instance.current_step > 0)
-        else "w"
-    )
+
+    if force_reset:
+        if file_exists:
+            try:
+                os.remove(solver_instance.output_filename)
+                logging.info(f"Reset Output: Deleted old file {solver_instance.output_filename}")
+            except OSError as e:
+                logging.error(f"Could not delete old file (check permissions/locks): {e}")
+        mode = "w"
+        logging.warning(f"Reset Output Flag Active: Overwriting {solver_instance.output_filename}")
+    elif file_exists and (solver_instance.current_t > 1e-9 or solver_instance.current_step > 0):
+        mode = "a"
+    else:
+        mode = "w"
 
     try:
         with NetCDFWriter(
@@ -320,6 +330,19 @@ def check_and_save_analysis_output(
     solver_instance: "Solver", analysis_active: bool
 ) -> None:
     """Handles saving of standard analysis output based on analysis_active flag."""
+
+    is_forced_restart_save = (solver_instance.reset_output and not solver_instance._initial_save_completed)
+
+    # Handle initial state (t=0 OR Forced Restart) separately and unconditionally
+    if solver_instance.current_step == 0 or is_forced_restart_save:
+        save_analysis_output(solver_instance, "initial state (t=0 or restart)")
+
+        # Mark current time as saved if it matches a tout
+        for i, t_val in enumerate(solver_instance.tout):
+            if abs(t_val - solver_instance.current_t) < 1e-7:  # Epsilon tolerance
+                if not solver_instance._output_times_saved[i]:
+                    solver_instance._output_times_saved[i] = True
+        return
 
     # Handle initial state (t=0, step=0) separately and unconditionally for analysis output
     if solver_instance.current_step == 0:

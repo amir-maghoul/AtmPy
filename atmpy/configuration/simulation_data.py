@@ -71,6 +71,16 @@ class SpatialGrid:
                 raise ValueError("Grid must have at least one dimension (nx > 0).")
         return dims
 
+@dataclass
+class SpongeLayerConfig:
+    """Configuration data for the sponge layer."""
+    active: bool = False
+    width: int = 10
+    amplitude: float = 0.5
+    power: int = 2
+    target_vars: List[str] = field(default_factory=lambda: ["RHOU", "RHOV", "RHOW"])
+    apply_on_axes: List[int] = field(default_factory=lambda: [0, 2])
+
 
 @dataclass
 class BoundarySpec:
@@ -105,6 +115,7 @@ class BoundaryConditions:
             # Add FRONT/BACK if needed for 3D
         }
     )
+    sponge: SpongeLayerConfig = field(default_factory=SpongeLayerConfig)
 
 
 @dataclass

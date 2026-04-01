@@ -19,6 +19,8 @@ from atmpy.boundary_conditions.contexts import (
     BoundaryConditionsConfiguration,
     BCApplicationContext,
 )
+from atmpy.boundary_conditions.bc_extra_operations import SpongeLayer
+from atmpy.infrastructure.enums import VariableIndices as VI
 from dataclasses import replace
 
 
@@ -32,6 +34,38 @@ class BoundaryManager:
         self._sorted_bcs: List["BaseBC"] = []
         self._sorted_mpv_bcs: List["BaseBC"] = []
         self.setup_conditions(bc_config)
+        self.sponge_config = bc_config.sponge_config
+        self._sponge_op: Optional[SpongeLayer] = None
+
+        if self.sponge_config and self.sponge_config.active:
+            self._sponge_op = SpongeLayer(
+                width=self.sponge_config.width,
+                amplitude=self.sponge_config.amplitude,
+                power=self.sponge_config.power,
+                apply_on_axes=self.sponge_config.apply_on_axes,
+                target_side=BdrySide.ALL,
+                target_type = BdryType.ALL
+            )
+
+    def apply_sponge_layer(self, cell_vars: "np.ndarray"):
+        """
+        Applies the sponge layer to the variables defined in the configuration.
+        """
+        if self._sponge_op is None:
+            return
+
+        # Iterate over the target variables (e.g., RHOU, RHOV)
+        for var_name in self.sponge_config.target_vars:
+            try:
+                idx = getattr(VI, var_name)
+                variable = cell_vars[..., idx]
+
+                # Use existing infrastructure: apply 'extra' to all sides
+                # We wrap the operation in a list as expected by apply_extra_all_sides
+                self.apply_extra_all_sides(variable, [self._sponge_op])
+
+            except AttributeError:
+                logging.warning(f"Sponge layer target variable '{var_name}' is not a valid VariableIndex.")
 
     def setup_conditions(self, bc_config: "BoundaryConditionsConfiguration") -> None:
         """Set up the boundary conditions in dictionaries for main and MPV variables."""
@@ -299,7 +333,7 @@ class BoundaryManager:
                     # Check if the operation's target_type matches the condition's type
                     if (
                         operation.target_type is not None
-                        and condition.type == operation.target_type
+                        and (condition.type == operation.target_type) or operation.target_type == BdryType.ALL
                     ):
                         condition.apply_extra(variable, operation)
                         applied = True

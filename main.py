@@ -264,6 +264,11 @@ if args.mode in ["run", "debug"]:
             loaded_data = Solver.load_checkpoint_data(args.restart)
             initial_t = loaded_data["current_t"]
             initial_step = loaded_data["current_step"] + 1
+
+            if args.reset_output:
+                logger.info("Reset Output Flag Active: Resetting simulation step counter to 0.")
+                initial_step = 0
+
             variables.cell_vars[...] = loaded_data["cell_vars"]
             mpv.p2_nodes[...] = loaded_data["p2_nodes"]
             logger.info(
@@ -282,6 +287,7 @@ if args.mode in ["run", "debug"]:
         time_integrator=time_integrator,
         initial_t=initial_t,
         initial_step=initial_step,
+        reset_output=args.reset_output,
     )
     solver.run()
     logger.info(f"Run for case {args.case} completed.")

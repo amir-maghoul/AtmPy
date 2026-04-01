@@ -31,6 +31,7 @@ from atmpy.boundary_conditions.bc_extra_operations import (
     WallAdjustment,
     WallFluxCorrection,
     WallVariableZeroOut,
+    SpongeLayer,
 )
 from atmpy.infrastructure.utility import (
     direction_axis,
@@ -118,7 +119,56 @@ class BaseBoundaryCondition(ABC):
         """Optional extra update on variable, like scaling wall nodes. This function should be considered as a
         refinement of the boundary condition. It should be called in the euler steps (explicit and implicit) to
         refine the already applied boundary conditions."""
+        if isinstance(operation, SpongeLayer):
+            self._apply_sponge_logic(variable, operation)
         pass
+
+    def _apply_sponge_logic(self, variable: np.ndarray, op: "SpongeLayer"):
+        """Calculates and applies the damping profile."""
+        axis = self.direction
+        side_idx = self.side_axis  # 0 or 1
+        ng = self.ng[side_idx]
+        width = op.width
+
+        # No sponge for the vertical direction
+        if self.direction not in op.apply_on_axes:
+             return
+
+        axis = self.direction
+        side_idx = self.side_axis
+
+        # We assume 'variable' is the full array.
+        # Determine slice indices relative to the FULL array (including ghosts)
+        slc = [slice(None)] * self.ndim
+
+        if side_idx == 0:
+            # Sponge applied at start: [ng, ng + width]
+            # (Starts at first physical cell, goes inward)
+            start_idx = ng
+            end_idx = ng + width
+            # Ramp: 1.0 at boundary -> 0.0 inside
+            ramp = np.linspace(1.0, 0.0, width)
+        else:
+            # Sponge applied at end: [N - ng - width, N - ng]
+            dim_len = variable.shape[axis]
+            end_idx = dim_len - ng
+            start_idx = end_idx - width
+            # Ramp: 0.0 inside -> 1.0 at boundary
+            ramp = np.linspace(0.0, 1.0, width)
+
+        slc[axis] = slice(start_idx, end_idx)
+
+        # Create damping factor: factor = Amp * (ramp^Power)
+        # 1.0 means full damping (var becomes 0), 0.0 means no damping.
+        profile_shape = [1] * self.ndim
+        profile_shape[axis] = width
+
+        # Reshape for broadcasting
+        damping_factor = (op.amplitude * (ramp ** op.power)).reshape(profile_shape)
+
+        # Apply: var = var * (1 - factor)
+        # Note: We clamp amplitude in config or here to ensure stability (<= 1.0)
+        variable[tuple(slc)] *= (1.0 - damping_factor)
 
     @property
     def pad_width(self):
@@ -237,6 +287,9 @@ class PeriodicBoundary(BaseBoundaryCondition):
         self.periodic_nodal_condition(variable)
 
     def apply_extra(self, variable: np.ndarray, operation: "ExtraBCOperation") -> None:
+        if isinstance(operation, SpongeLayer):
+            self._apply_sponge_logic(variable, operation)
+            return
         pass
 
     @property
@@ -481,6 +534,8 @@ class ReflectiveGravityBoundary(BaseBoundaryCondition):
             momenta_slice = slice(0, self.ndim)
             pad_slice = self.padded_slices()
             variables[pad_slice + (momenta_slice,)] *= factor
+        elif isinstance(operation, SpongeLayer):
+            self._apply_sponge_logic(variables, operation)
         else:
             pass
 
@@ -674,6 +729,8 @@ class Wall(BaseBoundaryCondition):
             factor = operation.factor
             pad_slice = self.padded_slices()
             variables[pad_slice] *= factor
+        elif isinstance(operation, SpongeLayer):
+            self._apply_sponge_logic(variables, operation)
         else:
             pass
 

@@ -114,57 +114,52 @@ class TravelingVortexQG(BaseTestCase):
 
         ############################### Vortex Specific Parameters #####################################################
 
-        self.u0: float = 0.0  # Background velocity U
-        self.v0: float = 0.0  # Background velocity V
-        self.w0: float = 0.0  # Background velocity W
-        self.p0: float = 1.0  # Background pressure (dimensionless)
+        self.u0: float = 0.0  # Background velocity U (x)
+        self.v0: float = 0.0  # Background velocity V (y - vertical)
+        self.w0: float = 0.0  # Background velocity W (z)
+        self.p0: float = 1.0  # Background pressure
 
-        self.rho0: float = 0.5  # Background density (dimensionless)
-        self.del_rho: float = 0.5  # Density deficit at center
-        self.alpha = 0
-        self.alpha_const = 1
+        # Vortex Geometry
+        self.xc: float = 0.0
+        self.yc: float = 0.0
+        self.zc: float = 0.0
 
-        self.xc: float = 0.0  # Vortex center x
-        self.yc: float = 0.0  # Vortex center y
-        self.zc: float = 0.0  # Vortex center z
+        # Scales
+        self.size = 1.0
+        self.boxsize = 1.0 * self.size
+        self.h_scale = 1
+        self.y_boxscale = 0.1  # Height of domain relative to width
+        self.R0: float = 0.2 * self.size  # Horizontal radius
+        self.H_frac: float = 0.1  # Vertical aspect ratio of the vortex bubble
 
-        self.rotdir: float = 1.0  # Rotation direction
-        self.size = 1
-        self.boxsize = 1*self.size
-        self.y_boxscale = 0.1
-        self.R0: float = 0.25*self.size  # Vortex radius scale
-        self.tmax = 1.0*self.size
+        # Amplitude (Exner pressure perturbation amplitude)
+        # Needs to be small for QG validity (Rossby << 1)
+        self.p_amp: float = -1.0e-4
 
-        self.p_amp: float = -1.0e-5 # nondimensional pressure perturbation amplitude
-        self.H_frac: float = 0.3  # fraction of Ly used for vertical scale H
-        self.del_Y: float = 0.005  # Potential temperature perturbation amplitude
-        N_factor = 10000
-        self.Nsq_ref = 1.0e-4*N_factor
-        Msq_factor = 100
-        self.Msq = 1.0/Msq_factor
+        # Simulation settings
+        self.tmax = 1.0 * self.size
+        self.output_freq = 1
+        self.dtfixed0 = None
+        self.dtfixed = 0.001  # Conservative time step
 
+        # Physics
         self.baroclinic = True
         self.stratified_atmosphere = True
-
-        self.dtfixed0 = None
-        self.dtfixed = self.dtfixed0 if self.dtfixed0 else 0.1
-        self.acoustic_cfl = True
-
-        self.output_freq = 1
         self.h_ref = 10_000.0
         self.t_ref = 100.0
-        self.g = 1.0 if self.stratified_atmosphere else 0.0
-        coriolis_factor = 100
-        force = 1.0e-4 * self.t_ref * coriolis_factor  # Constant coriolis force
-        self.cor_f = [0.0, 0.0, 0.0]
-        self.coriolis_axis = 1
-        self.cor_f[self.coriolis_axis] = force
+        N_factor = 1
+        self.Nsq_ref = 1.0e-4 * N_factor
 
-        self.is_nongeostrophic = 0
-        self.is_nonhydrostatic = 0
+        self.g = 1.0
+        self.coriolis_strength = 10  # f parameter (Make relatively large for small Ro)
+
+        # Switches for testing (User wants code to work with these = 1)
+        self.is_nongeostrophic = 1
+        self.is_nonhydrostatic = 1
         self.is_compressible = 1
 
-
+        if run_setup_method:
+            self.setup()
         if run_setup_method:
             self.setup()
 

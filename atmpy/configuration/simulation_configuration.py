@@ -124,7 +124,7 @@ class SimulationConfig:
                 "No valid boundary conditions generated for the BoundaryManager configuration."
             )
 
-        return BoundaryConditionsConfiguration(options=options_list)
+        return BoundaryConditionsConfiguration(options=options_list, sponge_config=self.boundary_conditions.sponge)
 
     def update_from_kwargs(self, **kwargs):
         for key, value in kwargs.items():

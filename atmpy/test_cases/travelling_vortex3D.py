@@ -76,7 +76,7 @@ class TravelingVortex3D(BaseTestCase):
 
         self.u0: float = 1.0  # Background velocity U
         self.v0: float = 0.0  # Background velocity V
-        self.w0: float = 0.0  # Background velocity W
+        self.w0: float = 1.0  # Background velocity W
         self.p0: float = 1.0  # Background pressure (dimensionless)
 
         if self.correct_distribution:
@@ -108,7 +108,9 @@ class TravelingVortex3D(BaseTestCase):
         self.dtfixed0 = None
         self.dtfixed = self.dtfixed0 if self.dtfixed0 else 0.0001
         self.acoustic_cfl = True
-        self.output_freq = 1
+        self.checkpoint_freq = 100
+        self.output_freq = 50
+        self.maxstep = 10000
 
         self.g = 1.0 if self.stratified_atmosphere else 0.0
         coriolis_factor = 1
@@ -117,9 +119,17 @@ class TravelingVortex3D(BaseTestCase):
         self.coriolis_axis = 1
         self.cor_f[self.coriolis_axis] = force
 
-        self.is_nongeostrophic = 0
-        self.is_nonhydrostatic = 1
-        self.is_compressible = 0
+        QG = True
+        self.initial_projection = False
+        self.is_nongeostrophic = 1
+        self.is_nonhydrostatic =  1
+        self.is_compressible = 1
+
+        if QG:
+            self.initial_projection = False
+            self.is_nongeostrophic = 0
+            self.is_nonhydrostatic = 1
+            self.is_compressible = 0
 
         self.qg_filter = 0.0
         self.qg_filter_number = 2
@@ -245,8 +255,8 @@ class TravelingVortex3D(BaseTestCase):
         print("Setting up 3D Traveling Vortex configuration...")
 
         #################################### Grid Configuration ########################################################
-        nx = nz = 40
-        ny = 3
+        nx = nz = 30
+        ny = 30
 
         grid_updates = {
             "ndim": 3,
@@ -306,7 +316,7 @@ class TravelingVortex3D(BaseTestCase):
             "dtfixed0": self.dtfixed0,
             "tout": np.array([0.0, self.tmax]),
             "tmax": self.tmax,
-            "stepmax": 100_000,
+            "stepmax": self.maxstep,
             "use_acoustic_cfl": self.acoustic_cfl,
         }
         self.set_temporal(temporal_updates)
@@ -330,7 +340,7 @@ class TravelingVortex3D(BaseTestCase):
             "second_order_advection_routine": AdvectionRoutines.STRANG_SPLIT,
             "linear_solver": LinearSolvers.BICGSTAB,
             "preconditioner": Preconditioners.DIAGONAL,
-            "initial_projection": False,
+            "initial_projection": self.initial_projection,
         }
         self.set_numerics(numerics_updates)
 
@@ -350,8 +360,10 @@ class TravelingVortex3D(BaseTestCase):
             "output_type": "test",
             "output_folder": "traveling_vortex_3d",
             "output_base_name": "_traveling_vortex_3d",
+            "checkpoint_base_name": "_traveling_vortex_3d_checkpoint",
             "output_timesteps": True,
             "output_frequency_steps": self.output_freq,
+            "checkpoint_frequency_steps": self.checkpoint_freq,
         }
         self.set_outputs(output_updates)
 
