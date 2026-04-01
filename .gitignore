@@ -6,5 +6,6 @@ redundancies.py
 output_data/
 Result_Pictures/
 pdfs/
+*.png
 
 
