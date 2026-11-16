@@ -19,7 +19,7 @@ BASE_OUTPUT_DIR = "outputs"
 MAIN_SCRIPT_PATH = (
     "/home/amir/Projects/Python/Atmpy/main.py"  # Path to your main execution script
 )
-RESOLUTIONS_NX = [32, 64, 128, 256]
+RESOLUTIONS_NX = [64, 128, 256]
 T_FINAL = 0.01
 BASE_DT_FOR_COARSEST = 0.005
 EXPECTED_VARIABLES = ["rho", "u", "v", "Y"]

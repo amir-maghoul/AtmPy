@@ -1,21 +1,24 @@
-import numpy as np
-from dataclasses import field
-from typing import List, Tuple, Dict, Any, TYPE_CHECKING
-import matplotlib
-from setuptools.sandbox import run_setup
+"""Weak, vertically uniform rotating vortex in the x-z plane.
 
-from atmpy.boundary_conditions.contexts import BCApplicationContext
+Initial pressure weights:
+    alpha=0, alpha_const=1: geostrophic (default)
+    alpha=1, alpha_const=1: gradient wind
+    alpha=1, alpha_const=0: centrifugal only
 
-# matplotlib.use("TkAgg")
-
+This case intentionally has zero gravity. Geostrophic initial conditions
+retain an O(Rossby-number) centrifugal imbalance in the full momentum equations.
+The configured background wind is treated as in the original atmpy case.
+"""
+from fractions import Fraction
+from math import comb, ceil
+from typing import TYPE_CHECKING
 import logging
+import numpy as np
 
-from atmpy.infrastructure.utility import (
-    one_element_inner_nodal_shape,
-    one_element_inner_slice,
-    directional_indices,
-    directional_full_inner_slice,
-)
+import numpy as np
+from scipy.special import beta, betainc
+from atmpy.pressure_solver.discrete_operations import ClassicalDiscreteOperator
+
 from atmpy.test_cases.base_test_case import BaseTestCase
 from atmpy.configuration.simulation_configuration import SimulationConfig
 from atmpy.infrastructure.enums import (
@@ -26,8 +29,6 @@ from atmpy.infrastructure.enums import (
     FluxReconstructions,
     LinearSolvers,
     Preconditioners,
-)
-from atmpy.infrastructure.enums import (
     VariableIndices as VI,
     HydrostateIndices as HI,
     SlopeLimiters as LimiterType,
@@ -39,224 +40,153 @@ if TYPE_CHECKING:
     from atmpy.variables.multiple_pressure_variables import MPV
 
 
-def traveling_vortex_stratification(z: float) -> float:
-    """
-    Isothermal stratification for the Traveling Vortex case.
-    Returns a constant value (typically 1.0 in non-dimensional setups).
-    The argument corresponds to the vertical coordinate.
-    """
+def traveling_vortex_stratification(y):
+    """Constant reference potential-temperature profile; gravity is zero."""
     return 1.0
 
 
 class TravelingVortex3D(BaseTestCase):
-    """
-    3D Traveling Vortex test case based on the setup described in PyBella and
-    the provided C code. This involves an isentropic vortex, uniform along the
-    y-axis (vertical), embedded in a uniform flow on a doubly periodic domain (xz) with
-    wall boundaries in y. Gravity is set to zero.
-    """
+    def __init__(
+        self,
+        config_override: SimulationConfig = None,
+        *,
+        size: float = 10.0,
+        is_compressible: bool = True,
+        alpha: float = 1.0, # Centrifugal force
+        alpha_const: float = 1.0, # Geostrophic balance force
+    ):
+        effective_config = (
+            config_override if config_override is not None else SimulationConfig()
+        )
+        super().__init__(name="TravelingVortex3D", config=effective_config)
 
-    def __init__(self, config_override: SimulationConfig = None):
-        # Initialize with a default SimulationConfig, which will be modified in setup
-        _effective_config: SimulationConfig
-        run_setup_method = False
+        # Vortex parameters; a supplied config remains authoritative for physics
+        # and model switches, just as in the original class.
 
-        if config_override is not None:
-            _effective_config = config_override
-        else:
-            # No override, create a default config. BaseTestCase will get this,
-            # and then setup() will populate it.
-            _effective_config = SimulationConfig()
-            run_setup_method = True
-
-        super().__init__(name="TravelingVortex3D", config=_effective_config)
-
-        ############################### Vortex Specific Parameters #####################################################
+        # --------------------------------------------------------------------------
+        # Vortex distribution
+        # --------------------------------------------------------------------------
         self.correct_distribution = True
 
-        self.u0: float = 1.0  # Background velocity U
-        self.v0: float = 0.0  # Background velocity V
-        self.w0: float = 1.0  # Background velocity W
-        self.p0: float = 1.0  # Background pressure (dimensionless)
+        # --------------------------------------------------------------------------
+        # Background wind
+        # --------------------------------------------------------------------------
+        self.u0 = 1.0
+        self.v0 = 0.0
+        self.w0 = 1.0
 
-        if self.correct_distribution:
-            self.rho0: float = 0.5  # Background density (dimensionless)
-            self.del_rho: float = 0.5  # Density deficit at center
-            self.alpha = 0.0
-            self.alpha_const = 1.
-        else:
-            self.rho0: float = 1  # Background density (dimensionless)
-            self.del_rho: float = -0.5  # Density deficit at center
-            self.alpha: float = -1
-            self.alpha_const: float = 3
+        # --------------------------------------------------------------------------
+        # Pressure, density, and balance weights
+        # --------------------------------------------------------------------------
+        self.p0 = 1.0
+        self.rho0 = 0.5
+        self.del_rho = 0.5
+        self.alpha = float(alpha)
+        self.alpha_const = float(alpha_const)
+        self.rotdir = 1.0
+        self.fac = 1.0
 
-        self.rotdir: float = 1.0  # Rotation direction
+        # --------------------------------------------------------------------------
+        # Reference scales and vortex geometry
+        # --------------------------------------------------------------------------
         self.h_ref = 10_000.0
         self.t_ref = 100.0
-        self.size = 1
-        self.tmax = 1.0*self.size
-        self.boxsize = 0.5*self.size
-        self.R0: float = 0.5*self.size  # Vortex radius scale
-        self.fac: float = 1.0 # Vortex magnitude factor
-        self.xc: float = 0.0  # Vortex center x
-        self.yc: float = 0.0  # Vortex center y
-        self.zc: float = 0.0  # Vortex center z
+        self.size = float(size)
+        if not np.isfinite(self.size) or self.size <= 0:
+            raise ValueError("size must be finite and positive")
+        self.tmax = 3.0 * size
+        self.boxsize = self.R0 = 0.5 * self.size
+        self.xc = self.yc = self.zc = 0.0
 
-        self.baroclinic = False
-        self.stratified_atmosphere = False
-
-        self.dtfixed0 = None
-        self.dtfixed = self.dtfixed0 if self.dtfixed0 else 0.0001
-        self.acoustic_cfl = True
-        self.checkpoint_freq = 100
-        self.output_freq = 50
-        self.maxstep = 10000
-
-        self.g = 1.0 if self.stratified_atmosphere else 0.0
-        coriolis_factor = 1
-        force = 1.0e-4 * self.t_ref * coriolis_factor  # Constant coriolis force
-        self.cor_f = [0.0, 0.0, 0.0]
+        # --------------------------------------------------------------------------
+        # Physical settings
+        # --------------------------------------------------------------------------
+        self.baroclinic = self.stratified_atmosphere = False
+        self.g = 0.0
         self.coriolis_axis = 1
-        self.cor_f[self.coriolis_axis] = force
+        self.cor_f = [0.0, 1.0e-4 * self.t_ref, 0.0]
 
-        QG = True
-        self.initial_projection = False
+
+        # --------------------------------------------------------------------------
+        # Model regimes and projection
+        # --------------------------------------------------------------------------
+        self.initial_projection = True
         self.is_nongeostrophic = 1
-        self.is_nonhydrostatic =  1
+        self.is_nonhydrostatic = 1
         self.is_compressible = 1
-
-        if QG:
-            self.initial_projection = False
-            self.is_nongeostrophic = 0
-            self.is_nonhydrostatic = 1
-            self.is_compressible = 0
-
         self.qg_filter = 0.0
         self.qg_filter_number = 2
 
-        ####################### Polynomial coefficients for pressure perturbation ######################################
-        # Coefficients remain the same as they are based on a 2D radial profile.
-        self.coe_correct = np.zeros((25,))
-        self.coe_correct[0] = 1.0 / 12.0
-        self.coe_correct[1] = -12.0 / 13.0
-        self.coe_correct[2] = 9.0 / 2.0
-        self.coe_correct[3] = -184.0 / 15.0
-        self.coe_correct[4] = 609.0 / 32.0
-        self.coe_correct[5] = -222.0 / 17.0
-        self.coe_correct[6] = -38.0 / 9.0
-        self.coe_correct[7] = 54.0 / 19.0
-        self.coe_correct[8] = 783.0 / 20.0
-        self.coe_correct[9] = -558.0 / 7.0
-        self.coe_correct[10] = 1053.0 / 22.0
-        self.coe_correct[11] = 1014.0 / 23.0
-        self.coe_correct[12] = -1473.0 / 16.0
-        self.coe_correct[13] = 204.0 / 5.0
-        self.coe_correct[14] = 510.0 / 13.0
-        self.coe_correct[15] = -1564.0 / 27.0
-        self.coe_correct[16] = 153.0 / 8.0
-        self.coe_correct[17] = 450.0 / 29.0
-        self.coe_correct[18] = -269.0 / 15.0
-        self.coe_correct[19] = 174.0 / 31.0
-        self.coe_correct[20] = 57.0 / 32.0
-        self.coe_correct[21] = -74.0 / 33.0
-        self.coe_correct[22] = 15.0 / 17.0
-        self.coe_correct[23] = -6.0 / 35.0
-        self.coe_correct[24] = 1.0 / 72.0
+        # --------------------------------------------------------------------------
+        # Time parameters
+        # --------------------------------------------------------------------------
+        self.dtfixed0 = None
+        self.dtfixed = 0.005
+        self.acoustic_cfl = True
 
-        self.const_coe_correct = np.zeros((13,))
-        self.const_coe_correct[0] = 1.0 / 12.0
-        self.const_coe_correct[1] = -12.0 / 13.0
-        self.const_coe_correct[2] = 33.0 / 7.0
-        self.const_coe_correct[3] = -44.0 / 3.0
-        self.const_coe_correct[4] = 495.0 / 16.0
-        self.const_coe_correct[5] = -792.0 / 17.0
-        self.const_coe_correct[6] = 154.0 / 3.0
-        self.const_coe_correct[7] = -792.0 / 19.0
-        self.const_coe_correct[8] = 99.0 / 4.0
-        self.const_coe_correct[9] = -220.0 / 21.0
-        self.const_coe_correct[10] = 3.0
-        self.const_coe_correct[11] = -12.0 / 23.0
-        self.const_coe_correct[12] = 1.0 / 24.0
+        # --------------------------------------------------------------------------
+        # Output cadence
+        # --------------------------------------------------------------------------
+        self.checkpoint_freq = 100
+        self.output_freq = 1
+        self.maxstep = max(10_000, ceil(self.tmax / self.dtfixed) + 1)
 
-        # This is an integral of the rho*u_theta defined in Kadioglu 2008 PLUS the integral of rho_0*u_theta
-        # Where rho_0 is mostly set to 0.5 (see above for differences)
-        self.coe_cor_correct = np.zeros((19,))
-        self.coe_cor_correct[0] = 1.0 / 7.0
-        self.coe_cor_correct[1] = -3.0 / 4.0
-        self.coe_cor_correct[2] = 4.0 / 3.0
-        self.coe_cor_correct[3] = -1.0 / 5.0
-        self.coe_cor_correct[4] = -45.0 / 22.0
-        self.coe_cor_correct[5] = 3.0 / 4.0
-        self.coe_cor_correct[6] = 9.0 / 2.0
-        self.coe_cor_correct[7] = -36.0 / 7.0
-        self.coe_cor_correct[8] = -11.0 / 5.0
-        self.coe_cor_correct[9] = 55.0 / 8.0
-        self.coe_cor_correct[10] = -33.0 / 17.0
-        self.coe_cor_correct[11] = -4.0
-        self.coe_cor_correct[12] = 58.0 / 19.0
-        self.coe_cor_correct[13] = 3.0 / 5.0
-        self.coe_cor_correct[14] = -10.0 / 7.0
-        self.coe_cor_correct[15] = 4.0 / 11.0
-        self.coe_cor_correct[16] = 9.0 / 46.0
-        self.coe_cor_correct[17] = -1.0 / 8.0
-        self.coe_cor_correct[18] = 1.0 / 50.0
-
-        self.coe_d_correct = np.zeros((25,))
-        self.coe_d_correct[0] = 1.0 / 12.0
-        self.coe_d_correct[1] = -12.0 / 13.0
-        self.coe_d_correct[2] = 30.0 / 7.0
-        self.coe_d_correct[3] = -148.0 / 15.0
-        self.coe_d_correct[4] = 57.0 / 8.0
-        self.coe_d_correct[5] = 348.0 / 17.0
-        self.coe_d_correct[6] = -538.0 / 9.0
-        self.coe_d_correct[7] = 900.0 / 19.0
-        self.coe_d_correct[8] = 1071.0 / 20.0
-        self.coe_d_correct[9] = -3128.0 / 21.0
-        self.coe_d_correct[10] = 1020.0 / 11.0
-        self.coe_d_correct[11] = 2040.0 / 23.0
-        self.coe_d_correct[12] = -1105.0 / 6.0
-        self.coe_d_correct[13] = 408.0 / 5.0
-        self.coe_d_correct[14] = 1020.0 / 13.0
-        self.coe_d_correct[15] = -3128.0 / 27.0
-        self.coe_d_correct[16] = 153.0 / 4.0
-        self.coe_d_correct[17] = 900.0 / 29.0
-        self.coe_d_correct[18] = -538.0 / 15.0
-        self.coe_d_correct[19] = 348.0 / 31.0
-        self.coe_d_correct[20] = 57.0 / 16.0
-        self.coe_d_correct[21] = -148.0 / 33.0
-        self.coe_d_correct[22] = 30.0 / 17.0
-        self.coe_d_correct[23] = -12.0 / 35.0
-        self.coe_d_correct[24] = 1.0 / 36.0
-
-        self.coe_rho = np.zeros((7,))
-        self.coe_rho[0] = 1.0 / 2.0
-        self.coe_rho[1] = -1.0
-        self.coe_rho[2] = 3.0 / 2.0
-        self.coe_rho[3] = -10.0 / 7.0
-        self.coe_rho[4] = 5.0 / 6.0
-        self.coe_rho[5] = -3.0 / 11.0
-        self.coe_rho[6] = 1.0 / 26.0
-
-        # Assign coefficients based on the chosen distribution
-        if self.correct_distribution:
-            self.coe = self.coe_correct
-            self.const_coe = self.const_coe_correct
-            self.coe_d = self.coe_d_correct
-            self.coe_cor = self.coe_cor_correct
-        else:
-            self.coe = self.coe_d_correct  # Example assignment
-            self.const_coe = self.const_coe_correct  # Example assignment
-
-        if run_setup_method:
+        # --------------------------------------------------------------------------
+        # Build coefficients and apply configuration
+        # --------------------------------------------------------------------------
+        self._build_pressure_coefficients()
+        if config_override is None:
             self.setup()
 
+    # --------------------------------------------------------------------------
+    # Analytical pressure coefficients
+    # --------------------------------------------------------------------------
+    def _build_pressure_coefficients(self):
+        """Integrate the polynomial density times swirl, with exact coefficients.
+
+        rho(s) = rho0 + del_rho*(1-s*s)**6
+        F'(s) = rho(s)*s**11*(1-s)**12
+        G'(s) = rho(s)*s**6*(1-s)**6
+        Thus q = alpha*A**2*[F(s)-F(1)]
+               + alpha_const*f*A*R0*[G(s)-G(1)], A=fac*rotdir.
+        """
+        density = [Fraction(0) for _ in range(13)]
+        density[0] = Fraction(str(self.rho0))
+        for k in range(7):
+            density[2*k] += Fraction(str(self.del_rho)) * (-1)**k * comb(6, k)
+
+        def integral_coefficients(degree, first_power):
+            product = [Fraction(0) for _ in range(13 + degree)]
+            for j, value in enumerate(density):
+                for k in range(degree + 1):
+                    product[j+k] += value * (-1)**k * comb(degree, k)
+            return np.array(
+                [
+                    np.longdouble(c.numerator)
+                    / np.longdouble(c.denominator)
+                    / (first_power + k)
+                    for k, c in enumerate(product)
+                ],
+                dtype=np.longdouble,
+            )
+
+        self.coe = integral_coefficients(12, 12)
+        self.coe_cor = integral_coefficients(6, 7)
+        self.coe_correct = self.coe.copy()
+        self.coe_cor_correct = self.coe_cor.copy()
+
+    # --------------------------------------------------------------------------
+    # Simulation configuration
+    # --------------------------------------------------------------------------
     def setup(self):
         """Configure the SimulationConfig for the 3D Traveling Vortex case."""
         print("Setting up 3D Traveling Vortex configuration...")
 
-        #################################### Grid Configuration ########################################################
-        nx = nz = 30
-        ny = 30
+        # --------------------------------------------------------------------------
+        # Grid Configuration
+        # --------------------------------------------------------------------------
+        nx = nz = 80
+        ny = 3
 
         grid_updates = {
             "ndim": 3,
@@ -275,7 +205,9 @@ class TravelingVortex3D(BaseTestCase):
         }
         self.set_grid_configuration(grid_updates)
 
-        #################################### Global Constants ##########################################################
+        # --------------------------------------------------------------------------
+        # Global Constants
+        # --------------------------------------------------------------------------
         constants_updates = {
             "gamma": 1.4,
             "R_gas": 287.4,
@@ -288,7 +220,9 @@ class TravelingVortex3D(BaseTestCase):
         }
         self.set_global_constants(constants_updates)
 
-        #################################### Boundary Conditions #######################################################
+        # --------------------------------------------------------------------------
+        # Boundary Conditions
+        # --------------------------------------------------------------------------
         # Periodic in X and Z, Wall in Y (vertical)
         self.set_boundary_condition(
             BoundarySide.LEFT, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
@@ -309,7 +243,9 @@ class TravelingVortex3D(BaseTestCase):
             BoundarySide.BACK, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC
         )
 
-        #################################### Temporal Setting ##########################################################
+        # --------------------------------------------------------------------------
+        # Temporal Setting
+        # --------------------------------------------------------------------------
         temporal_updates = {
             "CFL": 0.8,
             "dtfixed": self.dtfixed,
@@ -321,7 +257,9 @@ class TravelingVortex3D(BaseTestCase):
         }
         self.set_temporal(temporal_updates)
 
-        #################################### Model Regimes #############################################################
+        # --------------------------------------------------------------------------
+        # Model Regimes
+        # --------------------------------------------------------------------------
         regime_updates = {
             "is_nongeostrophic": self.is_nongeostrophic,
             "is_nonhydrostatic": self.is_nonhydrostatic,
@@ -331,7 +269,9 @@ class TravelingVortex3D(BaseTestCase):
         }
         self.set_model_regimes(regime_updates)
 
-        #################################### Numerics ##################################################################
+        # --------------------------------------------------------------------------
+        # Numerics
+        # --------------------------------------------------------------------------
         numerics_updates = {
             "limiter": LimiterType.AVERAGE,
             "riemann_solver": RiemannSolvers.MODIFIED_HLL,
@@ -344,18 +284,26 @@ class TravelingVortex3D(BaseTestCase):
         }
         self.set_numerics(numerics_updates)
 
-        ################################### Physics Settings ###########################################################
+        # --------------------------------------------------------------------------
+        # Physics Settings
+        # --------------------------------------------------------------------------
         cor = self.cor_f
         g = self.g
         physics_updates = {
             "wind_speed": [self.u0, self.v0, self.w0],
             "gravity_strength": (0.0, g, 0.0),  # Gravity is zero for this test case
             "coriolis_strength": cor,
-            "stratification": self.constant_stratification if not self.baroclinic else self.qg_stratification,
+            "stratification": (
+                self.constant_stratification
+                if not self.baroclinic
+                else self.qg_stratification
+            ),
         }
         self.set_physics(physics_updates)
 
-        #################################### Outputs ###################################################################
+        # --------------------------------------------------------------------------
+        # Outputs
+        # --------------------------------------------------------------------------
         output_updates = {
             "output_type": "test",
             "output_folder": "traveling_vortex_3d",
@@ -367,14 +315,18 @@ class TravelingVortex3D(BaseTestCase):
         }
         self.set_outputs(output_updates)
 
-        #################################### Diagnostics ###############################################################
+        # --------------------------------------------------------------------------
+        # Diagnostics
+        # --------------------------------------------------------------------------
         diag_updates = {
             "diag": True,
             "diag_current_run": "atmpy_travelling_vortex_3d",
         }
         self.set_diagnostics(diag_updates)
 
-        ################################################################################################################
+        # --------------------------------------------------------------------------
+        #
+        # --------------------------------------------------------------------------
         self._update_Msq()
         self._update_output_suffix()
 
@@ -383,351 +335,216 @@ class TravelingVortex3D(BaseTestCase):
             f"Output files: {self.config.outputs.output_base_name}{self.config.outputs.output_suffix}"
         )
 
-    def qg_stratification(self, y: np.ndarray):
-        """Analytical stratification profile, matching project 1."""
-        gl = self.config.global_constants
-        g_eff = self.config.physics.gravity_strength[1] / self.config.model_regimes.Msq
-        Nsq_scaled = gl.Nsq_ref * (gl.t_ref**2)
-        return np.exp(Nsq_scaled * y / g_eff)
+    # --------------------------------------------------------------------------
+    # Reference-state and radial-profile helpers
+    # --------------------------------------------------------------------------
+    def constant_stratification(self, y):
+        return traveling_vortex_stratification(y)
 
-    def constant_stratification(self, y: float) -> float:
-        """
-        Isothermal stratification for the Traveling Vortex case.
-        Returns a constant value (typically 1.0 in non-dimensional setups).
-        The argument corresponds to the vertical coordinate.
-        """
-        return 1.0
+    def qg_stratification(self, y):
+        raise NotImplementedError(
+            "This initializer is for a vertically uniform, zero-gravity vortex."
+        )
 
-    def _reshape_hydrostate_into_3D(self,variables: "Variables", mpv: "MPV", variable_1d:np.ndarray, nodal:bool = False):
-        """ Reshape the given hydrostate 1D profile into 3D by broadcasting. """
-        g_axis = self.config.physics.gravity.axis
+    def _reshape_hydrostate_into_3D(
+        self, variables, mpv, variable_1d, nodal=False
+    ):
         grid = self.config.spatial_grid.grid
-        ng_g_axis = self.config.spatial_grid.grid.ng[g_axis][0]
-        inner_slice = grid.get_inner_slice()
+        inner = grid.get_inner_slice()
+        axis = self.config.physics.gravity.axis
+        profile = np.asarray(variable_1d)[inner[axis]]
+        shape = [1, 1, 1]
+        shape[axis] = profile.size
+        target = (
+            mpv.p2_nodes[inner].shape
+            if nodal
+            else variables.cell_vars[inner + (VI.RHO,)].shape
+        )
+        return np.broadcast_to(profile.reshape(shape), target)
 
-        inner_slice_1d = slice(ng_g_axis, -ng_g_axis if ng_g_axis > 0 else None)
-        variable_1d_inner = variable_1d[inner_slice_1d]
-
-        # Reshape for broadcasting based on the gravity axis
-        reshape_dims = [1] * grid.ndim
-        reshape_dims[g_axis] = -1  # e.g., (1, -1, 1) for g_axis=1
-        variable_reshaped = variable_1d_inner.reshape(tuple(reshape_dims))
-
-        # Broadcast to the full 3D inner domain shape
-        if not nodal:
-            target_shape_3d = variables.cell_vars[inner_slice + (VI.RHO,)].shape
-        else:
-            target_shape_3d = mpv.p2_nodes[inner_slice].shape
-        variable_3D = np.broadcast_to(variable_reshaped, target_shape_3d)
-        return variable_3D
-
-    def initialize_solution(self, variables: "Variables", mpv: "MPV"):
-        """Initialize density, momentum, potential temperature, and pressure fields for 3D.
-
-        Notice the initial states are:
-
-        rho(x, y, z) = rho_c * 1/2 * (1-r^2)^6 if r <= 1 else rho_c [notice rho_c is 1/2 above]
-        u(x, y, z) = -1024 * sin(Θ) * (1-r)^6 * r^6 + u_c if r <= 1 else u_c
-        v(x, y, z) = 1024 * cos(Θ) * (1-r)^6 * r^6 + v_c if r <= 1 else v_c
-
-        therefore the tangential velocity is:
-        V_Θ = 1024 * (1-r)^6 * r^6
-
-        Radial momentum balance equation:
-        dp/dr = rho * (V_theta ^2 / r + f V_theta) with f is the CONSTANT coriolis force in the vertical direction.
-
-        ----------------------------------------------------------------------------------------------------------------
-        from Wolfram|Alpha:
-
-         Radial pressure gradient for constant density
-          (1-x)^12 * x^11 =
-                x^11 - 12 x^12 + 66 x^13 - 220 x^14 + 495 x^15 - 792 x^16 + 924 x^17 - 792 x^18 + 495 x^19 - 220 x^20
-                + 66 x^21 - 12 x^22 + x^23
-
-         Radial pressure distribution as deviation from pressure at the center for constant density
-          int_0^x ((1-y)^12 * y^11) dy
-                x^12/12 - (12 x^13)/13 + (33 x^14)/7 - (44 x^15)/3 + (495 x^16)/16 - (792 x^17)/17 + (154 x^18)/3
-                -(792 x^19)/19 + (99 x^20)/4 - (220 x^21)/21 + 3 x^22 - (12 x^23)/23 + x^24/24
-
-         Radial pressure gradient for the density variation
-          (1-x^2)^6 * (1-x)^12 * x^11 =
-                x^35 - 12 x^34 + 60 x^33 - 148 x^32 + 114 x^31 + 348 x^30 - 1076 x^29 + 900 x^28 + 1071 x^27
-                - 3128 x^26 + 2040 x^25 + 2040 x^24 - 4420 x^23 + 2040 x^22 + 2040 x^21 - 3128 x^20 + 1071 x^19
-                + 900 x^18 - 1076 x^17 + 348 x^16 + 114 x^15 - 148 x^14 + 60 x^13 - 12 x^12 + x^11
-
-         Radial pressure distribution as deviation from pressure at the center for the variable density part
-         int_0^x ((1-y^2)^6 * (1-y)^12 * y^11) dy =
-                x^12/12 - (12 x^13)/13 + (30 x^14)/7 - (148 x^15)/15 + (57 x^16)/8 + (348 x^17)/17 - (538 x^18)/9 +
-                (900 x^19)/19 + (1071 x^20)/20 - (3128 x^21)/21 + (1020 x^22)/11 + (2040 x^23)/23 - (1105 x^24)/6 +
-                (408 x^25)/5 + (1020 x^26)/13 - (3128 x^27)/27 + (153 x^28)/4 + (900 x^29)/29 - (538 x^30)/15 +
-                (348 x^31)/31 + (57 x^32)/16 - (148 x^33)/33 + (30 x^34)/17 - (12 x^35)/35 + x^36/36
-
-
-
-        """
-        print("Initializing solution for 3D Traveling Vortex...")
-
-        grid = self.config.spatial_grid.grid
-        thermo = Thermodynamics()
-        thermo.update(self.config.global_constants.gamma)
-        Msq = self.config.model_regimes.Msq
-
-        # --- Calculate Hydrostatic Base State ---
-        gravity = self.config.physics.gravity_strength
-        g_axis = self.config.physics.gravity.axis
-        mpv.state(gravity, Msq)
-        coriolis = self.config.physics.coriolis_strength[
-            self.coriolis_axis
-        ]  # Coriolis force in z-direction which is *NOT* the vertical direction
-
-        # Get slice for the full inner domain
-        inner_slice = grid.get_inner_slice()
-        inner_slice_1d = inner_slice[g_axis]
-
-        # --- Get Cell-Centered Coordinates ---
-        if grid.ndim == 3:
-            XC, YC, ZC = np.meshgrid(
-                grid.x_cells[inner_slice[0]],
-                grid.y_cells[inner_slice[1]],
-                grid.z_cells[inner_slice[2]],
-                indexing="ij",
-            )
-        else:
-            raise NotImplementedError(
-                "Traveling vortex initialization requires a 3D grid"
-            )
-
-        # --- Calculate Distance from Vortex Center in the XZ-Plane (Handling Periodicity) ---
-        Lx = grid.x_end - grid.x_start
-        Ly = grid.y_end - grid.y_start
-        Lz = grid.z_end - grid.z_start
-
-        dx = XC - self.xc
-        dz = ZC - self.zc
-
-        # Account for periodicity
+    def _radius(self, x, z, grid):
+        dx, dz = x - self.xc, z - self.zc
+        Lx, Lz = grid.x_end - grid.x_start, grid.z_end - grid.z_start
         dx = dx - Lx * np.round(dx / Lx)
         dz = dz - Lz * np.round(dz / Lz)
+        return dx, dz, np.hypot(dx, dz)
 
-        # The vortex is uniform in y, so radius is calculated only in the xz-plane
-        r_cell = np.sqrt(dx**2 + dz**2)
-        r_over_R0_cell = np.divide(r_cell, self.R0, where=self.R0 != 0)
+    def _pressure_perturbation(self, radius, coriolis):
+        """Physical pressure perturbation q=(p-p0)/Msq, on either grid."""
+        result = np.zeros_like(radius, dtype=float)
+        mask = radius < self.R0
+        s = np.asarray(radius[mask] / self.R0, dtype=np.longdouble)
 
-        # --- Calculate Tangential Velocity ---
-        uth_cell = np.zeros_like(r_cell)
-        mask_cell = (r_cell < self.R0) & (r_cell > 1e-9)
-        uth_cell[mask_cell] = (
-            self.rotdir
-            * self.fac
-            * (1.0 - r_over_R0_cell[mask_cell]) ** 6
-            * r_over_R0_cell[mask_cell] ** 6
+        def integral_difference(coefficients, first_power):
+            # Same coefficient construction on cells and nodes. Extended precision
+            # reduces cancellation in the alternating polynomial coefficients.
+            value = np.zeros_like(s)
+            for k, coefficient in enumerate(coefficients):
+                value += coefficient * (s**(first_power + k) - 1)
+            return value
+
+        amplitude = np.longdouble(self.fac * self.rotdir)
+        q = (
+            self.alpha * amplitude**2 * integral_difference(self.coe, 12)
+            + self.alpha_const
+            * coriolis
+            * amplitude
+            * self.R0
+            * integral_difference(self.coe_cor, 7)
         )
+        result[mask] = np.asarray(q, dtype=float)
+        return result
 
-        # Calculate components of the tangential basis:
-        # NOTE:
-        # The sign of geostrophic balance is flipped when the axes are x-z instead of x-y.
-        e_th_1 = dz[mask_cell] / r_cell[mask_cell]
-        e_th_2 = -dx[mask_cell] / r_cell[mask_cell]
+    # --------------------------------------------------------------------------
+    # Solution initialization
+    # --------------------------------------------------------------------------
+    def initialize_solution(self, variables: "Variables", mpv: "MPV"):
 
-        # --- Calculate Velocity Components (Perturbations in U and W) ---
-        u_pert = np.zeros_like(uth_cell)
-        w_pert = np.zeros_like(uth_cell)
-        u_pert[mask_cell] = uth_cell[mask_cell] * e_th_1
-        w_pert[mask_cell] = uth_cell[mask_cell] * e_th_2
-
-        u_background_tangential = np.zeros_like(uth_cell)
-        u_background_tangential[mask_cell] = self.u0*e_th_1 + self.v0*e_th_2
-
-        u_total = self.u0 + u_pert
-        w_total = self.w0 + w_pert
-        v_total = np.full_like(u_total, self.v0)  # v-velocity is uniform background
-
-        # --- Calculate Density ---
-        rho_pert = np.zeros_like(r_cell)
-        rho_total = np.full_like(r_cell, self.rho0)
-        mask_rho = r_cell < self.R0
-        rho_pert[mask_rho] = self.del_rho * (1.0 - r_over_R0_cell[mask_rho] ** 2) ** 6
-        rho_total[mask_rho] += rho_pert[mask_rho]
-
-        # --- Calculate Pressure Perturbation (dp2c) ---
-        dp2c = np.zeros_like(r_cell)
-        if Msq > 1e-10:
-            # Main pressure term
-            term_main = np.zeros_like(r_cell)
-            for ip, c in enumerate(self.coe):
-                term = (
-                    self.fac**2
-                    * c
-                    * (r_over_R0_cell ** (12 + ip) - 1.0)
-                    * self.rotdir**2
-                )
-                term_main[mask_rho] += term[mask_rho]
-
-            # Coriolis/Constant term
-            dp2c_const = np.zeros_like(r_cell)
-            if self.correct_distribution:
-                for ip, c in enumerate(self.coe_cor):
-                    term = (
-                        self.fac
-                        * coriolis
-                        * c
-                        * (r_over_R0_cell ** (7 + ip) - 1.0)
-                        * self.R0
-                        * self.rotdir
-                    )
-                    dp2c_const[mask_rho] += term[mask_rho]
-            else:
-                for ip, c in enumerate(self.const_coe):
-                    term = (
-                        self.fac**2
-                        * c
-                        * (r_over_R0_cell ** (12 + ip) - 1.0)
-                        * self.rotdir**2
-                    )
-                    dp2c_const[mask_rho] += term[mask_rho]
-
-            dp2c = self.alpha * term_main + self.alpha_const * dp2c_const
-        else:
-            print("Msq is near zero, pressure perturbation dp2c set to zero.")
-
-        # --- Handle rhoY (Potential Temperature * Density) ---
-        # Get ghost cell info
-
-        # Extract the 1D hydrostatic variable (it includes ghost cells)
-        rhoY0_cells_1d_full = mpv.hydrostate.cell_vars[..., HI.RHOY0]
-        rho0_1d_full = mpv.hydrostate.cell_vars[..., HI.RHO0]
-        Y0_1d_full = rhoY0_cells_1d_full / rho0_1d_full
-
-        rhoY0_cells = self._reshape_hydrostate_into_3D(variables, mpv, rhoY0_cells_1d_full)
-        rho0_cells = self._reshape_hydrostate_into_3D(variables, mpv,  rho0_1d_full)
-        Y0_cells = self._reshape_hydrostate_into_3D(variables, mpv,  Y0_1d_full)
-
-        p0 = self.p0
-
-        if self.config.model_regimes.is_compressible:
-            p_total = p0 + Msq * dp2c
-            p_total_safe = np.maximum(p_total, 1e-9)
-            rhoY_total = p_total_safe**thermo.gamminv
-        else:
-            rhoY_total = rhoY0_cells
-
-
-        # --- Assign to Cell Variables (Inner Domain Only) ---
-        variables.cell_vars[inner_slice + (VI.RHO,)] = rho_total
-        variables.cell_vars[inner_slice + (VI.RHOU,)] = rho_total * u_total
-        variables.cell_vars[inner_slice + (VI.RHOV,)] = rho_total * v_total
-        variables.cell_vars[inner_slice + (VI.RHOW,)] = rho_total * w_total
-        variables.cell_vars[inner_slice + (VI.RHOY,)] = rhoY_total
-        variables.cell_vars[inner_slice + (VI.RHOX,)] = 0.0
-########################################################################################################################
-        #############################################################################
-        # --- Calculate Nodal Pressure Perturbation p2 (Nodes, Inner Domain Only) ---
-        if grid.ndim == 3:
-            XN, YN, ZN = np.meshgrid(
-                grid.x_nodes[inner_slice[0]],
-                grid.y_nodes[inner_slice[1]],
-                grid.z_nodes[inner_slice[2]],
-                indexing="ij",
+        # --------------------------------------------------------------------------
+        # 1. Grid and physical configuration
+        # --------------------------------------------------------------------------
+        grid = self.config.spatial_grid.grid
+        if grid.ndim != 3:
+            raise ValueError("TravelingVortex3D requires a 3D grid")
+        gravity = np.asarray(self.config.physics.gravity_strength, dtype=float)
+        if np.any(gravity != 0) or self.stratified_atmosphere or self.baroclinic:
+            raise NotImplementedError(
+                "Nonzero gravity requires a joint hydrostatic/thermodynamic "
+                "initialization; this case implements the zero-gravity column."
             )
-        else:
-            raise NotImplementedError("Nodal calculation requires 3D grid")
+        wind = np.asarray(self.config.physics.wind_speed, dtype=float)
+        if wind.shape != (3,) or wind[1] != 0:
+            raise ValueError("Background wind must be horizontal for y-wall boundaries")
+        rotation = np.asarray(self.config.physics.coriolis_strength, dtype=float)
+        if rotation[0] != 0 or rotation[2] != 0:
+            raise ValueError("Coriolis vector must be along the vertical y-axis")
+        f = rotation[1]
+        if self.R0 <= 0 or self.R0 > 0.5 * min(
+            grid.x_end - grid.x_start,
+            grid.z_end - grid.z_start,
+        ):
+            raise ValueError("R0 must be positive and fit inside the periodic box")
+        if self.p0 <= 0 or min(self.rho0, self.rho0 + self.del_rho) <= 0:
+            raise ValueError("Pressure and density must be positive")
 
-        dx_node = XN - self.xc
-        dz_node = ZN - self.zc
-        dx_node = dx_node - Lx * np.round(dx_node / Lx)
-        dz_node = dz_node - Lz * np.round(dz_node / Lz)
+        # --------------------------------------------------------------------------
+        # 2. Thermodynamics and hydrostatic reference state
+        # --------------------------------------------------------------------------
+        th = Thermodynamics()
+        th.update(self.config.global_constants.gamma)
+        Msq = float(self.config.model_regimes.Msq)
+        compressible = bool(self.config.model_regimes.is_compressible)
+        if not np.isfinite(Msq) or Msq < 0 or (compressible and Msq == 0):
+            raise ValueError("Compressible initialization requires positive finite Msq")
+        self._build_pressure_coefficients()
+        mpv.state(tuple(gravity), Msq)
+        inner = grid.get_inner_slice()
 
-        r_node = np.sqrt(dx_node**2 + dz_node**2)  # Radius is in xz-plane
-        r_over_R0_node = np.divide(r_node, self.R0, where=self.R0 != 0)
-        mask_node = r_node < self.R0
-
-        # Main term
-        term_main_node = np.zeros_like(r_node)
-        for ip, c in enumerate(self.coe):
-            term = (
-                self.fac**2 * c * (r_over_R0_node ** (12 + ip) - 1.0) * self.rotdir**2
-            )
-            term_main_node[mask_node] += term[mask_node]
-
-        # Coriolis/Constant term
-        p2n_const_unscaled = np.zeros_like(r_node)
-        if self.correct_distribution:
-            for ip, c in enumerate(self.coe_cor):
-                term = (
-                    self.fac
-                    * coriolis
-                    * c
-                    * (r_over_R0_node ** (7 + ip) - 1.0)
-                    * self.R0
-                    * self.rotdir
-                )
-                p2n_const_unscaled[mask_node] += term[mask_node]
-        else:
-            for ip, c in enumerate(self.const_coe):
-                term = (
-                    self.fac**2
-                    * c
-                    * (r_over_R0_node ** (12 + ip) - 1.0)
-                    * self.rotdir**2
-                )
-                p2n_const_unscaled[mask_node] += term[mask_node]
-
-        p2_nodes_unscaled = (
-            self.alpha * term_main_node + self.alpha_const * p2n_const_unscaled
+        # --------------------------------------------------------------------------
+        # 3. Cell coordinates and vortex velocity
+        # --------------------------------------------------------------------------
+        # Cell-centered coordinates and velocity, uniform along y.
+        XC, YC, ZC = np.meshgrid(
+            grid.x_cells[inner[0]],
+            grid.y_cells[inner[1]],
+            grid.z_cells[inner[2]],
+            indexing="ij",
         )
-
-        # # --- Correctly broadcast the nodal hydrostatic state ---
-        rhoY0_nodes_1d_full = mpv.hydrostate.node_vars[..., HI.RHOY0]
-        rhoY0_nodes = self._reshape_hydrostate_into_3D(variables, mpv,  rhoY0_nodes_1d_full, nodal=True)
-
-        # rhoY0_nodes_1d_inner = rhoY0_nodes_1d_full[inner_slice_1d]
-        #
-        # reshape_dims_nodes = [1] * grid.ndim
-        # reshape_dims_nodes[g_axis] = -1
-        # rhoY0_nodes_reshaped = rhoY0_nodes_1d_inner.reshape(tuple(reshape_dims_nodes))
-        #
-        # target_shape_3d_nodes = mpv.p2_nodes[inner_slice].shape
-        # rhoY0_nodes = np.broadcast_to(rhoY0_nodes_reshaped, target_shape_3d_nodes)
+        dx, dz, radius = self._radius(XC, ZC, grid)
+        s = radius / self.R0
+        inside = radius < self.R0
+        rotating = inside & (radius > 0)
+        uth = np.zeros_like(radius)
+        uth[rotating] = (
+            self.rotdir * self.fac * s[rotating]**6 * (1 - s[rotating])**6
+        )
+        u_pert, w_pert = np.zeros_like(radius), np.zeros_like(radius)
+        u_pert[rotating] = uth[rotating] * dz[rotating] / radius[rotating]
+        w_pert[rotating] = -uth[rotating] * dx[rotating] / radius[rotating]
 
 
-        # p0 = self.p0 + self.rho0 * coriolis * (-self.w0 * dx_node + self.w0*Lx/2 + self.u0 * dz_node - self.u0*Lz/2)
-        # p0 = self.p0 + self.rho0 * coriolis * (-self.w0 * dx_node + self.u0 * dz_node)
+        # --------------------------------------------------------------------------
+        # 4. Cell density and physical-pressure perturbation
+        # --------------------------------------------------------------------------
+        rho = np.full_like(radius, self.rho0)
+        rho[inside] += self.del_rho * (1 - s[inside]**2)**6
+        dp2c = self._pressure_perturbation(radius, f)
 
-        # p0 = self.p0 + self.rho0 * coriolis * (+self.w0 * XN - self.w0*Lx/2 - self.u0 * ZN + self.u0*Lz/2)
+        # --------------------------------------------------------------------------
+        # 5. Reference thermodynamic fields
+        # --------------------------------------------------------------------------
+        # Reference P = rho*theta on cells and nodes.
+        P0c = self._reshape_hydrostate_into_3D(
+            variables, mpv, mpv.hydrostate.cell_vars[..., HI.RHOY0]
+        )
+        P0n = self._reshape_hydrostate_into_3D(
+            variables, mpv, mpv.hydrostate.node_vars[..., HI.RHOY0], nodal=True
+        )
+        expected_P0 = self.p0**(1 / th.gamma)
+        if (
+            not np.allclose(P0c, expected_P0, rtol=1e-10, atol=1e-12)
+            or not np.allclose(P0n, expected_P0, rtol=1e-10, atol=1e-12)
+        ):
+            raise ValueError("Hydrostate P0 must match the constant background p0")
 
-        p0 = self.p0
-
-        # p_total_nodes = p0 + Msq * p2_nodes_unscaled
-        # rhoY0_nodes = p_total_nodes**thermo.gamminv
-
-
-        rho_pert = np.zeros_like(r_node)
-        mask_rho = r_node < self.R0
-        rho_pert[mask_rho] = self.del_rho * (1.0 - r_over_R0_node[mask_rho] ** 2) ** 6
-
-        if self.stratified_atmosphere:
-            # The hydrostatic pressure perturbation (vertical balance)
-            p_hydrostatic_pert_n = mpv.integrate_density_hydrostatically(rho_pert, gravity)
-            p2_nodes_unscaled += p_hydrostatic_pert_n
-            rhoY0_nodes = self._reshape_hydrostate_into_3D(variables, mpv, rhoY0_nodes_1d_full, nodal=True)
-
-            mpv.p2_nodes[inner_slice] = thermo.Gamma * np.divide(
-                p2_nodes_unscaled, rhoY0_nodes, where=rhoY0_nodes != 0
-            )
-
-            # mpv.p2_nodes[inner_slice] = pi_pert_nodes
-
+        # --------------------------------------------------------------------------
+        # 6. Regime-specific cell thermodynamics
+        # --------------------------------------------------------------------------
+        if compressible:
+            p_cells = self.p0 + Msq * dp2c
+            if np.any(p_cells <= 0):
+                raise ValueError("Vortex produces non-positive cell pressure")
+            P = p_cells**(1 / th.gamma)
         else:
-            if self.is_compressible:
-                p_total_nodes = p0 + Msq * p2_nodes_unscaled
-                p_total_nodes_safe = np.maximum(p_total_nodes, 1e-9)
-                rhoY0_nodes = p_total_nodes_safe**thermo.gamminv
+            P = P0c
 
-            mpv.p2_nodes[inner_slice] = thermo.Gamma * np.divide(
-                p2_nodes_unscaled, rhoY0_nodes, where=rhoY0_nodes != 0
+        # --------------------------------------------------------------------------
+        # 7. Assign cell variables
+        # --------------------------------------------------------------------------
+        variables.cell_vars[inner + (VI.RHO,)] = rho
+        variables.cell_vars[inner + (VI.RHOU,)] = rho * (wind[0] + u_pert)
+        variables.cell_vars[inner + (VI.RHOV,)] = rho * wind[1]
+        variables.cell_vars[inner + (VI.RHOW,)] = rho * (wind[2] + w_pert)
+        variables.cell_vars[inner + (VI.RHOY,)] = P
+        # Zero gravity: this buoyancy variable has no dynamical effect.
+        variables.cell_vars[inner + (VI.RHOX,)] = 0.0
+
+        # --------------------------------------------------------------------------
+        # 8. Nodal pressure initialization
+        # --------------------------------------------------------------------------
+        # Nodal pressure: same physical q profile, evaluated at node coordinates.
+        XN, YN, ZN = np.meshgrid(
+            grid.x_nodes[inner[0]],
+            grid.y_nodes[inner[1]],
+            grid.z_nodes[inner[2]],
+            indexing="ij",
+        )
+        _, _, radius_nodes = self._radius(XN, ZN, grid)
+        p2_nodes_unscaled = self._pressure_perturbation(radius_nodes, f)
+        if compressible:
+            relative_dp = Msq * p2_nodes_unscaled / self.p0
+            if np.any(relative_dp <= -1):
+                raise ValueError("Vortex produces non-positive nodal pressure")
+            # Exact pi2 = [(p0 + Msq*q)**Gamma - p0**Gamma]/Msq.
+            mpv.p2_nodes[inner] = (
+                self.p0**th.Gamma
+                * np.expm1(th.Gamma * np.log1p(relative_dp))
+                / Msq
             )
+        else:
+            mpv.p2_nodes[inner] = th.Gamma * p2_nodes_unscaled / P0n
 
-        logging.info("3D solution initialization complete.")
-
-
-
+        # --------------------------------------------------------------------------
+        # 9. Completion
+        # --------------------------------------------------------------------------
+        # Ghost cells are filled by the normal boundary-manager startup sequence.
+        logging.info(
+            "3D vortex initialized: compressible=%s, alpha=%g, "
+            "alpha_const=%g, fac=%g, R0=%g, f=%g",
+            compressible,
+            self.alpha,
+            self.alpha_const,
+            self.fac,
+            self.R0,
+            f,
+        )

@@ -152,6 +152,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         method based on Benacchio & Klein (2019).
         """
         global_time_step_num = kwargs.pop("global_step")
+        initial_projection = kwargs.pop("initial_projection")
 
         logging.info(
             f"--- Starting time step {global_time_step_num} with dt = {self.dt} ---"
@@ -165,6 +166,8 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
         self._predictor_step(self.dt, initial_vars_arr, global_time_step_num)
         # After this, self.flux contains (Pv)^{n+1/2}
         # self.variables contains Sol^{n+1/2} and self.mpv.p2_nodes contains p^{n+1/2} (these are intermediate)
+        if initial_projection:
+            return
 
         ######################### Corrector Stage: Advance state from t^n to t^{n+1} ###################################
         self._corrector_step(self.dt, initial_vars_arr, global_time_step_num)
@@ -461,7 +464,7 @@ class IMEXTimeIntegrator(AbstractTimeIntegrator):
 
         ############################ 6. Solve the elliptic helmholtz equation ##########################################
         rtol = 1.0e-8
-        max_iter = 1000
+        max_iter = 3000
         p2_inner_flat, solver_info = self.pressure_solver.solve_helmholtz(
             rhs_flat,
             dt,

@@ -7,8 +7,8 @@ from pathlib import Path
 # USER CONFIGURATION
 # ==========================================
 BASE_DIR = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/_baroclinic_qg_vortex_40_10_40"
-FILE_FC = f"{BASE_DIR}_N_10_f_100_QG_off_bgVel_0.nc"
-FILE_QG = f"{BASE_DIR}_N_10_f_100_QG_on_bgVel_0.nc"
+FILE_FC = f"{BASE_DIR}_N_1_cor_1000_QG_off_p_5_Hfac_2.nc"
+FILE_QG = f"{BASE_DIR}_N_1_cor_1000_QG_on_p_5_Hfac_2.nc"
 
 VAR_NAME = 'p2_nodes'
 VAR_LABEL = r"Error in $\pi'$ ($FC - QG$)"

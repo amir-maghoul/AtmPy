@@ -113,14 +113,15 @@ class Solver:
         solver_saver.handle_saving(self)
         self._initial_save_completed = True
 
-        if self.config.numerics.initial_projection:
+        initial_projection = self.config.numerics.initial_projection
+        if initial_projection:
             compressibility = self.time_integrator.is_compressible
             geostrophic = self.time_integrator.is_nongeostrophic
             hydrostatic = self.time_integrator.is_nonhydrostatic
             self.time_integrator.is_compressible = False
             self.time_integrator.is_nongeostrophic = True
             self.time_integrator.is_nonhydrostatic = True
-            self.time_integrator.step(global_step=self.current_step)
+            self.time_integrator.step(global_step=self.current_step, initial_projection=initial_projection)
             self.time_integrator.is_compressible = compressibility
             self.time_integrator.is_nongeostrophic = geostrophic
             self.time_integrator.is_nonhydrostatic = hydrostatic
@@ -191,7 +192,7 @@ class Solver:
 
             step_start_time = time.time()
             try:
-                self.time_integrator.step(global_step=self.current_step)
+                self.time_integrator.step(global_step=self.current_step, initial_projection=False)
             except Exception as e:
                 logging.error(
                     f"Error during step {self.current_step + 1} (t={self.current_t + current_dt:.4f}): {e}",

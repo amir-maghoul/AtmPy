@@ -16,6 +16,7 @@ CASE_CHOICES = [
     "SineWaveAdvection1D",
     "InertialGravityWaves",
     "InertialGravityLongWaves",
+    "ThermalWind3D",
 ]
 DEFAULT_DEBUG_PORT = 5678  # Default port for PyCharm debugger
 

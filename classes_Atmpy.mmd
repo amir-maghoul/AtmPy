@@ -1,0 +1,1007 @@
+classDiagram
+  class AbstractDiscreteOperator {
+    boundary_manager : str
+    boundary_operations : Optional[List[ExtraBCOperation]]
+    grid : str
+    divergence(vector: np.ndarray)*
+    gradient(p: np.ndarray)* Tuple[np.ndarray, np.ndarray, np.ndarray]
+  }
+  class AbstractPressureSolver {
+    Msq : float
+    coriolis : str
+    discrete_operator : str
+    linear_solver : str
+    precon_apply : Callable
+    precondition_type : str
+    th : str
+    vertical_momentum_index : int
+  }
+  class AbstractTimeIntegrator {
+    get_dt()*
+    step()*
+  }
+  class AdvectionRoutines {
+    name
+  }
+  class BCApplicationContext {
+    is_nodal : bool
+  }
+  class BCInstantiationOptions {
+    direction : str
+    gravity : Tuple[float]
+    grid : str
+    is_compressible : bool
+    mpv : Optional['MPV']
+    mpv_boundary_type : Optional['BdryType']
+    side : str
+    stratification
+    thermodynamics
+    type : str
+  }
+  class BaroclinicQGVortex {
+    H_frac : float
+    Nsq_ref : float
+    R0 : float
+    baroclinic : bool
+    boxsize : float
+    checkpoint_freq : int
+    coriolis_strength : float
+    dtfixed : float
+    dtfixed0 : NoneType
+    g : float
+    h_ref : float
+    h_scale : float
+    initial_projection : bool
+    is_compressible : int
+    is_nongeostrophic : int
+    is_nonhydrostatic : int
+    output_freq : int
+    p0 : float
+    p_amp : float
+    rossby_adjustment : float
+    size : float
+    sponge_amplitude : float
+    sponge_axis : list
+    sponge_layer : bool
+    sponge_power : int
+    sponge_width : int
+    stepmax : int
+    stratified_atmosphere : bool
+    t_ref : float
+    tmax : float
+    u0 : float
+    v0 : float
+    w0 : float
+    xc : float
+    y_boxscale : float
+    yc : float
+    zc : float
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    qg_stratification(y: np.ndarray)
+    setup()
+  }flowchart TD
+    A[Christmas] -->|Get money| B(Go shopping)
+    B --> C{Let me think}
+    C -->|One| D[Laptop]
+    C -->|Two| E[iPhone]
+    C -->|Three| F[fa:fa-car Car]
+
+  class BaroclinicQGVortex {
+    CFL : float
+    CHECKPOINT_INTERVAL_SECONDS : float
+    GHOST_CELLS : int
+    H_scale
+    MIN_DOMAIN_RADII : float
+    MIN_GRID_COUNT : int
+    MIN_HORIZONTAL_WAVE_POINTS : int
+    MIN_STEP_LIMIT : int
+    MIN_VERTICAL_WAVE_POINTS : int
+    N_s : float
+    Nsq_ref
+    R0
+    R_gas : float
+    STEP_LIMIT_HEADROOM : int
+    T_ref : float
+    add_unbalanced_anomaly : bool
+    anomaly_horizontal_mode : int
+    anomaly_kind : str
+    anomaly_vertical_mode : int
+    applied_thermal_anomaly_max_abs_K : float
+    baroclinic : bool
+    center_height_m : float
+    checkpoint_freq
+    coriolis_strength
+    domain_height_m : float
+    domain_width_m : float
+    dt_seconds : float
+    dtfixed
+    dtfixed0 : NoneType
+    duration_hours : float
+    f_s : float
+    g : NoneType
+    g_ms2 : float
+    gamma : float
+    h_ref : float
+    half_depth_m : float
+    initial_balance_residuals
+    initial_diagnostics : dict
+    initial_projection : bool
+    is_compressible : int
+    is_nongeostrophic : int
+    is_nonhydrostatic : int
+    mode : str
+    output_freq
+    output_interval_seconds : float
+    p_amp : NoneType, float
+    p_ref : float
+    radius_m : float
+    resolution : tuple
+    stepmax
+    stratified_atmosphere : bool
+    t_ref : float
+    target_wind_ms : float
+    thermal_anomaly_K : float
+    tmax
+    u0 : float
+    v0 : float
+    velocity_ref : float
+    w0 : float
+    xc : float
+    yc
+    zc : float
+    dimensional_fields(variables: 'Variables')
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    qg_stratification(y)
+    setup()
+  }
+  class BarotropicEOS {
+    K : float
+    gamma : float
+    pressure()
+    sound_speed()
+  }
+  class BaseBoundaryCondition {
+    application_priority
+    direction : int
+    direction_str
+    full_inner_slice : List[Tuple[int, int]]
+    grid : str
+    ndim : int
+    ng : Tuple[int, int]
+    pad_width
+    side
+    side_axis : int
+    type
+    apply(cell_vars)*
+    apply_extra(variable: np.ndarray, operation: 'ExtraBCOperation')* None
+    apply_single_variable(variable: np.ndarray, context: 'BCApplicationContext')*
+    padded_slices() Tuple[slice, ...]
+  }
+  class BaseTestCase {
+    config : SimulationConfig
+    name : str
+    initialize_solution(variables: 'Variables', mpv: 'MPV')*
+    set_boundary_condition(boundary_side: BoundarySide, main_type: BdryType, mpv_type: Optional[BdryType])
+    set_boundary_conditions(bc_updates: Dict[BoundarySide, Tuple[BdryType, Optional[BdryType]]])
+    set_diagnostics(diagnostics_updates: dict)
+    set_global_constants(global_constant_updates: Dict[str, float])
+    set_grid_configuration(grid_updates: Dict[str, Any])
+    set_model_regimes(model_regime_updates: dict)
+    set_numerics(numerics_updates: dict)
+    set_outputs(output_updates: dict)
+    set_physics(physics_updates: dict)
+    set_temporal(temporal_updates: Dict[str, Any])
+    setup()*
+  }
+  class BiCGStabSolver {
+    iterations_ : int
+    solve(A: 'np.ndarray', b: 'np.ndarray', rtol: float, max_iter: int, M: 'np.ndarray', x0: 'np.ndarray')
+  }
+  class BoundaryConditions {
+    name
+  }
+  class BoundaryConditionsConfiguration {
+    options : List[BCInstantiationOptions]
+    sponge_config : Optional['SpongeLayerConfig']
+  }
+  class BoundaryManager {
+    boundary_conditions : Dict[BdrySide, 'BaseBC']
+    mpv_boundary_conditions : Dict[BdrySide, 'BaseBC']
+    sponge_config
+    apply_boundary_on_all_sides(cells: 'np.ndarray')
+    apply_boundary_on_direction(cells: 'np.ndarray', direction: str)
+    apply_boundary_on_one_side(cells: 'np.ndarray', side: BdrySide)
+    apply_boundary_on_single_var_all_sides(variable: 'np.ndarray', contexts: List['BCApplicationContext'])
+    apply_boundary_on_single_var_direction(variable: 'np.ndarray', direction: str, contexts: List['BCApplicationContext'])
+    apply_boundary_on_single_var_one_side(variable: 'np.ndarray', side: 'BdrySide', contexts: List['BCApplicationContext'])
+    apply_extra(variable: 'np.ndarray', side: 'BdrySide', operations: List['ExtraBCOperation'], target_mpv: bool) None
+    apply_extra_all_sides(variable: 'np.ndarray', operations: List['ExtraBCOperation'], target_mpv: bool) None
+    apply_pressure_boundary_on_all_sides(mpv_vars: 'np.ndarray')
+    apply_pressure_boundary_on_direction(mpv_vars: 'np.ndarray', direction: str)
+    apply_pressure_boundary_on_one_side(mpv_vars: 'np.ndarray', side: BdrySide)
+    apply_sponge_layer(cell_vars: 'np.ndarray')
+    setup_conditions(bc_config: 'BoundaryConditionsConfiguration') None
+  }
+  class BoundarySide {
+    name
+    opposite
+  }
+  class ClassicalDiscreteOperator {
+    divergence(vector: np.ndarray) np.ndarray
+    gradient(p: np.ndarray) Tuple[np.ndarray, np.ndarray, np.ndarray]
+  }
+  class CoriolisOperator {
+    coriolis_inverse_kernel : Callable
+    gravity : str
+    strength : ndarray
+    apply_inverse_for_helmholtz_operator(Pu: np.ndarray, Pv: np.ndarray, Pw: np.ndarray, variables: 'Variables', mpv: 'MPV', is_nongeostrophic: bool, is_nonhydrostatic: bool, Msq: float, dt: float) None
+    apply_inverse_for_momentum_state(U: np.ndarray, V: np.ndarray, W: np.ndarray, variables: 'Variables', mpv: 'MPV', is_nongeostrophic: bool, is_nonhydrostatic: bool, Msq: float, dt: float) None
+  }
+  class CoriolisUse {
+    name
+  }
+  class DimensionSpec {
+    end : float
+    n : int
+    ng : int
+    start : float
+  }
+  class DiscreteOperators {
+    name
+  }
+  class DiscreteOperatorsContext {
+    boundary_manager : str
+    boundary_operations : Optional[List[ExtraBCOperation]]
+    grid : str
+    operator_type : str
+    instantiate() TDiscreteOperator
+  }
+  class EOS {
+    pressure()* np.ndarray
+    sound_speed()* np.ndarray
+  }
+  class ExnerBasedEOS {
+    R : int
+    cp : float
+    cv : float
+    gamma : float
+    p_ref : float
+    pressure()
+    sound_speed()
+  }
+  class ExtraBCOperation {
+    target_side
+    target_type : Optional[BdryType]
+    get_identifier()* str
+    get_target_description() str
+  }
+  class Flux {
+    eos : str
+    flux : dict
+    grid : str
+    kernels : list
+    limiter
+    ndim
+    reconstruction
+    riemann_solver
+    variables
+    apply_reconstruction(lmbda: float, direction: str) Tuple[Variables, Variables]
+    apply_riemann_solver(lmbda: float, direction: str) None
+    compute_averaging_fluxes() None
+  }
+  class FluxReconstructions {
+    name
+  }
+  class GMRESSolver {
+    iterations_ : int
+    solve(A: 'np.ndarray', b: 'np.ndarray', rtol: float, max_iter: int, M: 'np.ndarray', x0: 'np.ndarray')
+  }
+  class Gravity {
+    axis : int
+    direction : str
+    ndim : int
+    perpendicular_momentum_index : RHOW
+    strength : float
+    vector : ndarray
+    vertical_momentum_index : RHOV
+    get_coordinate_cells(grid: 'Grid')
+    horizontal_momentum_indices()
+  }
+  class Grid {
+    cshape : Tuple[int, ...], tuple
+    dx : float
+    dxyz : List[float]
+    dy : float
+    dz : float
+    grid_type : str
+    icshape : Tuple[int, ...], tuple
+    inner_slice : list
+    inner_slice_x : slice
+    inner_slice_y : slice
+    inner_slice_z : slice
+    inshape : Tuple[int, ...], tuple
+    nc : List[int, ...]
+    ncx_total : int
+    ncy_total : int
+    ncz_total : int
+    ndim : int
+    ng : List[Tuple[int, int]]
+    ngx : int
+    ngy : Optional[int]
+    ngz : Optional[int]
+    nnx_total : int
+    nny_total : int
+    nnz_total : int
+    normal_x : ndarray
+    normal_y : ndarray
+    normal_z : ndarray
+    nshape : Tuple[int, ...], tuple
+    nx : int
+    ny : Optional[int]
+    nz : Optional[int]
+    x_cells : ndarray
+    x_end : float
+    x_nodes : ndarray
+    x_start : float
+    y_cells : ndarray
+    y_end : Optional[float]
+    y_nodes : ndarray
+    y_start : Optional[float]
+    z_cells : ndarray
+    z_end : Optional[float]
+    z_nodes : ndarray
+    z_start : Optional[float]
+    compute_normals()
+    evaluate_function_on_cells(func)
+    evaluate_function_on_nodes(func)
+    get_boundary_cells() Tuple[slice, ...]
+    get_boundary_nodes() Tuple[slice, ...]
+    get_cell_coordinates(axis)
+    get_inner_slice() Tuple[slice, ...]
+    get_node_coordinates(axis)
+    get_total_number_of_cells(axis)
+  }
+  class HydrostateIndices {
+    name
+  }
+  class HydrostaticStateND {
+    S0 : ndarray
+    p0 : ndarray
+    p20 : ndarray
+    p20_nodes : ndarray
+    rhoY0 : ndarray
+  }
+  class ILinearSolver {
+    solve(A: 'np.ndarray', b: 'np.ndarray', rtol: float, max_iter: int, M: 'np.ndarray', x0: 'np.ndarray')*
+  }
+  class IMEXTimeIntegrator {
+    Msq : float
+    advection_routine : Callable
+    boundary_manager : str
+    coriolis : str
+    discrete_operator : str
+    dt : float
+    first_order_advection_routine
+    flux : str
+    gravity : str
+    grid : str
+    is_compressible : bool
+    is_nongeostrophic : bool
+    is_nonhydrostatic : bool
+    mpv : str
+    ndim
+    pressure_solver : str
+    qg_filter : float
+    qg_filter_number : int
+    second_order_advection_routine
+    th : str
+    variables : str
+    vertical_momentum_index
+    wind_speed : ndarray
+    backward_update_explicit(dt: float)
+    backward_update_implicit(dt: float, initial_vars: np.ndarray)
+    forward_update(dt: float) None
+    geostrophic_nudge(dt: float, Y: np.ndarray)
+    get_dt()*
+    step() None
+  }
+  class IdealGasEOS {
+    gamma : float
+    pressure()
+    sound_speed()
+  }
+  class InertialGravityLongWaves {
+    href : float
+    scale_factor : float
+    tref : float
+    u0 : float
+    v0 : float
+    w0 : float
+    xc : float
+    inertial_gravity_waves_stratification(y: float) float
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    molly_function(x: float)
+    setup()
+  }
+  class InertialGravityWaves {
+    correct_distribution : bool
+    scale_factor : float
+    u0 : float
+    v0 : float
+    w0 : float
+    xc : float
+    inertial_gravity_waves_stratification(y: float) float
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    molly_function(x: float)
+    setup()
+  }
+  class InflowBoundary {
+    apply(cell_vars)*
+  }
+  class InletMassFlowCorrection {
+    relaxation : float
+    target_mass_flow : float
+    get_identifier() str
+  }
+  class IterationCounter {
+    count : int
+    residuals : list
+  }
+  class LinearSolvers {
+    name
+  }
+  class MPV {
+    Pu : ndarray
+    Pv : ndarray
+    Pw : ndarray
+    direction : int
+    direction_str : str
+    dp2_cells : ndarray
+    dp2_nodes : ndarray
+    grid : str
+    grid1D
+    hydrostate
+    p0 : float
+    p00 : float
+    p2_cells : ndarray
+    p2_nodes : ndarray
+    p2_nodes0 : ndarray
+    rhs : ndarray
+    wcenter : ndarray
+    wplus : ndarray
+    compute_dS_on_nodes()
+    compute_hydrostate_from_profile(Y_cells_nd: np.ndarray, Y_nodes_nd: np.ndarray, gravity_strength: Union[np.ndarray, list, tuple], Msq: float)
+    compute_hydrostate_from_profile3D(Y_cells: np.ndarray, Y_nodes: np.ndarray, gravity_strength: tuple, Msq: float) HydrostaticStateND
+    correct_initial_pressure(main_vars: 'Variables', Msq: float)
+    correct_initial_pressure3D(variables: 'Variables', Msq: float, g)
+    get_S0c_on_cells()
+    integrate_density_hydrostatically(rho_field_3d: np.ndarray, gravity_strength: np.ndarray) np.ndarray
+    set_rhs_to_zero()
+    state(gravity_strength: Union[np.ndarray, list, tuple], Msq: float)
+  }
+  class NetCDFWriter {
+    add_time_dim : bool
+    config : str
+    ds : NoneType, Optional[netCDF4.Dataset]
+    filename : str
+    grid : str
+    is_checkpoint : bool
+    mode : str
+    close()
+    define_variable(var_name: str, dimensions: Tuple[str, ...], dtype: type, attributes: Optional[Dict[str, Any]], zlib: bool, complevel: int) Optional[netCDF4.Variable]
+    write_snapshot_data(data_dict: Dict[str, np.ndarray], global_attributes: Optional[Dict[str, Any]])
+    write_timestep_data(sim_time: float, data_dict: Dict[str, np.ndarray])
+  }
+  class NonReflectiveOutlet {
+    apply(cell_vars)*
+  }
+  class OutflowBoundary {
+    apply(cell_vars)*
+  }
+  class PeriodicAdjustment {
+    factor : float
+    target_type : PERIODIC
+    get_identifier() str
+  }
+  class PeriodicBoundary {
+    inner_slice
+    apply(cell_vars: np.ndarray)
+    apply_extra(variable: np.ndarray, operation: 'ExtraBCOperation') None
+    apply_single_variable(variable: np.ndarray, context: 'BCApplicationContext')
+    bisided_pad_width()
+    inner_and_padded_slices(full, nodal) Tuple[slice, ...]
+    periodic_nodal_condition(variable)
+  }
+  class Preconditioners {
+    name
+  }
+  class PressureContext {
+    extra_dependencies : Dict[str, Any]
+    linear_solver_type : str
+    op_context
+    precondition_type : str
+    solver_type : str
+    instantiate() TPressureSolver
+  }
+  class PressureSolvers {
+    name
+  }
+  class PrimitiveVariableIndices {
+    name
+  }
+  class ReflectiveGravityBoundary {
+    application_priority
+    facet : str
+    gravity
+    is_compressible : bool
+    mpv : str
+    stratification : Callable[[Any], Any]
+    th : str
+    apply(cell_vars: np.ndarray)
+    apply_extra(variables: np.ndarray, operation: 'ExtraBCOperation') None
+    apply_single_variable(variable: np.ndarray, context: 'BCApplicationContext')*
+  }
+  class RiemannSolvers {
+    name
+  }
+  class RisingBubble {
+    del_theta_k : float
+    r0_bubble : float
+    xc_bubble : float
+    yc_bubble : float
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    setup()
+  }
+  class SineWaveAdvection1D {
+    advection_speed : float
+    amplitude : float
+    background_rho : float
+    background_rhoY : float
+    wavelength : float
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    setup()
+  }
+  class SlopeLimiters {
+    name
+  }
+  class Solver {
+    checkpoint_filename : str
+    checkpoint_frequency_steps : int
+    checkpoint_keep_n : int
+    config : str
+    current_step : int
+    current_t : float
+    dt : float
+    enable_checkpointing : bool
+    grid : str
+    mpv : str
+    output_filename : str
+    output_frequency_steps : int
+    reset_output : bool
+    start_time_wall : float
+    stepmax : int
+    time_integrator : str
+    tmax : float
+    tout : ndarray
+    variables : str
+    load_checkpoint_data(filename: str) Dict[str, Any]
+    run() None
+  }
+  class SpongeLayer {
+    amplitude : float
+    apply_on_axes : List[int]
+    power : int
+    width : int
+    get_identifier() str
+  }
+  class TFQMRSolver {
+    iterations_ : int
+    solve(A: 'np.ndarray', b: 'np.ndarray', rtol: float, max_iter: int, M: 'np.ndarray', x0: 'np.ndarray')
+  }
+  class ThermalWind3D {
+    H_scale : float
+    N_s : float
+    Nsq_ref : float
+    R_gas : float
+    T_ref : float
+    acoustic_cfl : bool
+    altitude_offset_m : float
+    checkpoint_freq
+    coriolis_strength : float
+    dt_seconds : float
+    dtfixed
+    dtfixed0 : NoneType
+    duration_hours : float
+    f_s : float
+    g : NoneType
+    g_ms2 : float
+    gamma : float
+    h_ref : float
+    half_depth_m : float
+    height_m : float
+    initial_diagnostics : dict
+    initial_projection : bool
+    is_compressible : int
+    is_nongeostrophic : int
+    is_nonhydrostatic : int
+    mode : str
+    output_freq
+    p_amp : NoneType, float
+    p_ref : float
+    resolution : tuple
+    stepmax
+    t_ref : float
+    target_shear_wind_ms : float
+    tmax
+    u0 : float
+    v0 : float
+    velocity_ref : float
+    w0 : float
+    x_length_m : float
+    yc : float
+    z_length_m : float
+    zc : float
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    measure_drift(variables: 'Variables', mpv: 'MPV')
+    setup()
+    thermal_wind_stratification(y)
+  }
+  class Thermodynamics {
+    Gamma : float
+    Gammainv : float
+    gamma : float
+    gamminv : float
+    gm1 : float
+    gm1inv : float
+    update(gamma: float)
+  }
+  class TimeIntegratorContext {
+    boundary_manager : str
+    dt : float
+    extra_dependencies : Dict[str, Any]
+    first_order_advection_routine : str
+    flux : str
+    grid : str
+    integrator_type
+    second_order_advection_routine : str
+    variables : str
+    instantiate() TTimeIntegrator
+  }
+  class TimeIntegrators {
+    name
+  }
+  class TravelingVortex {
+    R0 : float
+    alpha : float, int
+    alpha_const : float, int
+    coe : ndarray
+    coe_cor : ndarray
+    coe_cor_correct : ndarray
+    coe_correct : ndarray
+    coe_d : ndarray
+    coe_d_correct : ndarray
+    coe_incorrect : ndarray
+    const_coe : ndarray
+    const_coe_correct : ndarray
+    const_coe_incorrect : ndarray
+    cor_f : list
+    coriolis_axis : int
+    correct_distribution : bool
+    del_rho : float
+    fac : float
+    p0 : float
+    rho0 : float
+    rotdir : float
+    u0 : float
+    v0 : float
+    w0 : float
+    xc : float
+    yc : float
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    setup()
+  }
+  class TravelingVortex3D {
+    R0 : float
+    acoustic_cfl : bool
+    alpha : float
+    alpha_const : float
+    baroclinic : bool
+    boxsize : float
+    checkpoint_freq : int
+    coe : ndarray
+    coe_cor : ndarray
+    coe_cor_correct : ndarray
+    coe_correct : ndarray
+    coe_d : ndarray
+    coe_d_correct : ndarray
+    coe_rho : ndarray
+    const_coe : ndarray
+    const_coe_correct : ndarray
+    cor_f : list
+    coriolis_axis : int
+    correct_distribution : bool
+    del_rho : float
+    dtfixed : float
+    dtfixed0 : NoneType
+    fac : float
+    g : float
+    h_ref : float
+    initial_projection : bool
+    is_compressible : int
+    is_nongeostrophic : int
+    is_nonhydrostatic : int
+    maxstep : int
+    output_freq : int
+    p0 : float
+    qg_filter : float
+    qg_filter_number : int
+    rho0 : float
+    rotdir : float
+    size : int
+    stratified_atmosphere : bool
+    t_ref : float
+    tmax : float
+    u0 : float
+    v0 : float
+    w0 : float
+    xc : float
+    yc : float
+    zc : float
+    constant_stratification(y: float) float
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    qg_stratification(y: np.ndarray)
+    setup()
+  }
+  class TravelingVortex3D {
+    R0
+    acoustic_cfl : bool
+    alpha : float
+    alpha_const : float
+    baroclinic : bool
+    boxsize
+    checkpoint_freq : int
+    coe : ndarray
+    coe_cor : ndarray
+    coe_cor_correct
+    coe_correct
+    cor_f : list
+    coriolis_axis : int
+    correct_distribution : bool
+    del_rho : float
+    dtfixed : float
+    dtfixed0 : NoneType
+    fac : float
+    g : float
+    h_ref : float
+    initial_projection : bool
+    is_compressible : int
+    is_nongeostrophic : int
+    is_nonhydrostatic : int
+    maxstep
+    output_freq : int
+    p0 : float
+    qg_filter : float
+    qg_filter_number : int
+    rho0 : float
+    rotdir : float
+    size : float
+    stratified_atmosphere : bool
+    t_ref : float
+    tmax : float
+    u0 : float
+    v0 : float
+    w0 : float
+    xc : float
+    yc : float
+    zc : float
+    constant_stratification(y)
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    qg_stratification(y)*
+    setup()
+  }
+  class TravelingVortexQG {
+    H_frac : float
+    Nsq_ref : float
+    R0 : float
+    baroclinic : bool
+    boxsize : float
+    checkpoint_freq : int
+    coriolis_strength : float
+    dtfixed : float
+    dtfixed0 : NoneType
+    g : float
+    h_ref : float
+    h_scale : float
+    initial_projection : bool
+    is_compressible : int
+    is_nongeostrophic : int
+    is_nonhydrostatic : int
+    output_freq : int
+    p0 : float
+    p_amp : float
+    rossby_adjustment : float
+    size : float
+    sponge_amplitude : float
+    sponge_axis : list
+    sponge_layer : bool
+    sponge_power : int
+    sponge_width : int
+    stepmax : int
+    stratified_atmosphere : bool
+    t_ref : float
+    tmax : float
+    u0 : float
+    v0 : float
+    w0 : float
+    xc : float
+    y_boxscale : float
+    yc : float
+    zc : float
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    qg_stratification(y: np.ndarray)
+    setup()
+  }
+  class TravelingVortexQG {
+    H_frac : float
+    Nsq_ref : float
+    R0 : float
+    baroclinic : bool
+    boxsize : float
+    coriolis_strength : int
+    dtfixed : float
+    dtfixed0 : NoneType
+    g : float
+    h_ref : float
+    h_scale : int
+    is_compressible : int
+    is_nongeostrophic : int
+    is_nonhydrostatic : int
+    output_freq : int
+    p0 : float
+    p_amp : float
+    size : float
+    stratified_atmosphere : bool
+    t_ref : float
+    tmax : float
+    u0 : float
+    v0 : float
+    w0 : float
+    xc : float
+    y_boxscale : float
+    yc : float
+    zc : float
+    constant_stratification(y: np.ndarray)
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    qg_stratification(y: np.ndarray)
+    setup()
+  }
+  class VariableIndices {
+    name
+  }
+  class Variables {
+    cell_vars : ndarray
+    grid : str
+    ndim : int
+    node_vars : ndarray
+    num_vars_cell : int
+    num_vars_node : int
+    primitives : ndarray
+    adjust_background_wind(wind_speeds: Union[np.ndarray, list], scale: float, in_place: bool) np.ndarray
+    get_cell_vars()
+    get_node_vars()
+    print_debug_info()
+    to_conservative(rho: np.ndarray) None
+    to_primitive(eos)
+    update_cell_vars(new_values)
+    update_node_vars(new_values)
+  }
+  class Wall {
+    inner_slice
+    apply(cell_vars: np.ndarray)
+    apply_extra(variables: np.ndarray, operation: 'ExtraBCOperation') None
+    apply_single_variable(variable: np.ndarray, context: 'BCApplicationContext')
+  }
+  class WallAdjustment {
+    coeff : bool
+    factor : float
+    get_identifier() str
+  }
+  class WallFluxCorrection {
+    factor : float
+    get_identifier() str
+  }
+  class WallVariableZeroOut {
+    factor : int
+    get_identifier() str
+  }
+  class ZonalJetStream {
+    acoustic_cfl : bool
+    boxsize : int
+    cor_f : list
+    coriolis_axis : int
+    dtfixed : float
+    dtfixed0 : NoneType
+    g : float
+    is_compressible : int
+    is_nongeostrophic : int
+    is_nonhydrostatic : int
+    jet_U_max : float
+    jet_center_z : float
+    jet_width : float
+    output_freq : int
+    p0 : float
+    qg_filter : float
+    qg_filter_number : int
+    rho0 : float
+    size : int
+    stratification : bool
+    t_ref : float
+    tmax : float
+    initialize_solution(variables: 'Variables', mpv: 'MPV')
+    setup()
+  }
+  class _InitialState {
+    inverse_theta_anomaly : ndarray
+    nodes_x : ndarray
+    nodes_y : ndarray
+    pressure_gradients : Tuple[np.ndarray, np.ndarray, np.ndarray]
+    pressure_nodes : ndarray
+    reference_inverse_theta : ndarray
+    rho : ndarray
+    rho_theta : ndarray
+    theta : ndarray
+    u : ndarray
+    w : ndarray
+  }
+  class _WaveParameters {
+    angular_frequency : float
+    horizontal_wavelength_m : float
+    horizontal_wavenumber : float
+    period_seconds
+    points_per_shortest_horizontal_wave : float
+    points_per_vertical_wave : float
+    vertical_wavelength_m : float
+    vertical_wavenumber : float
+  }
+  InletMassFlowCorrection --|> ExtraBCOperation
+  PeriodicAdjustment --|> ExtraBCOperation
+  SpongeLayer --|> ExtraBCOperation
+  WallAdjustment --|> ExtraBCOperation
+  WallFluxCorrection --|> ExtraBCOperation
+  WallVariableZeroOut --|> ExtraBCOperation
+  InflowBoundary --|> BaseBoundaryCondition
+  NonReflectiveOutlet --|> BaseBoundaryCondition
+  OutflowBoundary --|> BaseBoundaryCondition
+  PeriodicBoundary --|> BaseBoundaryCondition
+  ReflectiveGravityBoundary --|> BaseBoundaryCondition
+  Wall --|> BaseBoundaryCondition
+  BarotropicEOS --|> EOS
+  ExnerBasedEOS --|> EOS
+  IdealGasEOS --|> EOS
+  ClassicalDiscreteOperator --|> AbstractDiscreteOperator
+  BiCGStabSolver --|> ILinearSolver
+  GMRESSolver --|> ILinearSolver
+  TFQMRSolver --|> ILinearSolver
+  TravelingVortexQG --|> BaseTestCase
+  BaroclinicQGVortex --|> BaseTestCase
+  BaroclinicQGVortex --|> BaseTestCase
+  InertialGravityLongWaves --|> BaseTestCase
+  InertialGravityWaves --|> BaseTestCase
+  RisingBubble --|> BaseTestCase
+  SineWaveAdvection1D --|> BaseTestCase
+  ThermalWind3D --|> BaseTestCase
+  TravelingVortex --|> BaseTestCase
+  TravelingVortex3D --|> BaseTestCase
+  TravelingVortexQG --|> BaseTestCase
+  TravelingVortex3D --|> BaseTestCase
+  ZonalJetStream --|> BaseTestCase
+  IMEXTimeIntegrator --|> AbstractTimeIntegrator
+  Grid --* MPV : grid1D
+  BoundaryConditions --* BaseBoundaryCondition : type
+  TimeIntegrators --* TimeIntegratorContext : integrator_type
+  Gravity --* ReflectiveGravityBoundary : gravity
+  Thermodynamics --* BCInstantiationOptions : thermodynamics
+  DiscreteOperatorsContext --* PressureContext : op_context
+  Variables --* MPV : hydrostate
+  BoundarySide --o ExtraBCOperation : target_side
+  Variables --o Flux : variables

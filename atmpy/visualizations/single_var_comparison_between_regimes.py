@@ -10,16 +10,43 @@ from pathlib import Path
 # List your files and their corresponding titles here
 SIMULATIONS = [
     {
-        "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/_traveling_vortex_3d_40_3_40_cor_1_full_comp.nc",
+        "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/long_simulation/_traveling_vortex_3d_80_3_80_t3_full_comp.nc",
         "title": "Full Compressible"
     },
 
     {
-        "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/_traveling_vortex_3d_40_3_40_cor_1_incomp.nc",
+        "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/long_simulation/_traveling_vortex_3d_80_3_80_t3_incomp.nc",
         "title": "Pseudo Incompressible"
     },
     {
-        "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/_traveling_vortex_3d_40_3_40_cor_1_qg.nc",
+        "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/long_simulation/_traveling_vortex_3d_80_3_80_t3_qg.nc",
+        "title": "Quasi-Geostrophic"
+    }
+]
+# SIMULATIONS = [
+#     {
+#         "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/_baroclinic_qg_vortex_40_10_40_N_10_cor_1000_QG_off_Hfac_4_QGprojection.nc",
+#         "title": "Full Compressible"
+#     },
+#
+#     {
+#         "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/_baroclinic_qg_vortex_40_10_40_N_10_cor_1000_QG_on_Hfac_4_QGprojection.nc",
+#         "title": "Quasi-Geostrophic"
+#     }
+# ]
+
+SIMULATIONS = [
+    {
+        "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/new_simulations/_traveling_vortex_3d_80_3_80_fac=1_a=0_ac=1_t_3_comp_pr.nc",
+        "title": "Full Compressible"
+    },
+
+    {
+        "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/new_simulations/_traveling_vortex_3d_80_3_80_fac=1_a=0_ac=1_t_3_incomp_pr.nc",
+        "title": "Pseudo-Incompressible"
+    },
+    {
+        "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/new_simulations/_traveling_vortex_3d_80_3_80_fac=1_a=0_ac=1_t_3_qg_pr.nc",
         "title": "Quasi-Geostrophic"
     }
 ]
@@ -46,13 +73,23 @@ LINE_COLOR = 'k'
 plt.rcParams.update({
     'font.family': 'serif', 'font.size': 14,
     'axes.titlesize': 16, 'axes.labelsize': 14,
-    'xtick.labelsize': 12, 'ytick.labelsize': 12,
+    'xtick.labelsize': 14, 'ytick.labelsize': 14,
     'figure.dpi': 300
 })
 
 # ==========================================
 # 2. VARIABLE CONFIGURATION
-# ==========================================
+# ==========================================# SIMULATIONS = [
+#     {
+#         "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/_baroclinic_qg_vortex_40_10_40.nc",
+#         "title": "Full Compressible"
+#     },
+#
+#     {
+#         "path": "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/long_simulation/_baroclinic_qg_vortex_40_10_40_t3_qg.nc",
+#         "title": "Quasi-Geostrophic"
+#     }
+# ]
 if USE_COLORBLIND_SAFE:
     CMAP_SEQ = 'cividis'
     CMAP_DIV = 'cividis'  # Standard choice for divergence
@@ -151,6 +188,8 @@ def plot_panel(ax, spec, plot_data, is_bottom, is_left):
 
     cbar = plt.colorbar(cf, ax=ax, orientation='vertical', shrink=0.8, pad=0.04)
     cbar.ax.ticklabel_format(style='sci', scilimits=(-1, 1), axis='y', useMathText=True)
+    cbar.ax.tick_params(labelsize=15)
+
 
 
 def create_plots():

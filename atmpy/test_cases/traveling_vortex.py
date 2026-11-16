@@ -81,7 +81,7 @@ class TravelingVortex(BaseTestCase):
             self.rho0: float = 0.5  # Background density (dimensionless)
             self.del_rho: float = 0.5  # Density deficit at center
             self.alpha = 1
-            self.alpha_const = 1
+            self.alpha_const = 0
         else:
             self.rho0: float = 1  # Background density (dimensionless)
             self.del_rho: float = -0.5  # Density deficit at center
@@ -261,7 +261,7 @@ class TravelingVortex(BaseTestCase):
         #################################### Grid Configuration ########################################################
         # nx = 64
         # ny = 30
-        nx = ny = 40
+        nx = ny = 64
 
         grid_updates = {
             "ndim": 2,
@@ -308,7 +308,7 @@ class TravelingVortex(BaseTestCase):
         temporal_updates = {
             "CFL": 0.45,
             "dtfixed": 0.001,
-            "dtfixed0": 0.001,
+            "dtfixed0": None,
             "tout": np.array([0.0, 10.0]),
             "tmax": 1.0,
             "stepmax": 10_000,
@@ -352,7 +352,7 @@ class TravelingVortex(BaseTestCase):
             "output_folder": "traveling_vortex",
             "output_base_name": "_traveling_vortex",
             "output_timesteps": True,
-            "output_frequency_steps": 10,
+            "output_frequency_steps": 1,
             # output_suffix is updated automatically based on grid
         }
         self.set_outputs(output_updates)

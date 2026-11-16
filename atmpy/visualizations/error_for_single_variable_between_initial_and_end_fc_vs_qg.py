@@ -9,17 +9,35 @@ from pathlib import Path
 # ==========================================
 
 # List of files to compare
+# FILE_PATHS = [
+#     "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/_baroclinic_qg_vortex_40_10_40_N_10_cor_1000_QG_off_Hfac_4_QGprojection.nc",
+#     "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/_baroclinic_qg_vortex_40_10_40_N_10_cor_1000_QG_on_Hfac_4_QGprojection.nc",
+# ]
+
 FILE_PATHS = [
-    "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/_baroclinic_qg_vortex_40_10_40_N_10_cor_1000_QG_off_Hfac_4_QGprojection.nc",
-    "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/_baroclinic_qg_vortex_40_10_40_N_10_cor_1000_QG_on_Hfac_4_QGprojection.nc",
+    # "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/long_simulation/_baroclinic_qg_vortex_40_10_40_t3_full_comp.nc",
+    "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/long_simulation/_baroclinic_qg_vortex_40_10_40_t3_full_comp.nc",
+    "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/long_simulation/_baroclinic_qg_vortex_40_10_40_t3_qg.nc",
 ]
 
+FILE_PATHS = [
+    # "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/long_simulation/_baroclinic_qg_vortex_40_10_40_t3_full_comp.nc",
+    "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/long_simulation/_baroclinic_qg_vortex_40_10_40_t1_incmp.nc",
+    "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/long_simulation/_baroclinic_qg_vortex_40_10_40_t1_full_comp.nc",
+]
+FILE_PATHS = [
+    "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/new_simulations/_traveling_vortex_3d_80_3_80_fac=1_a=0_ac=1_t_3_comp_pr.nc",
+    "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/new_simulations/_traveling_vortex_3d_80_3_80_fac=1_a=0_ac=1_t_3_incomp_pr.nc",
+    "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/new_simulations/_traveling_vortex_3d_80_3_80_fac=1_a=0_ac=1_t_3_qg_pr.nc",
+]
+
+
 # Custom labels
-FILE_LABELS = ["Full Compressible", "Quasi-Geostrophic"]
+FILE_LABELS = ["Full Compressible", "Pseudo-Incompressible",]
 
 # Analysis Settings
-VAR_NAME = 'u'  # Variable to calculate error for
-TIME_INDEX = -1  # Target time step index
+VAR_NAME = 'p2_nodes'  # Variable to calculate error for
+TIME_INDEX = -1 # Target time step index
 SLICE_DIM = 'z'  # Dimension to slice: 'x', 'y', or 'z'
 SLICE_VAL = 0.0  # Value to slice at
 
@@ -175,6 +193,7 @@ def plot_error_field(ax, plot_data, title):
 
     # Move the exponent text (e.g. 10^-4) slightly above the bar
     cbar.ax.yaxis.get_offset_text().set_position((0, 1.02))
+    cbar.ax.tick_params(labelsize=15)
 
 
 def create_error_dashboard():

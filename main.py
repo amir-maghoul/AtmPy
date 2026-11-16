@@ -32,6 +32,7 @@ from atmpy.test_cases.baroclinic_qg_vortex3D import BaroclinicQGVortex
 from atmpy.test_cases.inertial_gravity_long_waves import InertialGravityLongWaves
 from atmpy.test_cases.inertial_gravity_waves import InertialGravityWaves
 from atmpy.test_cases.sine_advection_1d import SineWaveAdvection1D
+from atmpy.test_cases.thermal_wind3D import ThermalWind3D
 from atmpy.test_cases.traveling_vortex import TravelingVortex
 from atmpy.test_cases.traveling_vortexQG import TravelingVortexQG
 from atmpy.test_cases.zonal_jet_stream import ZonalJetStream
@@ -77,6 +78,8 @@ def get_base_config_for_case(case_name: str) -> SimulationConfig:
         case_instance = RisingBubble()
     elif case_name == "SineWaveAdvection1D":
         case_instance = SineWaveAdvection1D()
+    elif case_name == "ThermalWind3D":
+        case_instance = ThermalWind3D()
     else:
         raise ValueError(f"Unknown test case for config retrieval: {case_name}")
     return case_instance.config
@@ -148,9 +151,12 @@ if args.mode in ["run", "debug"]:
         case = RisingBubble(config_override=loaded_config_override)
     elif args.case == "SineWaveAdvection1D":
         case = SineWaveAdvection1D(config_override=loaded_config_override)
+    elif args.case == "ThermalWind3D":
+        case = ThermalWind3D(config_override=loaded_config_override)
     else:
         logger.error(f"Unknown test case specified for run: {args.case}")
         sys.exit(1)
+    # case = TravelingVortex()
     # case = TravelingVortexHS()
     # case = RisingBubble()
     # case = InertialGravityWaves()

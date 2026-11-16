@@ -997,7 +997,7 @@ def animate_2d(
         return cont.collections
 
     ani = FuncAnimation(
-        fig, update, frames=len(frames_indices), interval=0.1, blit=False
+        fig, update, frames=len(frames_indices), interval=50, blit=False
     )
     return ani
 
@@ -1183,7 +1183,7 @@ def animate_3d(
         return []
 
     ani = FuncAnimation(
-        fig, update, frames=len(frames_indices), interval=20, blit=False
+        fig, update, frames=len(frames_indices), interval=50, blit=False
     )
     return ani
 

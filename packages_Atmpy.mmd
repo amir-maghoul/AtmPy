@@ -1,0 +1,439 @@
+classDiagram
+  class atmpy {
+  }
+  class analysis {
+  }
+  class outputs {
+  }
+  class post_process_convergence {
+  }
+  class run_convergence {
+  }
+  class asymptotic_error_plot {
+  }
+  class boundary_conditions {
+  }
+  class bc_extra_operations {
+  }
+  class boundary_conditions {
+  }
+  class boundary_manager {
+  }
+  class contexts {
+  }
+  class utility {
+  }
+  class convergence_of_the_scheme_wrt_N {
+  }
+  class divergence_plot {
+  }
+  class error_benchmark2 {
+  }
+  class error_for_single_variable_between_initial_and_end_fc_vs_qg {
+  }
+  class flux {
+  }
+  class flux {
+  }
+  class limiters {
+  }
+  class reconstruction {
+  }
+  class reconstruction_utility {
+  }
+  class riemann_solvers {
+  }
+  class utility {
+  }
+  class grid {
+  }
+  class kgrid {
+  }
+  class utility {
+  }
+  class infrastructure {
+  }
+  class enums {
+  }
+  class factory {
+  }
+  class registries {
+  }
+  class utility {
+  }
+  class io {
+  }
+  class filename_utils {
+  }
+  class output_writers {
+  }
+  class saver {
+  }
+  class physics {
+  }
+  class asymptotics {
+  }
+  class eos {
+  }
+  class gravity {
+  }
+  class thermodynamics {
+  }
+  class utility {
+  }
+  class plot_four_variables_in_grid_or_column_form_at_given_time {
+  }
+  class plotting2 {
+  }
+  class pressure_solver {
+  }
+  class abstract_pressure_solver {
+  }
+  class classical_pressure_solvers {
+  }
+  class contexts {
+  }
+  class discrete_operations {
+  }
+  class linear_solvers {
+  }
+  class operators_numba_kernels {
+  }
+  class preconditioners {
+  }
+  class utility {
+  }
+  class qg_vs_fc_error_plot {
+  }
+  class scripts {
+  }
+  class solver {
+  }
+  class solver {
+  }
+  class utility {
+  }
+  class visualize {
+  }
+  class test {
+  }
+  class test_cases {
+  }
+  class QG_template {
+  }
+  class baroclinic_qg_vortex3D {
+  }
+  class baroclinic_qg_vortex_old {
+  }
+  class base_test_case {
+  }
+  class inertial_gravity_long_waves {
+  }
+  class inertial_gravity_waves {
+  }
+  class rising_bubble {
+  }
+  class sine_advection_1d {
+  }
+  class thermal_wind3D {
+  }
+  class traveling_vortex {
+  }
+  class traveling_vortex3D_old {
+  }
+  class traveling_vortexQG {
+  }
+  class travelling_vortex3D {
+  }
+  class zonal_jet_stream {
+  }
+  class test_plot {
+  }
+  class time_integrators {
+  }
+  class abstract_time_integrator {
+  }
+  class advection_routines {
+  }
+  class contexts {
+  }
+  class coriolis {
+  }
+  class coriolis_numba_kernels {
+  }
+  class imex_operator_splitting {
+  }
+  class utility {
+  }
+  class variables {
+  }
+  class multiple_pressure_variables {
+  }
+  class utility {
+  }
+  class variables {
+  }
+  run_convergence --> traveling_vortex
+  bc_extra_operations --> enums
+  boundary_conditions --> bc_extra_operations
+  boundary_conditions --> utility
+  boundary_conditions --> enums
+  boundary_conditions --> utility
+  boundary_conditions --> gravity
+  boundary_conditions --> thermodynamics
+  boundary_conditions --> variables
+  boundary_manager --> bc_extra_operations
+  boundary_manager --> contexts
+  boundary_manager --> utility
+  boundary_manager --> enums
+  boundary_manager --> factory
+  boundary_manager --> utility
+  boundary_manager --> thermodynamics
+  boundary_manager --> multiple_pressure_variables
+  boundary_manager --> variables
+  contexts --> enums
+  contexts --> thermodynamics
+  utility --> enums
+  utility --> thermodynamics
+  flux --> utility
+  flux --> enums
+  flux --> factory
+  flux --> utility
+  flux --> utility
+  flux --> variables
+  reconstruction --> reconstruction_utility
+  reconstruction --> enums
+  reconstruction --> utility
+  reconstruction --> eos
+  reconstruction_utility --> utility
+  reconstruction_utility --> enums
+  reconstruction_utility --> utility
+  riemann_solvers --> enums
+  riemann_solvers --> utility
+  utility --> utility
+  utility --> kgrid
+  utility --> utility
+  factory --> enums
+  factory --> registries
+  registries --> boundary_conditions
+  registries --> limiters
+  registries --> reconstruction
+  registries --> riemann_solvers
+  registries --> enums
+  registries --> discrete_operations
+  registries --> linear_solvers
+  registries --> preconditioners
+  registries --> advection_routines
+  registries --> imex_operator_splitting
+  utility --> enums
+  saver --> enums
+  saver --> output_writers
+  saver --> eos
+  eos --> utility
+  gravity --> enums
+  classical_pressure_solvers --> bc_extra_operations
+  classical_pressure_solvers --> contexts
+  classical_pressure_solvers --> enums
+  classical_pressure_solvers --> utility
+  classical_pressure_solvers --> thermodynamics
+  classical_pressure_solvers --> pressure_solver
+  classical_pressure_solvers --> abstract_pressure_solver
+  classical_pressure_solvers --> preconditioners
+  classical_pressure_solvers --> utility
+  classical_pressure_solvers --> coriolis
+  classical_pressure_solvers --> utility
+  contexts --> bc_extra_operations
+  contexts --> factory
+  contexts --> abstract_pressure_solver
+  contexts --> discrete_operations
+  discrete_operations --> bc_extra_operations
+  discrete_operations --> utility
+  discrete_operations --> operators_numba_kernels
+  preconditioners --> utility
+  solver --> saver
+  solver --> utility
+  utility --> enums
+  QG_template --> contexts
+  QG_template --> enums
+  QG_template --> utility
+  QG_template --> thermodynamics
+  QG_template --> base_test_case
+  baroclinic_qg_vortex3D --> enums
+  baroclinic_qg_vortex3D --> thermodynamics
+  baroclinic_qg_vortex3D --> operators_numba_kernels
+  baroclinic_qg_vortex3D --> base_test_case
+  baroclinic_qg_vortex_old --> enums
+  baroclinic_qg_vortex_old --> thermodynamics
+  baroclinic_qg_vortex_old --> operators_numba_kernels
+  baroclinic_qg_vortex_old --> base_test_case
+  baroclinic_qg_vortex_old --> utility
+  base_test_case --> enums
+  inertial_gravity_long_waves --> enums
+  inertial_gravity_long_waves --> base_test_case
+  inertial_gravity_waves --> contexts
+  inertial_gravity_waves --> enums
+  inertial_gravity_waves --> utility
+  inertial_gravity_waves --> thermodynamics
+  inertial_gravity_waves --> base_test_case
+  rising_bubble --> enums
+  rising_bubble --> utility
+  rising_bubble --> thermodynamics
+  rising_bubble --> base_test_case
+  sine_advection_1d --> boundary_manager
+  sine_advection_1d --> contexts
+  sine_advection_1d --> enums
+  sine_advection_1d --> thermodynamics
+  sine_advection_1d --> base_test_case
+  thermal_wind3D --> enums
+  thermal_wind3D --> thermodynamics
+  thermal_wind3D --> operators_numba_kernels
+  thermal_wind3D --> base_test_case
+  traveling_vortex --> contexts
+  traveling_vortex --> enums
+  traveling_vortex --> utility
+  traveling_vortex --> thermodynamics
+  traveling_vortex --> base_test_case
+  traveling_vortex3D_old --> contexts
+  traveling_vortex3D_old --> enums
+  traveling_vortex3D_old --> utility
+  traveling_vortex3D_old --> thermodynamics
+  traveling_vortex3D_old --> base_test_case
+  traveling_vortexQG --> enums
+  traveling_vortexQG --> thermodynamics
+  traveling_vortexQG --> base_test_case
+  traveling_vortexQG --> utility
+  travelling_vortex3D --> enums
+  travelling_vortex3D --> thermodynamics
+  travelling_vortex3D --> discrete_operations
+  travelling_vortex3D --> base_test_case
+  zonal_jet_stream --> enums
+  zonal_jet_stream --> thermodynamics
+  zonal_jet_stream --> base_test_case
+  advection_routines --> enums
+  advection_routines --> utility
+  contexts --> enums
+  contexts --> factory
+  contexts --> abstract_time_integrator
+  coriolis --> enums
+  coriolis --> coriolis_numba_kernels
+  imex_operator_splitting --> bc_extra_operations
+  imex_operator_splitting --> boundary_manager
+  imex_operator_splitting --> contexts
+  imex_operator_splitting --> flux
+  imex_operator_splitting --> utility
+  imex_operator_splitting --> enums
+  imex_operator_splitting --> factory
+  imex_operator_splitting --> utility
+  imex_operator_splitting --> eos
+  imex_operator_splitting --> thermodynamics
+  imex_operator_splitting --> classical_pressure_solvers
+  imex_operator_splitting --> contexts
+  imex_operator_splitting --> discrete_operations
+  imex_operator_splitting --> utility
+  imex_operator_splitting --> traveling_vortex
+  imex_operator_splitting --> abstract_time_integrator
+  imex_operator_splitting --> contexts
+  imex_operator_splitting --> coriolis
+  imex_operator_splitting --> utility
+  imex_operator_splitting --> multiple_pressure_variables
+  imex_operator_splitting --> variables
+  utility --> thermodynamics
+  utility --> utility
+  multiple_pressure_variables --> utility
+  multiple_pressure_variables --> enums
+  multiple_pressure_variables --> utility
+  multiple_pressure_variables --> thermodynamics
+  variables --> enums
+  variables --> utility
+  variables --> eos
+  boundary_conditions ..> contexts
+  boundary_conditions ..> kgrid
+  boundary_conditions ..> multiple_pressure_variables
+  boundary_manager ..> bc_extra_operations
+  boundary_manager ..> boundary_conditions
+  contexts ..> kgrid
+  contexts ..> multiple_pressure_variables
+  utility ..> kgrid
+  flux ..> kgrid
+  flux ..> eos
+  reconstruction ..> variables
+  factory ..> contexts
+  factory ..> abstract_pressure_solver
+  factory ..> discrete_operations
+  factory ..> linear_solvers
+  factory ..> abstract_time_integrator
+  output_writers ..> kgrid
+  saver ..> solver
+  gravity ..> kgrid
+  abstract_pressure_solver ..> enums
+  abstract_pressure_solver ..> thermodynamics
+  abstract_pressure_solver ..> discrete_operations
+  abstract_pressure_solver ..> linear_solvers
+  abstract_pressure_solver ..> coriolis
+  classical_pressure_solvers ..> boundary_manager
+  classical_pressure_solvers ..> discrete_operations
+  classical_pressure_solvers ..> linear_solvers
+  classical_pressure_solvers ..> variables
+  contexts ..> boundary_manager
+  contexts ..> kgrid
+  contexts ..> enums
+  discrete_operations ..> boundary_manager
+  discrete_operations ..> kgrid
+  preconditioners ..> kgrid
+  preconditioners ..> classical_pressure_solvers
+  preconditioners ..> multiple_pressure_variables
+  solver ..> kgrid
+  solver ..> abstract_time_integrator
+  solver ..> multiple_pressure_variables
+  solver ..> variables
+  utility ..> kgrid
+  utility ..> eos
+  utility ..> variables
+  QG_template ..> multiple_pressure_variables
+  QG_template ..> variables
+  baroclinic_qg_vortex3D ..> multiple_pressure_variables
+  baroclinic_qg_vortex3D ..> variables
+  baroclinic_qg_vortex_old ..> multiple_pressure_variables
+  baroclinic_qg_vortex_old ..> variables
+  base_test_case ..> multiple_pressure_variables
+  base_test_case ..> variables
+  inertial_gravity_long_waves ..> thermodynamics
+  inertial_gravity_long_waves ..> multiple_pressure_variables
+  inertial_gravity_long_waves ..> variables
+  inertial_gravity_waves ..> multiple_pressure_variables
+  inertial_gravity_waves ..> variables
+  rising_bubble ..> kgrid
+  rising_bubble ..> multiple_pressure_variables
+  rising_bubble ..> variables
+  sine_advection_1d ..> multiple_pressure_variables
+  sine_advection_1d ..> variables
+  thermal_wind3D ..> multiple_pressure_variables
+  thermal_wind3D ..> variables
+  traveling_vortex ..> multiple_pressure_variables
+  traveling_vortex ..> variables
+  traveling_vortex3D_old ..> multiple_pressure_variables
+  traveling_vortex3D_old ..> variables
+  traveling_vortexQG ..> multiple_pressure_variables
+  traveling_vortexQG ..> variables
+  travelling_vortex3D ..> multiple_pressure_variables
+  travelling_vortex3D ..> variables
+  zonal_jet_stream ..> multiple_pressure_variables
+  zonal_jet_stream ..> variables
+  advection_routines ..> flux
+  advection_routines ..> kgrid
+  advection_routines ..> variables
+  contexts ..> boundary_manager
+  contexts ..> flux
+  contexts ..> kgrid
+  contexts ..> enums
+  contexts ..> variables
+  coriolis ..> gravity
+  coriolis ..> multiple_pressure_variables
+  coriolis ..> variables
+  imex_operator_splitting ..> kgrid
+  imex_operator_splitting ..> gravity
+  imex_operator_splitting ..> abstract_pressure_solver
+  imex_operator_splitting ..> coriolis
+  multiple_pressure_variables ..> kgrid
+  multiple_pressure_variables ..> variables
+  variables ..> kgrid

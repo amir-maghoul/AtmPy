@@ -1,7 +1,11 @@
+
+
 import numpy as np
 from dataclasses import field
 from typing import List, Tuple, Dict, Any, TYPE_CHECKING
 import logging
+
+from sphinx.testing.fixtures import if_graphviz_found
 from atmpy.variables.utility import cell_averaging, cells_to_nodes_averaging
 from atmpy.test_cases.base_test_case import BaseTestCase
 from atmpy.configuration.simulation_configuration import SimulationConfig
@@ -54,18 +58,20 @@ class TravelingVortexQG(BaseTestCase):
         # Scales
         self.size = 1.0
         self.boxsize = 1.0 * self.size
-        self.h_scale = 1
-        self.y_boxscale = 0.2  # Height of domain relative to width
+        self.h_scale = 1.0
+        self.y_boxscale = 0.1  # Height of domain relative to width
         self.R0: float = 0.2 * self.size  # Horizontal radius
-        self.H_frac: float = 0.1 # Vertical aspect ratio of the vortex bubble
+        self.H_frac: float = 0.2 # Vertical aspect ratio of the vortex bubble
 
         # Amplitude (Exner pressure perturbation amplitude)
         # Needs to be small for QG validity (Rossby << 1)
-        self.p_amp: float = -1.0e-4
+        self.p_amp: float = -1.0e-5
 
         # Simulation settings
         self.tmax = 1.0 * self.size
-        self.output_freq = 1
+        self.stepmax = 100000
+        self.output_freq = 10
+        self.checkpoint_freq = 1
         self.dtfixed0 = None
         self.dtfixed = 0.001  # Conservative time step
 
@@ -74,21 +80,32 @@ class TravelingVortexQG(BaseTestCase):
         self.stratified_atmosphere = True
         self.h_ref = 10_000.0
         self.t_ref = 100.0
-        N_factor = 10
+        N_factor = 10.0
         self.Nsq_ref = 1.0e-4*N_factor
 
-        # Regimes
-        # Msq is calculated automatically by the solver config,
-        # but we set the scaling reference here.
-        # self.Msq = 1.0e-1  # Target Mach squared magnitude
-
         self.g = 1.0
-        self.coriolis_strength =  1000  # f parameter (Make relatively large for small Ro)
+        factor = 1.0
+        self.coriolis_strength =  1.0e-4 * self.t_ref * factor # f parameter
+        self.rossby_adjustment = 0.0
+        self.sponge_layer = False
+        self.sponge_width = 6
+        self.sponge_axis = [0, 1, 2]
+        self.sponge_amplitude = 0.5
+        self.sponge_power = 2
 
-        # Switches for testing (User wants code to work with these = 1)
-        self.is_nongeostrophic = 0
-        self.is_nonhydrostatic = 1
-        self.is_compressible = 0
+        # Switches for testing
+        QG = True
+        self.initial_projection = True
+        self.is_nongeostrophic = 1
+        self.is_nonhydrostatic =  1
+        self.is_compressible = 1
+
+        if QG:
+            self.initial_projection = False
+            self.is_nongeostrophic = 0
+            self.is_nonhydrostatic = 0
+            self.is_compressible = 0
+
 
         if run_setup_method:
             self.setup()
@@ -144,6 +161,13 @@ class TravelingVortexQG(BaseTestCase):
         self.set_boundary_condition(BoundarySide.FRONT, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC)
         self.set_boundary_condition(BoundarySide.BACK, BdryType.PERIODIC, mpv_type=BdryType.PERIODIC)
 
+        self.config.boundary_conditions.sponge.active = self.sponge_layer
+        self.config.boundary_conditions.sponge.width = self.sponge_width
+        self.config.boundary_conditions.sponge.power = self.sponge_power
+        self.config.boundary_conditions.sponge.amplitude = self.sponge_amplitude
+        self.config.boundary_conditions.sponge.target_vars = ["RHOU", "RHOV", "RHOW"]
+        self.config.boundary_conditions.sponge.axis = self.sponge_axis
+
         #################################### Temporal Setting ##########################################################
         temporal_updates = {
             "CFL": 0.9,
@@ -151,7 +175,7 @@ class TravelingVortexQG(BaseTestCase):
             "dtfixed0": self.dtfixed0,
             "tout": np.array([0.0, self.tmax]),
             "tmax": self.tmax,
-            "stepmax": 100_000,
+            "stepmax": self.stepmax,
             "use_acoustic_cfl": True,
         }
         self.set_temporal(temporal_updates)
@@ -174,7 +198,7 @@ class TravelingVortexQG(BaseTestCase):
             "second_order_advection_routine": AdvectionRoutines.STRANG_SPLIT,
             "linear_solver": LinearSolvers.BICGSTAB,
             "preconditioner": Preconditioners.DIAGONAL,
-            "initial_projection": True,  # Projects initial velocity to be divergence free if needed
+            "initial_projection": self.initial_projection,  # Projects initial velocity to be divergence free if needed
         }
         self.set_numerics(numerics_updates)
 
@@ -196,7 +220,9 @@ class TravelingVortexQG(BaseTestCase):
             "output_type": "test",
             "output_folder": "traveling_vortex_qg",
             "output_base_name": "_traveling_vortex_qg",
+            "checkpoint_base_name": "_traveling_vortex_qg_checkpoint",
             "output_timesteps": True,
+            "checkpoint_frequency_steps": self.checkpoint_freq,
             "output_frequency_steps": self.output_freq,
         }
         self.set_outputs(output_updates)
@@ -236,26 +262,35 @@ class TravelingVortexQG(BaseTestCase):
         return np.meshgrid(x, y, z, indexing="ij")
 
     def _gaussian_perturbation(self, X, Y, Z, H_scale):
-        """Calculates Gaussian perturbation and its spatial derivatives."""
+        """
+        Fully smooth 3D Gaussian perturbation in Exner pressure.
+        (Replaces compact vertical polynomial with Gaussian)
+        """
+        Msq = self.config.model_regimes.Msq
+
+        # Domain periodicity (X, Z only)
         Lx = self.config.spatial_grid.grid.x_end - self.config.spatial_grid.grid.x_start
         Lz = self.config.spatial_grid.grid.z_end - self.config.spatial_grid.grid.z_start
 
-        # Periodicity handling
         dx = X - self.xc
-        dy = Y - self.yc
         dz = Z - self.zc
+        dy = Y - self.yc
+
         dx = dx - Lx * np.round(dx / Lx)
         dz = dz - Lz * np.round(dz / Lz)
 
+        # --- Full Gaussian (separable) ---
         r2_h = dx ** 2 + dz ** 2
-        envelope = np.exp(- (r2_h / (2 * self.R0 ** 2)) - (dy ** 2 / (2 * H_scale ** 2)))
 
-        val = self.p_amp * envelope
+        horiz = np.exp(-r2_h / (2 * self.R0 ** 2))
+        vert = np.exp(-(dy ** 2) / (2 * H_scale ** 2))
 
-        # Derivatives
+        val = self.p_amp * horiz * vert
+
+        # --- Derivatives ---
         d_val_dx = val * (-dx / self.R0 ** 2)
-        d_val_dy = val * (-dy / H_scale ** 2)
         d_val_dz = val * (-dz / self.R0 ** 2)
+        d_val_dy = val * (-dy / H_scale ** 2)
 
         return val, d_val_dx, d_val_dy, d_val_dz
 
@@ -283,83 +318,173 @@ class TravelingVortexQG(BaseTestCase):
         return variable_3D
 
     def initialize_solution(self, variables: "Variables", mpv: "MPV"):
+        """
+        Initialize solution using Exner-pressure generating function method.
+        Constructs a balanced QG vortex by defining pressure first, then deriving
+        velocities and thermodynamics to satisfy Geostrophic and Hydrostatic balance.
+        """
+        print("Initializing 3D QG Vortex (Exner-Consistent Method)...")
+
         grid = self.config.spatial_grid.grid
         thermo = Thermodynamics()
         thermo.update(self.config.global_constants.gamma)
+
+        Msq = self.config.model_regimes.Msq
+        g_vec = self.config.physics.gravity_strength
+        g = g_vec[1]  # Y-gravity
+        g_axis = 1
+        f = self.config.physics.coriolis_strength[1]  # Y-coriolis
         Gamma = thermo.Gamma
-        gm1inv = thermo.gm1inv
+        mpv.state(g_vec, Msq)
 
-        # FULL grid coordinates (including ghosts)
-        XC = grid.x_cells  # shape (nx_total,)
-        YC = grid.y_cells  # shape (ny_total,)
-        ZC = grid.z_cells  # shape (nz_total,)
+        # ------------------------------------------------------------------
+        # 1. Setup Hydrostatic Background State on 1D Grid
+        # ------------------------------------------------------------------
+        strat_func = self.config.physics.stratification
 
-        XN = grid.x_nodes
-        YN = grid.y_nodes
-        ZN = grid.z_nodes
+        # A. Get 1D coordinates (full including ghosts) from the main grid
+        y_cells_1d = grid.get_cell_coordinates(g_axis)
+        y_nodes_1d = grid.get_node_coordinates(g_axis)
 
-        XC3, YC3, ZC3 = np.meshgrid(XC, YC, ZC, indexing='ij')  # full 3D cell centers
-        XN3, YN3, ZN3 = np.meshgrid(XN, YN, ZN, indexing='ij')  # full 3D nodes
+        # B. Evaluate stratification profile
+        Y_cells_1d_val = strat_func(y_cells_1d)
+        Y_nodes_1d_val = strat_func(y_nodes_1d)
 
-        # Background stratification (your exponential profile)
-        Y_bg_cells = self.config.physics.stratification(YC3)
-        Y_bg_nodes = self.config.physics.stratification(YN3)
+        # C. Integrate for Hydrostatic Exner Pressure (pi0)
+        # Reference index (first inner cell)
+        ngy = grid.ng[1][0]
+        dy = grid.dxyz[g_axis]
 
-        # Small localized perturbation in potential temperature
-        amp = 0.001
-        H_scale = self.H_frac * (YC[-1] - YC[0])
-        Lx = XC[-1] - XC[0]
-        Lz = ZC[-1] - ZC[0]
-        LxN = XN[-1] - XN[0]
-        LzN = ZN[-1] - ZN[0]
+        # Node vars integration
+        pi0_nodes_1d = np.zeros_like(y_nodes_1d)
+        pi0_ref = 1.0 ** (thermo.gm1)  # p0=1.0
+        pi0_nodes_1d[ngy] = pi0_ref
 
-        dx_c = XC3 - self.xc;
-        dx_c -= Lx * np.round(dx_c / Lx)
-        dz_c = ZC3 - self.zc;
-        dz_c -= Lz * np.round(dz_c / Lz)
-        dx_n = XN3 - self.xc;
-        dx_n -= LxN * np.round(dx_n / LxN)
-        dz_n = ZN3 - self.zc;
-        dz_n -= LzN * np.round(dz_n / LzN)
+        # Integrate Up
+        for j in range(ngy, len(y_nodes_1d) - 1):
+            Y_val = Y_cells_1d_val[j]
+            d_pi = -(Gamma * g / Y_val) * dy
+            pi0_nodes_1d[j + 1] = pi0_nodes_1d[j] + d_pi
+        # Integrate Down
+        for j in range(ngy - 1, -1, -1):
+            Y_val = Y_cells_1d_val[j]
+            d_pi = (Gamma * g / Y_val) * dy
+            pi0_nodes_1d[j] = pi0_nodes_1d[j + 1] + d_pi
 
-        pert_c = amp * np.exp(-(dx_c ** 2 + dz_c ** 2) / (self.R0 ** 2) - (YC3 - self.yc) ** 2 / (H_scale ** 2))
-        pert_n = amp * np.exp(-(dx_n ** 2 + dz_n ** 2) / (self.R0 ** 2) - (YN3 - self.yc) ** 2 / (H_scale ** 2))
+        # Cell vars (Interpolate pi from nodes to cells for background)
+        pi0_cells_1d = 0.5 * (pi0_nodes_1d[:-1] + pi0_nodes_1d[1:])
 
-        Y_cells_full = Y_bg_cells + pert_c
-        Y_nodes_full = Y_bg_nodes + pert_n
+        # Derived thermodynamic vars
+        p0_nodes_1d = pi0_nodes_1d ** thermo.Gammainv
+        p0_cells_1d = pi0_cells_1d ** thermo.Gammainv
+        rhoY0_cells_1d = pi0_cells_1d ** thermo.gm1inv
+        rhoY0_nodes_1d = pi0_nodes_1d ** thermo.gm1inv
 
-        # NOW it works
-        HySt = mpv.compute_hydrostate_from_profile3D(
-            Y_cells_full, Y_nodes_full,
-            self.config.physics.gravity_strength,
-            self.config.model_regimes.Msq
-        )
+        # D. Assign to MPV Hydrostate (1D Variables)
+        def assign_1d(target, source):
+            target[:] = source
 
-        # Extract only inner part for prognostic variables
-        inner = grid.get_inner_slice()
-        rhoY0_inner = HySt.rhoY0 # shape (nx, ny, nz)
-        rho_inner = rhoY0_inner / Y_cells_full
+        # Cells
+        assign_1d(mpv.hydrostate.cell_vars[..., HI.P2_0], pi0_cells_1d / Msq)
+        assign_1d(mpv.hydrostate.cell_vars[..., HI.P0], p0_cells_1d)
+        assign_1d(mpv.hydrostate.cell_vars[..., HI.Y0], Y_cells_1d_val)
+        assign_1d(mpv.hydrostate.cell_vars[..., HI.S0], 1.0 / Y_cells_1d_val)
+        assign_1d(mpv.hydrostate.cell_vars[..., HI.RHOY0], rhoY0_cells_1d)
+        assign_1d(mpv.hydrostate.cell_vars[..., HI.RHO0], rhoY0_cells_1d / Y_cells_1d_val)
 
-        # Geostrophic velocity (thermal wind)
-        f = self.config.physics.coriolis_strength[1]
-        g = self.config.physics.gravity_strength[1]
+        # Nodes
+        assign_1d(mpv.hydrostate.node_vars[..., HI.P2_0], pi0_nodes_1d / Msq)
+        assign_1d(mpv.hydrostate.node_vars[..., HI.P0], p0_nodes_1d)
+        assign_1d(mpv.hydrostate.node_vars[..., HI.Y0], Y_nodes_1d_val)
+        assign_1d(mpv.hydrostate.node_vars[..., HI.S0], 1.0 / Y_nodes_1d_val)
+        assign_1d(mpv.hydrostate.node_vars[..., HI.RHOY0], rhoY0_nodes_1d)
+        assign_1d(mpv.hydrostate.node_vars[..., HI.RHO0], rhoY0_nodes_1d / Y_nodes_1d_val)
 
-        dpert_dz = np.diff(pert_c, axis=2) / grid.dz
-        dpert_dx = np.diff(pert_c, axis=0) / grid.dx
-        # simple central diff + padding omitted for brevity
+        # ------------------------------------------------------------------
+        # 2. Initialize Variables on Cells (Vortex Perturbation)
+        # ------------------------------------------------------------------
+        inner_slice = grid.get_inner_slice()
+        XC, YC, ZC = self._get_coordinates_3d(grid, inner_slice, nodal=False)
 
-        u_g = np.zeros_like(Y_bg_cells)
-        w_g = np.zeros_like(Y_bg_cells)
-        u_g[:, :, :-1] = (g / f) * dpert_dz / Y_bg_cells[:, :, :-1]
-        w_g[:-1, :, :] = -(g / f) * dpert_dx / Y_bg_cells[:-1, :, :]
+        # A. Get Background on Cells (Broadcasted from 1D arrays)
+        Y0_inner = Y_cells_1d_val[ngy:-ngy]
+        pi0_inner = pi0_cells_1d[ngy:-ngy]
 
-        variables.cell_vars[..., VI.RHO] = rho_inner
-        variables.cell_vars[..., VI.RHOY] = rhoY0_inner
-        variables.cell_vars[..., VI.RHOU] = rho_inner * u_g
-        variables.cell_vars[..., VI.RHOW] = rho_inner * w_g
-        variables.cell_vars[..., VI.RHOV] = 0.0
+        # Broadcast to 3D (1, ny, 1) -> (nx, ny, nz)
+        Y0_c = Y0_inner.reshape(1, -1, 1)
+        pi0_c = pi0_inner.reshape(1, -1, 1)
 
-        # p2 from hydrostatic integration
-        mpv.p2_nodes[...] = HySt.p20_nodes  # already full size
+        # Calculate Background Exner gradient locally
+        d_pi0_dy_c = - Gamma * g / Y0_c
 
-        mpv.correct_initial_pressure3D(variables, self.config.model_regimes.Msq, g)
+        # B. Calculate Perturbation (Gaussian in Exner Pressure)
+        H_scale = self.H_frac * (grid.y_end)
+        pi_pert_c, d_pi_pert_dx_c, d_pi_pert_dy_c, d_pi_pert_dz_c = self._gaussian_perturbation(XC, YC, ZC, H_scale)
+
+        # C. Construct Total Exner Pressure and Gradient
+        # Note: pi_pert_c is the physical perturbation amplitude
+        pi_total_c = pi0_c + pi_pert_c
+        d_pi_total_dy_c = d_pi0_dy_c + d_pi_pert_dy_c
+
+        Y_pert = Y0_c * d_pi_pert_dy_c / Gamma * g * Msq
+
+        # D. Recover Balanced Thermodynamics
+        # Hydrostatic Balance: d(pi_tot)/dy = - Gamma * g / Y_tot
+        # => Y_tot = - Gamma * g / (d_pi_tot/dy)
+        Y_total_c = Y0_c + Y_pert
+
+        # EOS: rhoY (Potential Pressure) = pi_tot ^ (1 / (gamma-1))
+        rhoY_total_c = pi_total_c ** thermo.gm1inv
+
+        # Density
+        rho_total_c = rhoY_total_c / Y_total_c
+
+        # E. Recover Balanced Geostrophic Velocities
+        # Geostrophic Balance (Y vertical, X/Z horizontal):
+        # f * k_hat x u = - Theta * Cp * Grad(Pi)
+        # Components:
+        # x-mom: -f * w = - (Y/Gamma) * dPi/dx  => w = (Y/(f*Gamma)) * dPi/dx
+        # z-mom: +f * u = - (Y/Gamma) * dPi/dz  => u = -(Y/(f*Gamma)) * dPi/dz
+
+        prefactor = Y0_c / (f * Gamma * Msq)
+        # prefactor = Y_total_c / (f * Gamma * Msq)
+        # prefactor = Y0_c / (f * Gamma)
+        # prefactor = (Gamma * Y0_c) / f
+
+
+        # Note signs: u relates to -dPi/dz, w relates to +dPi/dx for Cyclonic flow around Low
+        if self.rossby_adjustment:
+            u_geo_c = + prefactor * d_pi_pert_dz_c * self.rossby_adjustment
+            w_geo_c = - prefactor * d_pi_pert_dx_c * self.rossby_adjustment
+        else:
+            u_geo_c = + prefactor * d_pi_pert_dz_c
+            w_geo_c = - prefactor * d_pi_pert_dx_c
+
+        u_total_c = self.u0 + u_geo_c
+        w_total_c = self.w0 + w_geo_c
+        v_total_c = np.zeros_like(u_total_c)  # Vertical velocity 0 initially
+
+        # F. Assign to Cell Variables
+        variables.cell_vars[inner_slice + (VI.RHO,)] = rho_total_c
+        variables.cell_vars[inner_slice + (VI.RHOU,)] = rho_total_c * u_total_c
+        variables.cell_vars[inner_slice + (VI.RHOV,)] = rho_total_c * v_total_c
+        variables.cell_vars[inner_slice + (VI.RHOW,)] = rho_total_c * w_total_c
+        variables.cell_vars[inner_slice + (VI.RHOY,)] = rhoY_total_c
+        variables.cell_vars[inner_slice + (VI.RHOX,)] = 0.0
+
+        # ------------------------------------------------------------------
+        # 3. Initialize MPV on Nodes
+        # ------------------------------------------------------------------
+        XN, YN, ZN = self._get_coordinates_3d(grid, inner_slice, nodal=True)
+
+        # Calculate perturbation on nodes
+        pi_pert_n, _, _, _ = self._gaussian_perturbation(XN, YN, ZN, H_scale)
+
+        rhoY0_nodes = self._reshape_hydrostate_into_3D(variables, mpv, rhoY0_nodes_1d, nodal=True)
+
+        # Assign p2 (Exner perturbation / Msq)
+        # Standard formulation: p2 represents the Exner pressure perturbation scaled by Msq.
+        mpv.p2_nodes[inner_slice] = pi_pert_n / Msq
+        # mpv.p2_nodes[inner_slice] = 0.0
+
+        print("Initialization complete.")

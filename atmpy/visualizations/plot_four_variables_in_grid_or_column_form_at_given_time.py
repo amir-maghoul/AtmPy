@@ -7,8 +7,19 @@ from pathlib import Path
 # ==========================================
 # 1. USER CONFIGURATION
 # ==========================================
-FILE_PATH = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/_baroclinic_qg_vortex_40_10_40_N_10_cor_1000_QG_on_Hfac_4_QGprojection.nc"
+# FILE_PATH = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/_baroclinic_qg_vortex_40_10_40_N_10_cor_1000_QG_on_Hfac_4_QGprojection.nc"
 # FILE_PATH = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/_baroclinic_qg_vortex_40_10_40.nc"
+# FILE_PATH = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/long_simulation/_traveling_vortex_3d_40_3_40_t3_incomp.nc"
+# FILE_PATH = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/long_simulation/_traveling_vortex_3d_80_3_80_t3_incomp_balanced.nc"
+# FILE_PATH = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/long_simulation/_traveling_vortex_3d_80_3_80_t3_full_comp_balanced.nc"
+# FILE_PATH = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/long_simulation/_traveling_vortex_3d_80_3_80_t1_full_comp.nc"
+# FILE_PATH = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/long_simulation/_traveling_vortex_3d_80_3_80_t1_incomp.nc"
+# FILE_PATH = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/_traveling_vortex_3d_80_3_80_cor_1_incomp.nc"
+FILE_PATH = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/new_simulations/_traveling_vortex_3d_80_3_80_fac=1_a=1_ac=1_t_3_incomp_pr.nc"
+
+
+
+
 
 # --- Visual Configuration ---
 # 1. Color Blind Friendliness Switch
@@ -20,8 +31,8 @@ USE_COLORBLIND_SAFE = True
 LAYOUT_MODE = 'grid'
 
 # 3. Plotting Selection
-TIME_INDEX = 0
-SLICE_DIM = 'z'
+TIME_INDEX = -1
+SLICE_DIM = 'y'
 SLICE_VAL = 0.0
 
 # Toggle Perturbation Plotting (Calculates Field - Mean)
@@ -44,8 +55,8 @@ plt.rcParams.update({
     'font.size': 14,
     'axes.titlesize': 16,
     'axes.labelsize': 14,
-    'xtick.labelsize': 12,
-    'ytick.labelsize': 12,
+    'xtick.labelsize': 14,
+    'ytick.labelsize': 14,
     'figure.dpi': 150
 })
 
@@ -203,6 +214,7 @@ def plot_variable(ax, spec, plot_data, is_perturbation):
     # Colorbar
     cbar = plt.colorbar(cf, ax=ax, orientation='vertical', shrink=0.8)
     cbar.ax.ticklabel_format(style='sci', scilimits=(-1, 1), axis='y', useMathText=True)
+    cbar.ax.tick_params(labelsize=15)
 
 
 def create_dashboard():

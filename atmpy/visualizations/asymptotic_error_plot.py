@@ -11,7 +11,7 @@ from matplotlib.ticker import LogLocator, LogFormatterMathtext
 # ==========================================
 # USER CONFIGURATION
 # ==========================================
-DATA_FOLDER = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/asymptotics/80_3_80_full/"
+DATA_FOLDER = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/traveling_vortex_3d/asymptotics/80_3_80_qg/redundant/"
 # DATA_FOLDER = "/home/amir/Projects/Python/Atmpy/atmpy/output_data/baroclinic_qg_vortex/asymptotics/40_10_40_full/"
 
 
